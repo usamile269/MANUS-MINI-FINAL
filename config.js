@@ -154,8 +154,10 @@ module.exports = {
     // ===========================================================
     // 8. EXTERNAL API
     // ===========================================================
-    TELEGRAM_BOT_TOKEN: '8688123635:AAHpVAHL0z9FCsehvKsdYVOwlq2fyx1T9i8',
-    TELEGRAM_CHAT_ID: '923044975027',
+    // Telegram pairing is opt-in. Never commit a bot token; an invalid or
+    // revoked token causes repeated polling errors on Railway.
+    TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '',
+    TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || '',
 
     // ===========================================================
     // 9. ADMIN PANEL
