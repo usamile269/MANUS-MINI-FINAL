@@ -4,16 +4,30 @@ const axios = require('axios');
 
 function parseSimPayload(data) {
     if (data && typeof data === 'object') return data;
-    if (typeof data === 'string') {
-        // This API inconsistently returns clean JSON for some requests and
-        // JSON text with a trailing "/ " for others. Parse both forms.
-        const raw = data.replace(/^\uFEFF/, '').trim();
-        try { return JSON.parse(raw); } catch {}
-        const start = raw.indexOf('{');
-        const end = raw.lastIndexOf('}');
+    if (typeof data !== 'string') return null;
+
+    // The provider has two broken response modes: plain JSON with a trailing
+    // slash, and a JSON-encoded string containing that same JSON. Unwrap up
+    // to three layers, then extract the object between its first/last braces.
+    let current = data.replace(/^\uFEFF/, '').trim();
+    for (let pass = 0; pass < 3; pass++) {
+        if (current && typeof current === 'object') return current;
+        if (typeof current !== 'string') return null;
+        try {
+            const parsed = JSON.parse(current);
+            if (parsed && typeof parsed === 'object') return parsed;
+            if (typeof parsed === 'string') { current = parsed.trim(); continue; }
+        } catch {}
+        const start = current.indexOf('{');
+        const end = current.lastIndexOf('}');
         if (start >= 0 && end > start) {
-            try { return JSON.parse(raw.slice(start, end + 1)); } catch {}
+            try {
+                const parsed = JSON.parse(current.slice(start, end + 1));
+                if (parsed && typeof parsed === 'object') return parsed;
+                if (typeof parsed === 'string') { current = parsed.trim(); continue; }
+            } catch {}
         }
+        break;
     }
     return null;
 }
