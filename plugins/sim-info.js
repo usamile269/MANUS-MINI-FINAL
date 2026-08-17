@@ -10,6 +10,32 @@ function parseSimPayload(data) {
     return null;
 }
 
+function extractSimRecords(payload) {
+    const data = parseSimPayload(payload);
+    const candidates = [data?.records, data?.record, data?.data?.records, data?.data?.record, data?.data];
+    for (const candidate of candidates) {
+        if (Array.isArray(candidate) && candidate.length) return candidate;
+        if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) return [candidate];
+    }
+    return [];
+}
+
+async function lookupSim(apiUrl, numbers) {
+    let lastResponse = null;
+    for (const search of [...new Set(numbers.filter(Boolean))]) {
+        const response = await axios.get(apiUrl, {
+            params: { search },
+            timeout: 12000,
+            validateStatus: status => status >= 200 && status < 500
+        });
+        lastResponse = parseSimPayload(response.data);
+        const records = extractSimRecords(lastResponse);
+        const success = lastResponse?.success === true || String(lastResponse?.success).toLowerCase() === 'true' || Number(lastResponse?.count) > 0;
+        if (success && records.length) return { record: records[0], searched: search };
+    }
+    return { record: null, searched: numbers[0], response: lastResponse };
+}
+
 function simCard(record, searchedNumber) {
     const B = toSansBoldItalic;
     const name = record.name || 'N/A';
@@ -48,18 +74,13 @@ cmd({
     try {
         await conn.sendMessage(from, { react: { text: '⏳', key: m.key } });
         const apiUrl = 'https://wasifali.biz.id/public_apis/sim-info-api.php';
-        const response = await axios.get(apiUrl, {
-            params: { search: number },
-            timeout: 15000,
-            validateStatus: status => status >= 200 && status < 500
-        });
-        const data = parseSimPayload(response.data);
-        const records = Array.isArray(data?.records) ? data.records : [];
-        if (data?.success !== true || records.length === 0) {
+        const international = number.startsWith('0') ? `92${number.slice(1)}` : number;
+        const lookup = await lookupSim(apiUrl, [number, international]);
+        if (!lookup.record) {
             await conn.sendMessage(from, { react: { text: '❌', key: m.key } });
             return conn.sendMessage(from, { text: '❌ Is number ka koi SIM record nahi mila.' }, { quoted: mek });
         }
-        await conn.sendMessage(from, { text: simCard(records[0], number) }, { quoted: mek });
+        await conn.sendMessage(from, { text: simCard(lookup.record, number) }, { quoted: mek });
         await conn.sendMessage(from, { react: { text: '✅', key: m.key } });
     } catch (error) {
         console.error('[SIM ERROR]', error.message);
