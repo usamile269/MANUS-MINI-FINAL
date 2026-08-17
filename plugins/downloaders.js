@@ -444,7 +444,9 @@ async function getJawadTechResult(videoUrl) {
 
 async function getAdeelXtechVideoLink(videoUrl) {
     const apiUrl = `https://adeel-xtech-apis.vercel.app/api/ytmp4?url=${encodeURIComponent(videoUrl)}`;
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
+    // Live-tested pasted endpoint: commonly responds in several seconds,
+    // so give it a bounded 12s window instead of the generic 3s API timeout.
+    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 12000 });
     return (data?.status && data?.result?.video_download) || null;
 }
 
@@ -502,17 +504,12 @@ async function getVredenAudioLink(videoUrl) {
 // sometimes crawls" pattern. One short retry catches those transient blips
 // without meaningfully slowing down the common case where it just works.
 //
-// 🚨 EMPTIED (Bunty: "jo fail hai sab nikal do, only jo working wo rakho")
-// — across every single log Bunty's sent in this whole debugging session,
-// NONE of AdeelXtech/EliteProTech/Yupra ever once succeeded for video:
-// AdeelXtech = timeout every time, Yupra = timeout every time, EliteProTech
-// now returns 410 Gone (the endpoint's been permanently removed, not just
-// down). The only quick video source that's actually worked is JawadTech's
-// direct-URL fast path, which runs separately before this chain even
-// starts (see the ytmp4 command handler). Leaving this array empty means
-// a dead JawadTech attempt falls straight to yt-dlp instead of burning
-// another 9-10s probing three endpoints that have never once worked.
-const VIDEO_LINK_PROVIDERS = [];
+// Live-tested provider order. Adeel XTech returned HTTP 200 with a valid
+// video_download URL and its media endpoint returned video/mp4. Keep this
+// fast path before yt-dlp; failed/slow responses still fall through safely.
+const VIDEO_LINK_PROVIDERS = [
+    { name: 'AdeelXTech', method: getAdeelXtechVideoLink }
+];
 
 async function raceQuickApis(videoUrl) {
     let lastError;
@@ -1205,27 +1202,32 @@ async (conn, mek, m, { reply, args, from }) => {
         // exactly as before if this doesn't pan out.
         try {
             const jt = await getJawadTechResult(video.url);
-            // 🚨 SPEED FIX (Ahmad screenshot: logs showed WhatsApp itself
-            // failing to fetch the returned ydl.ymcdn.org URL, then the
-            // @lid-resolver retry (main.js) fetching that SAME broken URL a
-            // second time with no cap — two full unbounded fetch failures
-            // back to back before this ever fell through. A dead/unfetchable
-            // link is exactly the risk called out in the comment above this
-            // block ("if the link expires fast or WhatsApp can't fetch it,
-            // the video just never arrives") — bounding it with a race
-            // means that risk now costs at most 12s instead of whatever
-            // Baileys' own fetch+retry timeout happens to be.
-            await Promise.race([
-                conn.sendMessage(from, {
-                    video: { url: jt.mp4 },
-                    mimetype: 'video/mp4',
-                    caption: dlBox('YOUTUBE MP4', [`🎬 ${(jt.title || video.title)?.slice(0,50)}`], '🎬'),
-                    contextInfo: chanCtx()
-                }, { quoted: fakevCard }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('JawadTech direct-URL send timed out')), 12000))
-            ]);
+            // The pasted implementation handed WhatsApp a remote URL. That
+            // is unreliable because Baileys/WhatsApp may fail to fetch an
+            // expiring provider URL, especially in groups. Download the
+            // verified MP4 ourselves with strict size/time limits, then send
+            // the actual bytes; this is much more reliable while still
+            // bypassing yt-dlp and YouTube bot-check on the fast path.
+            const media = await axios.get(jt.mp4, {
+                responseType: 'arraybuffer',
+                timeout: 60000,
+                maxContentLength: 30 * 1024 * 1024,
+                maxBodyLength: 30 * 1024 * 1024
+            });
+            const videoBuffer = Buffer.from(media.data);
+            const isMp4 = videoBuffer.length >= 15000 && (
+                videoBuffer.subarray(4, 8).toString() === 'ftyp' ||
+                videoBuffer.subarray(0, 8).toString().includes('ftyp')
+            );
+            if (!isMp4) throw new Error('JawadTech returned invalid MP4 bytes');
+            await sendWithRetry(conn, from, {
+                video: videoBuffer,
+                mimetype: 'video/mp4',
+                caption: dlBox('YOUTUBE MP4', [`🎬 ${(jt.title || video.title)?.slice(0,50)}`], '🎬'),
+                contextInfo: chanCtx()
+            }, { quoted: fakevCard });
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            console.log(`[YTMP4] JawadTech direct-URL path took ${Date.now() - __dlStart}ms`);
+            console.log(`[YTMP4] JawadTech buffered path took ${Date.now() - __dlStart}ms (${videoBuffer.length} bytes)`);
             return;
         } catch (e) {
             console.log('[YTMP4] JawadTech fast path failed, falling back:', e.message);
