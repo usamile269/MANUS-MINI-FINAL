@@ -574,7 +574,12 @@ const MAX_QUICKAPI_AUDIO_BYTES = 20 * 1024 * 1024;
 // ever actually worked in this whole debugging session, so .play now skips
 // straight to yt-dlp instead of burning ~9s probing dead endpoints first.
 // If a genuinely working free API turns up later, add it back here.
-const AUDIO_LINK_PROVIDERS = [];
+// JawadTech is restored as the first .play provider because its live endpoint
+// currently returns an MP3 link in about a second. The short media timeout keeps
+// a dead/expired CDN link from delaying the normal fallback chain.
+const AUDIO_LINK_PROVIDERS = [
+    { name: 'JawadTech', method: async url => (await getJawadTechResult(url)).mp3 }
+];
 
 async function getQuickAudioBuffer(videoUrl) {
     let lastError;
@@ -584,7 +589,7 @@ async function getQuickAudioBuffer(videoUrl) {
             if (!link) throw new Error(`${provider.name}: no usable result`);
             const res = await axios.get(link, {
                 responseType: 'arraybuffer',
-                timeout: 20000,
+                timeout: 7000,
                 family: 4,
                 maxContentLength: MAX_QUICKAPI_AUDIO_BYTES,
                 maxBodyLength: MAX_QUICKAPI_AUDIO_BYTES,
@@ -602,11 +607,23 @@ async function getQuickAudioBuffer(videoUrl) {
 }
 
 async function dlAudio(videoUrl, outPath) {
-    // One shared fast path for .play/.song: resolve a real public MP4 from
+    // Fastest .play path: JawadTech's direct MP3, with validation. If its CDN
+    // link is expired or unavailable, continue immediately to the shared MP4
+    // provider path and then yt-dlp; no error is exposed until all fallbacks
+    // have failed.
+    try {
+        const quickAudio = await getQuickAudioBuffer(videoUrl);
+        fs.writeFileSync(outPath, quickAudio);
+        if (isLikelyAudio(quickAudio)) return;
+        try { fs.unlinkSync(outPath); } catch {}
+    } catch (e) {
+        console.log('[YTMP3] JawadTech direct-audio path failed, using shared video path:', e.message);
+    }
+
+    // One shared fallback path for .play/.song: resolve a real public MP4 from
     // the same providers as .video, fetch it with the range-aware media
-    // helper, then extract audio once. This avoids probing dead audio APIs
-    // and avoids waiting for a 120s yt-dlp bot-check before trying a working
-    // provider.
+    // helper, then extract audio once. This avoids waiting for a 120s yt-dlp
+    // bot-check before trying a working provider.
     try {
         const videoBuf = await raceVideoMedia(videoUrl);
         const tempVideoPath = outPath.replace(/\.mp3$/, '_shared_temp.mp4');
@@ -1024,31 +1041,21 @@ async (conn, mek, m, { reply, args, from }) => {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const started = Date.now();
         const video = await ytSearch(query);
-        let resolved;
+        // Restored from the previously fast, working implementation: resolve
+        // and fetch the provider media once inside the bounded queue, then send
+        // the bytes directly. This avoids WhatsApp performing a slow/unstable
+        // server-side fetch of the provider URL (the 32s direct-link path).
         try {
-            resolved = await resolveVideoLink(video.url);
-            const caption = dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬');
-            // Fastest video path: WhatsApp fetches the provider CDN directly;
-            // do not download the entire MP4 into Railway RAM first.
-            await sendWithRetry(conn, from, { video: { url: resolved.link }, mimetype: 'video/mp4', caption, contextInfo: chanCtx() }, { quoted: fakevCard });
-            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            console.log(`[YTMP4] direct-link path (${resolved.name}) completed in ${Date.now() - started}ms`);
-            return;
-        } catch (e) {
-            console.log('[YTMP4] direct-link path failed, buffering same provider:', e.message);
-        }
-
-        // Reliability fallback: buffer the already-resolved provider link,
-        // rather than resolving/probing every provider a second time.
-        if (resolved?.link) {
-            try {
-                const buffer = await fetchMediaBuffer(resolved.link, MAX_QUICKAPI_VIDEO_BYTES, 60000);
+            await heavyQueue.run(async () => {
+                const buffer = await raceVideoMedia(video.url);
                 await sendWithRetry(conn, from, { video: buffer, mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
                 await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-                console.log(`[YTMP4] buffered-provider path completed in ${Date.now() - started}ms`);
-                return;
-            } catch (e) { console.log('[YTMP4] buffered-provider path failed:', e.message); }
-        }
+            }, async position => {
+                await replyWithRetry(conn, from, mek, `⏳ Download queue position: #${position}`);
+            });
+            console.log(`[YTMP4] shared provider completed in ${Date.now() - started}ms`);
+            return;
+        } catch (e) { console.log('[YTMP4] shared provider failed:', e.message); }
 
         outPath = path.join('/tmp', `ytvideo_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
         await heavyQueue.run(async () => {
