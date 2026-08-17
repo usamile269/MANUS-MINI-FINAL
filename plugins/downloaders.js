@@ -467,7 +467,7 @@ async function fetchMediaBuffer(mediaUrl, maxBytes, timeout = 60000) {
     return buf;
 }
 
-async function raceVideoMedia(videoUrl) {
+async function resolveVideoLink(videoUrl) {
     const providers = [
         { name: 'JawadTech', resolve: async () => (await getJawadTechResult(videoUrl)).mp4 },
         { name: 'AdeelXTech', resolve: async () => getAdeelXtechVideoLink(videoUrl) }
@@ -475,14 +475,15 @@ async function raceVideoMedia(videoUrl) {
     const attempts = providers.map(async ({ name, resolve }) => {
         const link = await resolve();
         if (!link) throw new Error(`${name}: no usable link`);
-        try {
-            return await fetchMediaBuffer(link, MAX_QUICKAPI_VIDEO_BYTES, 60000);
-        } catch (e) {
-            throw new Error(`${name}: ${e.message}`);
-        }
+        return { name, link };
     });
     try { return await Promise.any(attempts); }
     catch (e) { throw new Error((e.errors || []).map(x => x.message).join(' | ') || 'All video providers failed'); }
+}
+
+async function raceVideoMedia(videoUrl) {
+    const { link } = await resolveVideoLink(videoUrl);
+    return fetchMediaBuffer(link, MAX_QUICKAPI_VIDEO_BYTES, 60000);
 }
 
 // 🆕 (Bunty: "BUNTY_MD wali file may .song/.video fully working hai, hamare
@@ -1023,19 +1024,31 @@ async (conn, mek, m, { reply, args, from }) => {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const started = Date.now();
         const video = await ytSearch(query);
-        // Both commands now use this exact same queued, concurrent provider
-        // race. No second legacy API path is probed before this one.
+        let resolved;
         try {
-            await heavyQueue.run(async () => {
-                const buffer = await raceVideoMedia(video.url);
+            resolved = await resolveVideoLink(video.url);
+            const caption = dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬');
+            // Fastest video path: WhatsApp fetches the provider CDN directly;
+            // do not download the entire MP4 into Railway RAM first.
+            await sendWithRetry(conn, from, { video: { url: resolved.link }, mimetype: 'video/mp4', caption, contextInfo: chanCtx() }, { quoted: fakevCard });
+            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
+            console.log(`[YTMP4] direct-link path (${resolved.name}) completed in ${Date.now() - started}ms`);
+            return;
+        } catch (e) {
+            console.log('[YTMP4] direct-link path failed, buffering same provider:', e.message);
+        }
+
+        // Reliability fallback: buffer the already-resolved provider link,
+        // rather than resolving/probing every provider a second time.
+        if (resolved?.link) {
+            try {
+                const buffer = await fetchMediaBuffer(resolved.link, MAX_QUICKAPI_VIDEO_BYTES, 60000);
                 await sendWithRetry(conn, from, { video: buffer, mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
                 await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            }, async position => {
-                await replyWithRetry(conn, from, mek, `⏳ Download queue position: #${position}`);
-            });
-            console.log(`[YTMP4] shared provider completed in ${Date.now() - started}ms`);
-            return;
-        } catch (e) { console.log('[YTMP4] shared provider failed:', e.message); }
+                console.log(`[YTMP4] buffered-provider path completed in ${Date.now() - started}ms`);
+                return;
+            } catch (e) { console.log('[YTMP4] buffered-provider path failed:', e.message); }
+        }
 
         outPath = path.join('/tmp', `ytvideo_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
         await heavyQueue.run(async () => {
