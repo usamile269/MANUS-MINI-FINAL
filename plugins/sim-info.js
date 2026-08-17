@@ -5,7 +5,15 @@ const axios = require('axios');
 function parseSimPayload(data) {
     if (data && typeof data === 'object') return data;
     if (typeof data === 'string') {
-        try { return JSON.parse(data); } catch { return null; }
+        // This API inconsistently returns clean JSON for some requests and
+        // JSON text with a trailing "/ " for others. Parse both forms.
+        const raw = data.replace(/^\uFEFF/, '').trim();
+        try { return JSON.parse(raw); } catch {}
+        const start = raw.indexOf('{');
+        const end = raw.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            try { return JSON.parse(raw.slice(start, end + 1)); } catch {}
+        }
     }
     return null;
 }
