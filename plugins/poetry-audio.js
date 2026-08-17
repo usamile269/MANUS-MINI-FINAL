@@ -10,6 +10,7 @@ const { heavyQueue } = require('../lib/queue');
 
 const BIN = path.join(__dirname, '..', 'bin', 'poetry-yt-dlp');
 const MAX_BYTES = 35 * 1024 * 1024;
+const POETRY_CLIP_SECONDS = 18;
 const SEARCH_CACHE = new Map();
 
 function run(cmd, args, timeout = 90000) {
@@ -90,7 +91,7 @@ async function downloadToFile(url, outPath) {
 }
 
 async function toAudio(input, output) {
-    await run(require('@ffmpeg-installer/ffmpeg').path, ['-y', '-i', input, '-vn', '-c:a', 'libopus', '-b:a', '96k', '-ac', '2', '-f', 'ogg', output], 90000);
+    await run(require('@ffmpeg-installer/ffmpeg').path, ['-y', '-i', input, '-vn', '-t', String(POETRY_CLIP_SECONDS), '-c:a', 'libopus', '-b:a', '96k', '-ac', '2', '-f', 'ogg', output], 90000);
     if (!fs.existsSync(output) || fs.statSync(output).size < 2000) throw new Error('Audio extraction failed');
 }
 
@@ -163,7 +164,7 @@ async (conn, mek, m, { from, args, q, reply }) => {
                 mimetype: 'audio/ogg; codecs=opus',
                 ptt: true,
                 fileName: 'ahmad-mini-poetry.ogg',
-                caption: `🎙️ ${B('REAL POETRY AUDIO')}\n📝 ${cleanName(sourceTitle)}\n🔗 ${sourceUrl}\n\n> ${randomFooter()}`
+                caption: `🎙️ ${B('REAL POETRY AUDIO')}\n⏱️ ${B(`${POETRY_CLIP_SECONDS}-second short clip`)}\n📝 ${cleanName(sourceTitle)}\n🔗 ${sourceUrl}\n\n> ${randomFooter()}`
             }, { quoted: mek });
         }, async () => {
             await conn.sendMessage(from, { text: '⏳ Your poetry audio is in the queue. I will send the real source audio as soon as it is ready.' }, { quoted: mek });
