@@ -73,7 +73,7 @@ async function socialMedia(url) {
     const data = response.data;
     const media = (data?.medias || data?.links || []).find(x => x.type === 'video' || x.ext === 'mp4' || x.quality === 'hd') || (data?.medias || data?.links || [])[0];
     const mediaUrl = media?.url || media?.link;
-    if (!mediaUrl) throw new Error('No public media found for this link');
+    if (!mediaUrl) throw new Error('No public media was found for this link');
     return { mediaUrl, title: data.title || data.desc || 'Poetry audio', source: url };
 }
 
@@ -86,12 +86,12 @@ async function downloadToFile(url, outPath) {
         response.data.pipe(writer);
         writer.on('finish', resolve); writer.on('error', reject); response.data.on('error', reject);
     });
-    if (!fs.existsSync(outPath) || fs.statSync(outPath).size < 10000) throw new Error('media file is empty or invalid');
+    if (!fs.existsSync(outPath) || fs.statSync(outPath).size < 10000) throw new Error('The media file is empty or invalid');
 }
 
 async function toAudio(input, output) {
     await run(require('@ffmpeg-installer/ffmpeg').path, ['-y', '-i', input, '-vn', '-c:a', 'libopus', '-b:a', '96k', '-ac', '2', '-f', 'ogg', output], 90000);
-    if (!fs.existsSync(output) || fs.statSync(output).size < 2000) throw new Error('audio extraction failed');
+    if (!fs.existsSync(output) || fs.statSync(output).size < 2000) throw new Error('Audio extraction failed');
 }
 
 function cleanName(value) { return String(value || 'Poetry').replace(/[\r\n]/g, ' ').slice(0, 80); }
@@ -99,7 +99,7 @@ function cleanName(value) { return String(value || 'Poetry').replace(/[\r\n]/g, 
 cmd({ pattern: 'poetry', alias: ['poetryaudio', 'shayari'], desc: 'Send real poetry audio from public clips', category: 'download', react: '🎙️' },
 async (conn, mek, m, { from, args, q, reply }) => {
     const query = (q || args.join(' ')).trim();
-    if (!query) return reply('🎙️ Usage: .poetry Ahmad Faraz\n🔗 Ya direct TikTok/YouTube/Instagram link bhejo.');
+    if (!query) return reply('🎙️ Usage: .poetry Ahmad Faraz\n🔗 Or send a direct TikTok, YouTube, or Instagram link.');
     const work = `/tmp/poetry_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const input = `${work}.source`;
     const output = `${work}.ogg`;
@@ -166,13 +166,13 @@ async (conn, mek, m, { from, args, q, reply }) => {
                 caption: `🎙️ ${B('REAL POETRY AUDIO')}\n📝 ${cleanName(sourceTitle)}\n🔗 ${sourceUrl}\n\n> ${randomFooter()}`
             }, { quoted: mek });
         }, async () => {
-            await conn.sendMessage(from, { text: '⏳ Poetry audio queue mein hai — real audio source milte hi send hoga.' }, { quoted: mek });
+            await conn.sendMessage(from, { text: '⏳ Your poetry audio is in the queue. I will send the real source audio as soon as it is ready.' }, { quoted: mek });
         });
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
     } catch (e) {
         console.error('[POETRY AUDIO]', e.message);
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-        return reply('❌ Public real poetry audio nahi mil saka. Poet name ya direct TikTok/YouTube/Instagram link try karo.');
+        return reply('❌ No public real poetry audio was found. Try another poet name or send a direct TikTok, YouTube, or Instagram link.');
     } finally {
         for (const file of [input, output]) { try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch {} }
     }
