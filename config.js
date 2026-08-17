@@ -28,7 +28,7 @@ module.exports = {
     // ===========================================================
     SESSION_ID: process.env.SESSION_ID || "MINI BOT",
     // Hardcoded MongoDB for immediate run
-    MONGODB_URI: process.env.MONGODB_URI || 'mongodb+srv://romy6220_db_user:jCaKwpMVHVLOeqi7@cluster0.tjswwlb.mongodb.net/?appName=Cluster0',
+    MONGODB_URI: process.env.MONGODB_URI || 'mongodb+srv://ahmadshukran98_db_user:UPYzDrwRLT9byM2G@cluster0.7gngsqn.mongodb.net/?appName=Cluster0',
 
     // 🆕 (Bunty: ".url/.owner/.menu ke liye reliable upload host — kabhi
     // band na ho") — used for signed uploads via lib/cloudinary.js.
