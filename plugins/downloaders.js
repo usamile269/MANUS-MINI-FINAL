@@ -27,6 +27,23 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 
 const FOOTER = '> ' + randomFooter();
 
+// Metadata cache: repeated `.play/.song/.video` requests for the same link or
+// search term should not hit YouTube again. Entries are tiny and expire quickly;
+// media files themselves are never kept in RAM.
+const ytSearchCache = new Map();
+const YT_SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
+function rememberYtResult(key, result) {
+    const now = Date.now();
+    if (ytSearchCache.size > 500) {
+        for (const [oldKey, entry] of ytSearchCache) {
+            if (entry.expiresAt <= now) ytSearchCache.delete(oldKey);
+            if (ytSearchCache.size <= 400) break;
+        }
+    }
+    ytSearchCache.set(key, { result, expiresAt: now + YT_SEARCH_CACHE_TTL_MS });
+    return result;
+}
+
 // 🚨 SPEED FIX (Bunty: ".play/.video bohot slow" — root cause found): this
 // AXIOS_DEFAULTS timeout, plus the even longer 60s/120s timeouts on the
 // actual file-download step below, are used by an 8-deep fallback cascade
@@ -209,6 +226,10 @@ async function socialDownload(url) {
 
 // YouTube search helper
 async function ytSearch(query) {
+    const cacheKey = query.trim().toLowerCase();
+    const cached = ytSearchCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.result;
+    if (cached) ytSearchCache.delete(cacheKey);
     const isUrl = query.includes('youtube.com') || query.includes('youtu.be');
     if (isUrl) {
         // 🚀 SPEED FIX (Bunty: "downloading slow hai" — root cause found): this
@@ -226,28 +247,28 @@ async function ytSearch(query) {
                 params: { url: query, format: 'json' },
                 timeout: 6000
             });
-            return {
+            return rememberYtResult(cacheKey, {
                 url: query,
                 title: oembed.data.title,
                 duration: '', // not available via oEmbed — omitted from the preview box
                 views: '',
                 author: oembed.data.author_name || 'Unknown',
                 thumb: oembed.data.thumbnail_url
-            };
+            });
         } catch (e) {
             console.log('[YTSEARCH] oEmbed failed, falling back to yt-dlp dump-json:', e.message);
         }
         const wrap = await ensureYtDlp();
         const raw = await wrap.execPromise([query, '--dump-json', '--no-playlist', '--skip-download', ...cookieArgs()]);
         const info = JSON.parse(raw.trim().split('\n')[0]);
-        return {
+        return rememberYtResult(cacheKey, {
             url: query,
             title: info.title,
             duration: (info.duration || 0) + 's',
             views: (info.view_count || 0).toLocaleString(),
             author: info.uploader || info.channel || 'Unknown',
             thumb: info.thumbnail
-        };
+        });
     }
     // 🔍 DIAGNOSTIC FIX (Bunty: "sari api sahi hein, kuch bhi nahi chal
     // raha" — root cause found): yt-search scrapes YouTube's own search
@@ -267,7 +288,7 @@ async function ytSearch(query) {
     }
     if (!search.videos?.length) throw new Error('No results');
     const v = search.videos[0];
-    return { url: v.url, title: v.title, duration: v.timestamp, views: v.views?.toLocaleString() || '0', author: v.author?.name, thumb: v.thumbnail };
+    return rememberYtResult(cacheKey, { url: v.url, title: v.title, duration: v.timestamp, views: v.views?.toLocaleString() || '0', author: v.author?.name, thumb: v.thumbnail });
 }
 
 // 🚨 BUG FIX: dlAudio() used to write whatever bytes an API returned straight
