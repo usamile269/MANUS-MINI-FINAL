@@ -3,7 +3,7 @@ const axios = require('axios');
 const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
 const { looksLikeIdentityQuestion, identityAnswer } = require('../lib/ai-persona');
-const { smartAI, looksLikeErrorPayload } = require('../lib/ai-provider');
+const { smartAI, groqReply, looksLikeErrorPayload } = require('../lib/ai-provider');
 
 const BASE = "https://felix-rdx-unlimited-free-apis.vercel.app/api/v1/api";
 
@@ -359,26 +359,16 @@ cmd({
 
         await conn.sendMessage(from, { react: { text: "🤖", key: m.key } });
 
-        // 🆕 (Bunty: ".ai bhi wohi APIs use kare") — same Groq → OpenRouter
-        // chain as .gpt/.deepseek/.gemini, with Felix as the last-resort
-        // fallback instead of the only option.
+        const prompt = `Be friendly, helpful, and knowledgeable — answer thoroughly. Always reply in the SAME language and script the user wrote in (English, Roman Urdu, or Urdu script).\n\nUser: ${query}`;
         try {
-            const answer = await smartAI(`Be friendly, helpful, and knowledgeable — answer thoroughly. Always reply in the SAME language and script the user wrote in (English, Roman Urdu, or Urdu script).\n\nUser: ${query}`);
+            const answer = await smartAI(prompt);
             return reply(`╭═══ 🤖 AI ═══⊷\n┃❃│ ${answer}\n╰═════════════════⊷\n\n> ${randomFooter()}`);
         } catch (e) {
-            console.log('[AI] Groq+OpenRouter failed, trying Felix:', e.message);
+            console.log('[AI] shared race failed, using direct verified Groq fallback:', e.message);
         }
-
-        const res = await axios.get(`${BASE}/gptlogic`, {
-            params: { q: query, prompt: "Be friendly, helpful, and knowledgeable — answer thoroughly. Always reply in the SAME language and script the user wrote in (English, Roman Urdu, or Urdu script)." },
-            timeout: 25000
-        });
-
-        if (res.data && res.data.response && !looksLikeErrorPayload(res.data.response)) {
-            reply(`╭═══ 🤖 AI ═══⊷\n┃❃│ ${res.data.response}\n╰═════════════════⊷\n\n> ${randomFooter()}`);
-        } else {
-            reply("❌ AI failed to respond.");
-        }
+        const answer = await groqReply(prompt);
+        if (!answer || looksLikeErrorPayload(answer)) throw new Error('AI failed to respond');
+        return reply(`╭═══ 🤖 AI ═══⊷\n┃❃│ ${answer}\n╰═════════════════⊷\n\n> ${randomFooter()}`);
     } catch (e) {
         reply("❌ Error found. Please try later.");
     }

@@ -18,8 +18,6 @@ const { cmd } = require('../ahmad-core');
 const axios = require('axios');
 const { randomFooter } = require('../lib/menu-styles');
 
-const NEX_BASE = 'https://api.nexoracle.com';
-const NEX_KEY = 'free_key@maher_apis';
 const FOOTER = () => `\n\n> ${randomFooter()}`;
 
 function normalizeTikTokUsername(input) {
@@ -59,11 +57,12 @@ cmd({
 }, async (conn, mek, m, { from, q, reply }) => {
     if (!q) return reply(`💻 *GitHub Stalk*\n\nExample: .ghstalk nexoracle${FOOTER()}`);
     try {
-        const { data } = await axios.get(`${NEX_BASE}/stalking/github-user`, {
-            params: { apikey: NEX_KEY, user: q },
-            timeout: 20000
+        const username = String(q).trim().replace(/^@/, '').split(/[/?#]/)[0];
+        const { data: u } = await axios.get(`https://api.github.com/users/${encodeURIComponent(username)}`, {
+            timeout: 10000,
+            headers: { 'User-Agent': 'MANUS-MINI/1.0', Accept: 'application/vnd.github+json' },
+            validateStatus: status => status >= 200 && status < 500
         });
-        const u = data.result;
         if (!u) return reply(`❌ User not found${FOOTER()}`);
 
         const caption = `╭━━〔 💻 GITHUB STALK 〕━━┈⊷

@@ -2,7 +2,7 @@ const { cmd } = require('../ahmad-core');
 const axios = require('axios');
 const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
-const { smartAI } = require('../lib/ai-provider');
+const { smartAI, groqReply } = require('../lib/ai-provider');
 
 const FOOTER = '> ' + randomFooter();
 
@@ -20,16 +20,8 @@ async function callAI(prompt) {
     } catch (e) {
         console.log('[AI-BATCH1] Groq+OpenRouter failed, trying old chain:', e.message);
     }
-    try {
-        const res = await axios.get(`https://gpt-3-5.apis-bj-devs.workers.dev/?prompt=${encodeURIComponent(prompt)}`, { timeout: 25000 });
-        if (res.data?.reply) return res.data.reply;
-        throw new Error('empty');
-    } catch (e) {
-        const res2 = await axios.get(`https://all-in-1-ais.officialhectormanuel.workers.dev/?query=${encodeURIComponent(prompt)}&model=deepseek`, { timeout: 25000 });
-        const answer = res2.data?.response || res2.data?.reply || res2.data?.result || res2.data?.answer;
-        if (!answer) throw new Error('AI service unavailable');
-        return answer;
-    }
+    // The old workers.dev chain is dead and added up to 50 seconds of delay.
+    return await groqReply(prompt);
 }
 
 function aiCmd(pattern, alias, desc, promptBuilder, emptyMsg) {

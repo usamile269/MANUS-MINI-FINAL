@@ -51,25 +51,6 @@ cmd({
     }
 
     if (!data || !data.datalist || !data.datalist.list.length) {
-      // Fallback: NexOracle
-      try {
-        const nexRes = await axios.get(`https://api.nexoracle.com/downloader/apk?apikey=free_key@maher_apis&q=${encodeURIComponent(q)}`, { timeout: 20000 });
-        const nexData = nexRes.data?.result;
-        if (nexData && nexData.dllink) {
-          await conn.sendMessage(from, {
-            image: { url: nexData.icon },
-            caption: `╭═══ 📱 APK FOUND ═══⊷\n┃❃│ 📛 ${nexData.name}\n┃❃│ 📦 ${nexData.size || 'N/A'}\n┃❃│ ⏳ Downloading...\n╰═════════════════⊷\n\n> ${randomFooter()}`
-          }, { quoted: mek });
-          await conn.sendMessage(from, {
-            document: { url: nexData.dllink },
-            mimetype: "application/vnd.android.package-archive",
-            fileName: `${nexData.name}.apk`
-          }, { quoted: mek });
-          await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
-          return;
-        }
-      } catch (e2) { /* fall through to not-found message */ }
-
       const display = `╭═══ 📱 APK DOWNLOADER ═══⊷
 ┃❃╭──────────────
 ┃❃│ ❌ APK Not Found

@@ -3,7 +3,7 @@ const axios = require('axios');
 const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
 const { looksLikeIdentityQuestion, identityAnswer, withLanguageMatch } = require('../lib/ai-persona');
-const { smartAI, looksLikeErrorPayload } = require('../lib/ai-provider');
+const { smartAI, groqReply, looksLikeErrorPayload } = require('../lib/ai-provider');
 
 const FOOTER = '> ' + randomFooter();
 
@@ -20,15 +20,11 @@ const FOOTER = '> ' + randomFooter();
 // three chat commands: each still tries its own named model first (in case
 // those come back up), but if that fails, it lands on a host we know is up
 // instead of a second dead one.
-const FELIX_BASE = 'https://felix-rdx-unlimited-free-apis.vercel.app/api/v1/api';
-
-async function felixFallback(q) {
-    const res = await axios.get(`${FELIX_BASE}/gptlogic`, {
-        params: { q, prompt: 'Be friendly, helpful, and knowledgeable — answer thoroughly. Always reply in the SAME language and script the user wrote in (English, Roman Urdu, or Urdu script).' },
-        timeout: 25000
-    });
-    const answer = res.data && res.data.response;
-    if (looksLikeErrorPayload(answer)) throw new Error('Felix fallback returned an upstream error payload, not a real answer');
+// Verified fallback: use the same reachable Groq provider directly instead of
+// waiting on the dead Felix workers endpoint.
+async function reliableAIFallback(q) {
+    const answer = await groqReply(q);
+    if (!answer || looksLikeErrorPayload(answer)) throw new Error('Groq fallback returned no usable answer');
     return answer;
 }
 // (Groq/OpenRouter chain now lives in lib/ai-provider.js — smartAI() below
@@ -84,14 +80,15 @@ async (conn, mek, m, { reply, args, quoted, from }) => {
         } catch (e) {
             console.log('[GPT] Groq failed/skipped, trying old chain:', e.message);
         }
-        const res = await axios.get(`https://gpt-3-5.apis-bj-devs.workers.dev/?prompt=${encodeURIComponent(prompt)}`, { timeout: 20000 });
-        if (!res.data?.reply || looksLikeErrorPayload(res.data.reply)) throw new Error('No reply');
-        saveToHistory(from, q, res.data.reply);
+        // The old workers.dev GPT proxy is dead; use the proven no-key fallback directly.
+        const answer = await reliableAIFallback(prompt);
+        if (!answer) throw new Error('No reply');
+        saveToHistory(from, q, answer);
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-        reply(aiReply('GPT', res.data.reply));
+        reply(aiReply('GPT', answer));
     } catch {
         try {
-            const answer = await felixFallback(withLanguageMatch(q));
+            const answer = await reliableAIFallback(withLanguageMatch(q));
             if (!answer) throw new Error('No reply');
             saveToHistory(from, q, answer);
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
@@ -125,7 +122,7 @@ async (conn, mek, m, { reply, args, quoted, from }) => {
         reply(aiReply('DEEPSEEK AI', answer));
     } catch {
         try {
-            const answer = await felixFallback(withLanguageMatch(q));
+            const answer = await reliableAIFallback(withLanguageMatch(q));
             if (answer) {
                 await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
                 return reply(aiReply('AI (Fallback)', answer));
@@ -152,14 +149,14 @@ async (conn, mek, m, { reply, args, quoted, from }) => {
         } catch (e) {
             console.log('[GEMINI] Groq failed, trying old chain:', e.message);
         }
-        const res = await axios.get(`https://gemini-1-5-flash.bjcoderx.workers.dev/?text=${encodeURIComponent(prompt)}`, { timeout: 25000 });
-        const answer = res.data?.response || res.data?.reply || res.data?.result || res.data?.answer || (typeof res.data === 'string' ? res.data : null);
-        if (!answer || looksLikeErrorPayload(answer)) throw new Error('No reply');
+        // The old workers.dev Gemini proxy is dead; use the proven fallback directly.
+        const answer = await reliableAIFallback(prompt);
+        if (!answer) throw new Error('No reply');
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
         reply(aiReply('GEMINI 1.5', answer));
     } catch {
         try {
-            const answer = await felixFallback(withLanguageMatch(q));
+            const answer = await reliableAIFallback(withLanguageMatch(q));
             if (answer) {
                 await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
                 return reply(aiReply('AI (Fallback)', answer));
@@ -177,10 +174,15 @@ async (conn, mek, m, { reply, args, from }) => {
     if (!q) return reply('❌ Usage: .gsearch <query>\n📝 Example: .gsearch best food in Pakistan');
     try {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
-        const res = await axios.get(`https://google-search.bjcoderx.workers.dev/?q=${encodeURIComponent(q)}`, { timeout: 15000 });
-        const results = res.data?.results || res.data?.data || [];
+        // Direct HTML search fallback; the old Google worker is DNS-dead.
+        const res = await axios.get(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`, {
+            timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        const html = String(res.data || '');
+        const results = [...html.matchAll(/<a[^>]+class=\"result__a\"[^>]+href=\"([^\"]+)\"[^>]*>([\s\S]*?)<\/a>/gi)]
+            .slice(0, 5).map(m => ({ link: m[1], title: m[2].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&') }));
         if (!results.length) throw new Error('No results');
-        const lines = results.slice(0,5).map((r,i) => `${i+1}. ${r.title || r.name}\n┃❃│    🔗 ${r.link || r.url || ''}`);
+        const lines = results.map((r,i) => `${i+1}. ${r.title}\n┃❃│    🔗 ${r.link}`);
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
         reply(`╭═══ 🔍 GOOGLE SEARCH ═══⊷\n┃❃│ 🔎 Query: ${q}\n┃❃╭──────────────\n┃❃│ ${lines.join('\n┃❃│ ')}\n┃❃╰───────────────\n╰═════════════════⊷\n\n${FOOTER}`);
     } catch {
