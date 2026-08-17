@@ -131,84 +131,42 @@ cmd({
 });
 
 // ==================== TIKTOK STALK ====================
-// Uses NexOracle's tiktok-user2 endpoint (same one AURA_MD's own tiktokstalk2
-// used) instead of AURA_MD's primary tiktokstalk, which depended on a
-// Cloudflare-bypass hop through a third-party site.
+// Public, no-key implementation. TikTok's official Display API requires an
+// OAuth user access token, so it is not suitable for a zero-variable bot.
+// The public profile page contains the same public profile fields and avoids
+// the old NexOracle/TikWM endpoints that were returning 404/Cloudflare 403.
 cmd({
     pattern: 'tiktokstalk',
     alias: ['ttstalk'],
-    desc: '🎵 Look up a TikTok profile',
+    desc: '🎵 Look up a public TikTok profile',
     category: 'osint',
-    use: '.tiktokstalk <username>',
+    use: '.tiktokstalk <username or profile URL>',
     filename: __filename
 }, async (conn, mek, m, { from, q, reply }) => {
     const username = normalizeTikTokUsername(q);
-    if (!username) return reply(`🎵 *TikTok Stalk*\n\nExample: .tiktokstalk khaby.lame${FOOTER()}`);
+    if (!username) return reply(`🎵 *TikTok Stalk*\n\nExample: .tiktokstalk bunty_081${FOOTER()}`);
 
-    const sendResult = async (u) => {
+    try {
+        const u = await fetchTikTokWebProfile(username);
+        const stats = u.stats || {};
         const caption = `╭━━〔 🎵 TIKTOK STALK 〕━━┈⊷
 ┃
-┃ 👤 Username: ${u.uniqueId || u.username || username}
+┃ 👤 Username: ${u.uniqueId || username}
 ┃ 📝 Nickname: ${u.nickname || 'N/A'}
-┃ 👥 Followers: ${u.followerCount ?? 'N/A'}
-┃ 👤 Following: ${u.followingCount ?? 'N/A'}
-┃ ❤️ Likes: ${u.heartCount ?? 'N/A'}
-┃ 🎥 Videos: ${u.videoCount ?? 'N/A'}
+┃ 👥 Followers: ${u.followerCount ?? stats.followerCount ?? 'N/A'}
+┃ 👤 Following: ${u.followingCount ?? stats.followingCount ?? 'N/A'}
+┃ ❤️ Likes: ${u.heartCount ?? stats.heartCount ?? stats.heart ?? 'N/A'}
+┃ 🎥 Videos: ${u.videoCount ?? stats.videoCount ?? 'N/A'}
 ┃ 📄 Bio: ${u.signature || 'N/A'}
 ┃ ✅ Verified: ${u.verified ? 'Yes' : 'No'}
 ┃
 ╰━━━━━━━━━━━━━━━┈⊷${FOOTER()}`;
-
-        const avatar = u.avatarLarger || u.avatar;
-        if (avatar) {
-            await conn.sendMessage(from, { image: { url: avatar }, caption }, { quoted: mek });
-        } else {
-            reply(caption);
-        }
-    };
-
-    // TikTok's own public profile page embeds a complete public profile
-    // payload and is currently reachable even when third-party APIs are
-    // blocked by Cloudflare.
-    try {
-        return await sendResult(await fetchTikTokWebProfile(username));
+        const avatar = u.avatarLarger || u.avatarMedium || u.avatarThumb;
+        if (avatar) await conn.sendMessage(from, { image: { url: avatar }, caption }, { quoted: mek });
+        else await conn.sendMessage(from, { text: caption }, { quoted: mek });
     } catch (e) {
-        console.log('[TIKTOKSTALK] direct TikTok profile failed:', e.message);
-    }
-
-    try {
-        const { data } = await axios.get('https://tikwm.com/api/user/info', {
-            params: { unique_id: username },
-            timeout: 15000,
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36' }
-        });
-        if (data?.code === 0 && data?.data?.user) return await sendResult({ ...data.data.user, ...data.data.stats });
-        throw new Error(`tikwm: ${data?.msg || 'no user data'}`);
-    } catch (e) {
-        console.log('[TIKTOKSTALK] tikwm failed:', e.message);
-    }
-
-    // Fallback: NexOracle (kept in case it comes back / tikwm rate-limits).
-    try {
-        const { data } = await axios.get(`${NEX_BASE}/stalking/tiktok-user2`, {
-            params: { apikey: NEX_KEY, user: username },
-            timeout: 20000
-        });
-        const u = data.result;
-        if (!u) return reply(`❌ User not found${FOOTER()}`);
-        await sendResult(u);
-    } catch (e) {
-        // 🔧 Bunty: was only logging e.message, which for an HTTP error just
-        // says "Request failed with status code 4xx/5xx" — no way to tell
-        // WHY it failed. Now logs the actual response status + body from
-        // NexOracle so the real cause (bad key, wrong param, endpoint
-        // renamed/down, rate limit, etc.) shows up in console next time.
-        console.log('[TIKTOKSTALK] error:', e.message);
-        if (e.response) {
-            console.log('[TIKTOKSTALK] status:', e.response.status);
-            console.log('[TIKTOKSTALK] body:', JSON.stringify(e.response.data));
-        }
-        reply(`❌ User not found or API error${FOOTER()}`);
+        console.log('[TIKTOKSTALK] public profile failed:', e.message);
+        await conn.sendMessage(from, { text: `❌ Public TikTok profile not found or temporarily unavailable.${FOOTER()}` }, { quoted: mek });
     }
 });
 
