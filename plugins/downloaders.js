@@ -450,6 +450,41 @@ async function getAdeelXtechVideoLink(videoUrl) {
     return (data?.status && data?.result?.video_download) || null;
 }
 
+async function fetchMediaBuffer(mediaUrl, maxBytes, timeout = 60000) {
+    const response = await axios.get(mediaUrl, {
+        responseType: 'arraybuffer',
+        timeout,
+        family: 4,
+        maxContentLength: maxBytes,
+        maxBodyLength: maxBytes,
+        // These public media CDNs return a complete stream reliably as 206;
+        // without the open-ended range some valid links answer 403/410.
+        headers: { 'User-Agent': 'Mozilla/5.0', Range: 'bytes=0-' }
+    });
+    if (![200, 206].includes(response.status)) throw new Error(`media HTTP ${response.status}`);
+    const buf = Buffer.from(response.data);
+    if (buf.length < 15000) throw new Error('media file too small');
+    return buf;
+}
+
+async function raceVideoMedia(videoUrl) {
+    const providers = [
+        { name: 'JawadTech', resolve: async () => (await getJawadTechResult(videoUrl)).mp4 },
+        { name: 'AdeelXTech', resolve: async () => getAdeelXtechVideoLink(videoUrl) }
+    ];
+    const attempts = providers.map(async ({ name, resolve }) => {
+        const link = await resolve();
+        if (!link) throw new Error(`${name}: no usable link`);
+        try {
+            return await fetchMediaBuffer(link, MAX_QUICKAPI_VIDEO_BYTES, 60000);
+        } catch (e) {
+            throw new Error(`${name}: ${e.message}`);
+        }
+    });
+    try { return await Promise.any(attempts); }
+    catch (e) { throw new Error((e.errors || []).map(x => x.message).join(' | ') || 'All video providers failed'); }
+}
+
 // 🆕 (Bunty: "BUNTY_MD wali file may .song/.video fully working hai, hamare
 // may bhi lagao, branding hamari rahay") — ported straight from that
 // confirmed-working code as extra providers in the SAME quick-API chains
@@ -508,30 +543,13 @@ async function getVredenAudioLink(videoUrl) {
 // video_download URL and its media endpoint returned video/mp4. Keep this
 // fast path before yt-dlp; failed/slow responses still fall through safely.
 const VIDEO_LINK_PROVIDERS = [
+    { name: 'JawadTech', method: async url => (await getJawadTechResult(url)).mp4 },
     { name: 'AdeelXTech', method: getAdeelXtechVideoLink }
 ];
 
 async function raceQuickApis(videoUrl) {
-    let lastError;
-    for (const provider of VIDEO_LINK_PROVIDERS) {
-        try {
-            const link = await provider.method(videoUrl);
-            if (!link) throw new Error(`${provider.name}: no usable result`);
-            const vidRes = await axios.get(link, {
-                responseType: 'arraybuffer',
-                timeout: 20000,
-                maxContentLength: MAX_QUICKAPI_VIDEO_BYTES,
-                maxBodyLength: MAX_QUICKAPI_VIDEO_BYTES
-            });
-            const buf = Buffer.from(vidRes.data);
-            if (buf.length < 15000) throw new Error(`${provider.name}: file too small`);
-            return buf;
-        } catch (e) {
-            console.log(`[QUICK-VIDEO] ${provider.name} failed:`, e.message);
-            lastError = e;
-        }
-    }
-    throw lastError || new Error('All quick-video providers failed');
+    try { return await raceVideoMedia(videoUrl); }
+    catch (e) { console.log('[QUICK-VIDEO] all providers failed:', e.message); throw e; }
 }
 
 // 🚀 EASY-MODE FIX (Bunty: ".play bhi aisay fast/no-cookies, audio wala") —
@@ -566,8 +584,10 @@ async function getQuickAudioBuffer(videoUrl) {
             const res = await axios.get(link, {
                 responseType: 'arraybuffer',
                 timeout: 20000,
+                family: 4,
                 maxContentLength: MAX_QUICKAPI_AUDIO_BYTES,
-                maxBodyLength: MAX_QUICKAPI_AUDIO_BYTES
+                maxBodyLength: MAX_QUICKAPI_AUDIO_BYTES,
+                headers: { 'User-Agent': 'Mozilla/5.0', Range: 'bytes=0-' }
             });
             const buf = Buffer.from(res.data);
             if (!isLikelyAudio(buf)) throw new Error(`${provider.name}: response not valid audio`);
@@ -581,100 +601,14 @@ async function getQuickAudioBuffer(videoUrl) {
 }
 
 async function dlAudio(videoUrl, outPath) {
-    // Easy no-cookies path first: quick direct audio link, validated then
-    // written straight to outPath — same file the rest of this function
-    // (and the caller's opus-conversion step) already expects.
+    // One shared fast path for .play/.song: resolve a real public MP4 from
+    // the same providers as .video, fetch it with the range-aware media
+    // helper, then extract audio once. This avoids probing dead audio APIs
+    // and avoids waiting for a 120s yt-dlp bot-check before trying a working
+    // provider.
     try {
-        const buf = await getQuickAudioBuffer(videoUrl);
-        fs.writeFileSync(outPath, buf);
-        return;
-    } catch (e) {
-        console.log('[YTMP3] quick no-cookies audio link failed, falling back to yt-dlp:', e.message);
-    }
-
-    // 🚨 ORDER BUG FIX (Bunty: ".play phir se slow ho gaya"): the comment
-    // right below this used to say "try yt-dlp bestaudio FIRST... the old
-    // video-API-then-strip method is now just the FALLBACK" — but the
-    // actual code order had it backwards: the slow JawadTech path (download
-    // an ENTIRE video, then strip audio with ffmpeg) was running BEFORE the
-    // fast yt-dlp bestaudio-only extraction. Every single .play that missed
-    // the quick-audio-link path was paying for a full video download it
-    // didn't need before even trying the fast option. Swapped to match
-    // what the comment always said the order should be.
-    //
-    // 🚀 SPEED FIX (Bunty: "search fast hai but download slow, seconds mein
-    // chahiye") — yt-dlp -f bestaudio downloads only the small audio-only
-    // stream directly, no wasted video bandwidth, no local re-encode of a
-    // full video.
-    //
-    // 🚀 SPEED FIX (Bunty: "download cmds slow hein"): this used to pass
-    // -x --audio-format mp3 --audio-quality 0, which makes yt-dlp run its
-    // OWN ffmpeg pass to transcode the raw downloaded stream into mp3 —
-    // and then the .play command handler (downloaders.js, ytmp3 cmd)
-    // ALWAYS runs a SECOND ffmpeg pass afterward anyway, converting that
-    // mp3 into opus/ogg (WhatsApp voice-note format). Every single .play
-    // was paying for two full audio transcodes back-to-back for no
-    // benefit — the intermediate mp3 was thrown away immediately after
-    // being created. Now yt-dlp just saves the raw bestaudio stream
-    // as-is (webm/opus or m4a, whatever YouTube serves) with no
-    // postprocessing of its own; the handler's existing single ffmpeg
-    // pass converts that raw stream straight to opus. isLikelyAudio()
-    // below and the handler's ffmpeg step both work on file BYTES, not
-    // the .mp3 name in outPath, so this is safe even though the actual
-    // container isn't really mp3 — one transcode instead of two, so this
-    // step should noticeably cut real time off every successful .play.
-    const wrap = await ensureYtDlp();
-    const fastArgs = [videoUrl, '-f', 'bestaudio/best',
-        '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
-    try {
-        await wrap.execPromise(fastArgs);
-        if (fs.existsSync(outPath) && isLikelyAudio(fs.readFileSync(outPath))) return;
-        try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
-    } catch (e) {
-        console.log('[YTMP3] fast yt-dlp bestaudio failed, falling back to JawadTech:', e.message);
-    }
-
-    // 🚀 RE-ENABLED (Bunty confirmed JawadTech working again): downloads the
-    // (small-ish, capped) video bytes and strips audio via ffmpeg — the
-    // slow path, now correctly LAST-resort-before-plain-yt-dlp instead of
-    // first.
-    try {
-        const jt = await getJawadTechResult(videoUrl);
-        const vidRes = await axios.get(jt.mp4, {
-            responseType: 'arraybuffer', timeout: 20000, family: 4,
-            maxContentLength: MAX_QUICKAPI_VIDEO_BYTES, maxBodyLength: MAX_QUICKAPI_VIDEO_BYTES
-        });
-        const tempVideoPath = outPath.replace(/\.mp3$/, '_jt_temp.mp4');
-        fs.writeFileSync(tempVideoPath, Buffer.from(vidRes.data));
-        // 🚨 MEMORY FIX (Bunty: ".play crash" — OOM risk on constrained
-        // hosts): the video is now safely on disk, so drop the in-memory
-        // copy immediately instead of holding both the Buffer AND the file
-        // for the whole ffmpeg conversion — cuts this step's peak memory
-        // roughly in half.
-        vidRes.data = null;
-        try {
-            await new Promise((resolve, reject) => {
-                ffmpeg(tempVideoPath).noVideo().audioCodec('libmp3lame').audioBitrate('128k').format('mp3')
-                    .on('end', resolve).on('error', reject).save(outPath);
-            });
-        } finally {
-            try { fs.unlinkSync(tempVideoPath); } catch {}
-        }
-        if (fs.existsSync(outPath) && isLikelyAudio(fs.readFileSync(outPath))) return;
-        try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
-    } catch (e) {
-        console.log('[YTMP3] JawadTech fallback failed, falling back to quick API race:', e.message);
-    }
-
-    let videoBuf = null;
-    try {
-        videoBuf = await raceQuickApis(videoUrl);
-    } catch (e) {
-        const msgs = (e.errors || [e]).map(x => x.message).join(' | ');
-        console.log('[YTMP3] quick API fallback also failed:', msgs);
-    }
-    if (videoBuf) {
-        const tempVideoPath = outPath.replace(/\.mp3$/, '_race_temp.mp4');
+        const videoBuf = await raceVideoMedia(videoUrl);
+        const tempVideoPath = outPath.replace(/\.mp3$/, '_shared_temp.mp4');
         fs.writeFileSync(tempVideoPath, videoBuf);
         try {
             await new Promise((resolve, reject) => {
@@ -685,12 +619,25 @@ async function dlAudio(videoUrl, outPath) {
             try { fs.unlinkSync(tempVideoPath); } catch {}
         }
         if (fs.existsSync(outPath) && isLikelyAudio(fs.readFileSync(outPath))) return;
+        try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
+    } catch (e) {
+        console.log('[YTMP3] shared provider path failed, using direct audio fallback:', e.message);
     }
 
-    // Last resort: plain yt-dlp extraction without forcing bestaudio, in case
-    // that format simply isn't available for this video.
-    const args = [videoUrl, '-x', '--audio-format', 'mp3', '--audio-quality', '0',
-        '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
+    // Direct audio-only yt-dlp is the next path: one small stream and one
+    // conversion in the command handler, with cookies if the host has them.
+    const wrap = await ensureYtDlp();
+    const fastArgs = [videoUrl, '-f', 'bestaudio/best', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
+    try {
+        await wrap.execPromise(fastArgs);
+        if (fs.existsSync(outPath) && isLikelyAudio(fs.readFileSync(outPath))) return;
+        try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
+    } catch (e) {
+        console.log('[YTMP3] direct bestaudio failed:', e.message);
+    }
+
+    // Last-resort extraction for formats where bestaudio is unavailable.
+    const args = [videoUrl, '-x', '--audio-format', 'mp3', '--audio-quality', '0', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
         await wrap.execPromise(args);
     } catch (e) {
@@ -698,7 +645,7 @@ async function dlAudio(videoUrl, outPath) {
     }
     if (!fs.existsSync(outPath) || !isLikelyAudio(fs.readFileSync(outPath))) {
         try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
-        throw new Error('yt-dlp: no valid audio produced (bot-check likely — check /cookies.txt)');
+        throw new Error('yt-dlp: no valid audio produced (provider/CDN or bot-check blocked the source)');
     }
 }
 
@@ -1024,289 +971,89 @@ async (conn, mek, m, { reply, args, from, q }) => {
 // 7. ytmp3 / song / play
 cmd({ pattern: 'ytmp3', alias: ['song', 'play'], desc: 'Download YouTube as MP3', category: 'download', react: '🎵' },
 async (conn, mek, m, { reply, args, from }) => {
-    const query = args.join(' ');
-    if (!query) return reply(dlBox('YOUTUBE MP3', ['❌ Song name ya link do!', '📝 .play <song name>', '🔗 .play <youtube link>'], '🎵'));
-    if (!YTDlpWrapLib) return reply('❌ Run npm install on the server: yt-dlp-wrap');
-    let outPath, opusPath; // declared here (not inside try) so the catch block can clean them up too
+    const query = args.join(' ').trim();
+    if (!query) return reply(dlBox('YOUTUBE MP3', ['❌ Song name or YouTube link required', '📝 .play <song name>', '🔗 .play <YouTube link>'], '🎵'));
+    if (!YTDlpWrapLib) return reply('❌ yt-dlp is unavailable on this server.');
+    let outPath;
     try {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
-        const __searchStart = Date.now();
+        const started = Date.now();
         const video = await ytSearch(query);
-        console.log(`[YTMP3] search took ${Date.now() - __searchStart}ms`);
-
-        // 🚀 SPEED FIX (Bunty: ".video fast hai but .play slow, kabhi download
-        // ke baad kuch nahi aata"): getQuickAudioBuffer() already existed
-        // (built for exactly this) but was never actually called here — this
-        // handler went straight to yt-dlp + local ffmpeg conversion every
-        // single time, which is the heavy/slow path AND the one most likely
-        // to silently hang or fail with no message (yt-dlp cookies issues,
-        // ffmpeg conversion errors). Try the quick direct-audio API first,
-        // same pattern .video already uses successfully; only fall through
-        // to yt-dlp below if it fails.
-        try {
-            const __quickStart = Date.now();
-            const quickBuf = await getQuickAudioBuffer(video.url);
-            console.log(`[YTMP3] quick-API path took ${Date.now() - __quickStart}ms`);
+        outPath = path.join('/tmp', `ytaudio_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`);
+        await heavyQueue.run(async () => {
             await conn.sendMessage(from, {
                 image: { url: video.thumb },
-                caption: dlBox('YOUTUBE MP3', [
-                    `🎵 ${video.title?.slice(0, 50)}`,
-                    `👤 ${video.author}`,
-                    ...(video.duration ? [`⏱️ ${video.duration}`] : []),
-                    `✅ Downloaded!`
-                ], '🎵'),
+                caption: dlBox('YOUTUBE MP3', [`🎵 ${video.title?.slice(0, 60)}`, `👤 ${video.author || 'YouTube'}`, '⏳ Downloading...'], '🎵'),
                 contextInfo: chanCtx()
-            }, { quoted: fakevCard }).catch(e => console.log('[YTMP3] quick thumbnail send failed (non-fatal):', e.message));
-            const { mimetype, ext } = detectAudioFormat(quickBuf);
-            await sendWithRetry(conn, from, {
-                audio: quickBuf,
-                mimetype,
-                fileName: `${video.title?.slice(0,30)}.${ext}`,
-                ptt: false
-            }, { quoted: fakevCard });
+            }, { quoted: fakevCard }).catch(e => console.log('[YTMP3] preview failed:', e.message));
+            await dlAudio(video.url, outPath);
+            const audio = fs.readFileSync(outPath);
+            let sent = false;
+            const opusPath = outPath.replace(/\.mp3$/, '.ogg');
+            try {
+                await new Promise((resolve, reject) => ffmpeg(outPath).audioCodec('libopus').audioBitrate('64k').audioChannels(1).format('ogg').on('end', resolve).on('error', reject).save(opusPath));
+                await sendWithRetry(conn, from, { audio: fs.readFileSync(opusPath), mimetype: 'audio/ogg; codecs=opus', ptt: false }, { quoted: fakevCard });
+                sent = true;
+            } catch (e) { console.log('[YTMP3] opus conversion failed:', e.message); }
+            if (!sent) await sendWithRetry(conn, from, { audio, mimetype: detectAudioFormat(audio).mimetype, fileName: `${video.title?.slice(0, 35) || 'audio'}.mp3`, ptt: false }, { quoted: fakevCard });
+            try { fs.unlinkSync(opusPath); } catch {}
+            try { fs.unlinkSync(outPath); } catch {}
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            return;
-        } catch (e) {
-            console.log('[YTMP3] quick-API path failed, falling back to yt-dlp:', e.message);
-        }
-
-        outPath = path.join('/tmp', `ytaudio_${Date.now()}.mp3`);
-        // 🆕 QUEUE (crash prevention): the heavy yt-dlp download + ffmpeg
-        // opus conversion below is the CPU/RAM-intensive part. If it's busy
-        // (4 already running), this waits its turn and tells the user
-        // instead of piling on top and risking a crash under load.
-        await heavyQueue.run(async () => {
-        const __dlStart = Date.now();
-        // 🚨 BUG FIX (Bunty: "gc mein .video/.play 'Download failed!' deta,
-        // private mein chal jaata"): Promise.all rejects the INSTANT any one
-        // of its promises rejects — the thumbnail/caption send here wasn't
-        // wrapped in its own catch, so if THAT send failed (groups are more
-        // prone to this: bigger payload, occasional rate-limits/hiccups
-        // sending media into a group vs a private DM), the whole Promise.all
-        // threw and aborted the ENTIRE command with a generic "Download
-        // failed!" — even when the actual audio download had succeeded or
-        // was still in progress. The thumbnail is cosmetic; its failure
-        // should never cancel the real download.
-        const [__] = await Promise.all([
-            dlAudio(video.url, outPath),
-            conn.sendMessage(from, {
-                image: { url: video.thumb },
-                caption: dlBox('YOUTUBE MP3', [
-                    `🎵 ${video.title?.slice(0, 50)}`,
-                    `👤 ${video.author}`,
-                    ...(video.duration ? [`⏱️ ${video.duration}`] : []),
-                    ...(video.views ? [`👁️ ${video.views}`] : []),
-                    `⏳ Downloading...`
-                ], '🎵'),
-                contextInfo: chanCtx()
-            }, { quoted: fakevCard }).catch(e => console.log('[YTMP3] thumbnail send failed (non-fatal):', e.message))
-        ]);
-        console.log(`[YTMP3] download took ${Date.now() - __dlStart}ms`);
-        if (!fs.existsSync(outPath)) throw new Error('Failed');
-
-        // 🚨 BUG FIX: sending the raw downloaded bytes (mp3/m4a/whatever) with
-        // a guessed mimetype kept producing "audio not available" on WhatsApp.
-        // The bot's OWN .menu voice note plays reliably every time because it
-        // converts to ogg/opus (WhatsApp's own native voice-note codec) via
-        // ffmpeg before sending — so do the exact same conversion here instead
-        // of trying to just get the mimetype label right on the raw file.
-        opusPath = path.join('/tmp', `ytaudio_opus_${Date.now()}.ogg`);
-        let sentAsOpus = false;
-        try {
-            const __convStart = Date.now();
-            await new Promise((resolve, reject) => {
-                ffmpeg(outPath)
-                    .audioCodec('libopus')
-                    .audioBitrate('64k')
-                    .audioChannels(1)
-                    .outputOptions(['-compression_level 0', '-application audio'])
-                    .format('ogg')
-                    .on('end', resolve)
-                    .on('error', reject)
-                    .save(opusPath);
-            });
-            console.log(`[YTMP3] opus conversion took ${Date.now() - __convStart}ms`);
-            const __uploadStart = Date.now();
-            await sendWithRetry(conn, from, {
-                audio: fs.readFileSync(opusPath),
-                mimetype: 'audio/ogg; codecs=opus',
-                ptt: false
-            }, { quoted: fakevCard });
-            console.log(`[YTMP3] upload took ${Date.now() - __uploadStart}ms`);
-            sentAsOpus = true;
-            fs.unlink(opusPath, () => {});
-        } catch (e) {
-            console.log('[YTMP3 OPUS CONVERT] failed, falling back to raw file:', e.message);
-            // 🚨 STORAGE FIX: a failed ffmpeg conversion can still leave a
-            // partial/corrupt .ogg file on disk — clean it up immediately
-            // instead of leaving it orphaned in /tmp.
-            try { if (fs.existsSync(opusPath)) fs.unlinkSync(opusPath); } catch {}
-        }
-
-        if (!sentAsOpus) {
-            // Fallback: original behavior, in case ffmpeg conversion itself fails.
-            const audioBuf = fs.readFileSync(outPath);
-            const { mimetype, ext } = detectAudioFormat(audioBuf);
-            const __uploadStart2 = Date.now();
-            await sendWithRetry(conn, from, {
-                audio: audioBuf,
-                mimetype,
-                fileName: `${video.title?.slice(0,30)}.${ext}`,
-                ptt: false
-            }, { quoted: fakevCard });
-            console.log(`[YTMP3] fallback upload took ${Date.now() - __uploadStart2}ms`);
-        }
-        fs.unlinkSync(outPath);
-        await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-        }, async (position) => {
-            await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
-            await replyWithRetry(conn, from, mek, `⏳ High demand right now — you're #${position} in line. Hang tight, coming right up!`);
+            console.log(`[YTMP3] completed in ${Date.now() - started}ms`);
+        }, async position => {
+            await replyWithRetry(conn, from, mek, `⏳ Download queue position: #${position}`);
         });
     } catch (e) {
-        // 🚨 STORAGE FIX: clean up any leftover temp files on any error path,
-        // instead of leaving them orphaned in /tmp forever.
         try { if (outPath && fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
-        try { if (opusPath && fs.existsSync(opusPath)) fs.unlinkSync(opusPath); } catch {}
-        await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
+        await conn.sendMessage(from, { react: { text: '❌', key: mek.key } }).catch(() => {});
         console.log('[YTMP3 FINAL ERROR]', e.message);
-        if (String(e.message).startsWith('YTSEARCH_FAILED')) {
-            await replyWithRetry(conn, from, mek, '❌ YouTube search failed (not a download issue) — paste a direct YouTube link instead of a song name and try again.');
-        } else if (/bot-check/i.test(e.message)) {
-            await replyWithRetry(conn, from, mek, '❌ YouTube bot-check blocked this (no cookies.txt) — add cookies.txt to the server root, otherwise this will often fail.');
-        } else {
-            await replyWithRetry(conn, from, mek, '❌ Download failed! Try a direct YouTube link.');
-        }
+        if (String(e.message).startsWith('YTSEARCH_FAILED')) return replyWithRetry(conn, from, mek, '❌ YouTube search failed. Paste a direct YouTube link and try again.');
+        return replyWithRetry(conn, from, mek, '❌ Download failed. Try a direct YouTube link or a shorter video.');
     }
 });
 
 // 8. ytmp4 / video
 cmd({ pattern: 'ytmp4', alias: ['video', 'yta', 'ytv'], desc: 'Download YouTube as MP4', category: 'download', react: '🎬' },
 async (conn, mek, m, { reply, args, from }) => {
-    const query = args.join(' ');
-    if (!query) return reply(dlBox('YOUTUBE MP4', ['❌ Video name ya link do!', '📝 .ytmp4 <name>'], '🎬'));
-    if (!YTDlpWrapLib) return reply('❌ Run npm install on the server: yt-dlp-wrap');
-    let outPath; // declared here (not inside try) so the catch block can clean it up too
+    const query = args.join(' ').trim();
+    if (!query) return reply(dlBox('YOUTUBE MP4', ['❌ Video name or YouTube link required', '📝 .video <name or link>'], '🎬'));
+    if (!YTDlpWrapLib) return reply('❌ yt-dlp is unavailable on this server.');
+    let outPath;
     try {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
+        const started = Date.now();
         const video = await ytSearch(query);
-        const __dlStart = Date.now();
-
-        // 🚀 FASTEST PATH (Bunty confirmed JawadTech working again): send
-        // the returned mp4 link straight to WhatsApp as a URL reference —
-        // WhatsApp fetches it directly, zero server-side download or
-        // re-upload. This is the exact pattern from Bunty's own
-        // confirmed-fast working code. Only downside: if the link expires
-        // fast or WhatsApp can't fetch it, the video just never arrives —
-        // so this is given a short window before moving on, and every
-        // other (slower but proven-reliable) path below still runs
-        // exactly as before if this doesn't pan out.
+        // Both commands now use this exact same queued, concurrent provider
+        // race. No second legacy API path is probed before this one.
         try {
-            const jt = await getJawadTechResult(video.url);
-            // The pasted implementation handed WhatsApp a remote URL. That
-            // is unreliable because Baileys/WhatsApp may fail to fetch an
-            // expiring provider URL, especially in groups. Download the
-            // verified MP4 ourselves with strict size/time limits, then send
-            // the actual bytes; this is much more reliable while still
-            // bypassing yt-dlp and YouTube bot-check on the fast path.
-            const media = await axios.get(jt.mp4, {
-                responseType: 'arraybuffer',
-                timeout: 60000,
-                maxContentLength: 30 * 1024 * 1024,
-                maxBodyLength: 30 * 1024 * 1024
+            await heavyQueue.run(async () => {
+                const buffer = await raceVideoMedia(video.url);
+                await sendWithRetry(conn, from, { video: buffer, mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
+                await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
+            }, async position => {
+                await replyWithRetry(conn, from, mek, `⏳ Download queue position: #${position}`);
             });
-            const videoBuffer = Buffer.from(media.data);
-            const isMp4 = videoBuffer.length >= 15000 && (
-                videoBuffer.subarray(4, 8).toString() === 'ftyp' ||
-                videoBuffer.subarray(0, 8).toString().includes('ftyp')
-            );
-            if (!isMp4) throw new Error('JawadTech returned invalid MP4 bytes');
-            await sendWithRetry(conn, from, {
-                video: videoBuffer,
-                mimetype: 'video/mp4',
-                caption: dlBox('YOUTUBE MP4', [`🎬 ${(jt.title || video.title)?.slice(0,50)}`], '🎬'),
-                contextInfo: chanCtx()
-            }, { quoted: fakevCard });
-            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            console.log(`[YTMP4] JawadTech buffered path took ${Date.now() - __dlStart}ms (${videoBuffer.length} bytes)`);
+            console.log(`[YTMP4] shared provider completed in ${Date.now() - started}ms`);
             return;
-        } catch (e) {
-            console.log('[YTMP4] JawadTech fast path failed, falling back:', e.message);
-        }
+        } catch (e) { console.log('[YTMP4] shared provider failed:', e.message); }
 
-        // 🚨 BUG FIX (Bunty: "gc mein Download failed!, private mein chal
-        // jaata") — same root cause as .play: the thumbnail send here wasn't
-        // caught on its own, so any hiccup sending media into a group (more
-        // common there than in a DM) rejected this whole Promise.all and
-        // aborted the real video download too. Thumbnail failure is now
-        // non-fatal.
-        const [quickResult] = await Promise.all([
-            raceQuickApis(video.url).then(buf => ({ ok: true, buf })).catch(e => ({ ok: false, e })),
-            conn.sendMessage(from, {
-                image: { url: video.thumb },
-                caption: dlBox('YOUTUBE MP4', [
-                    `🎬 ${video.title?.slice(0, 50)}`,
-                    ...(video.duration ? [`⏱️ ${video.duration}`] : []),
-                    `⏳ Downloading...`
-                ], '🎬'),
-                contextInfo: chanCtx()
-            }, { quoted: fakevCard }).catch(e => console.log('[YTMP4] thumbnail send failed (non-fatal):', e.message))
-        ]);
-        console.log(`[YTMP4] quick path took ${Date.now() - __dlStart}ms`);
-
-        // Easy no-cookies path first: actually download the video bytes
-        // (capped at 30MB — see MAX_QUICKAPI_VIDEO_BYTES — so this can never
-        // OOM the process like the old uncapped version did) and send the
-        // real file, not just a URL reference.
-        if (quickResult.ok) {
-            await sendWithRetry(conn, from, {
-                video: quickResult.buf,
-                mimetype: 'video/mp4',
-                caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0,50)}`], '🎬'),
-                contextInfo: chanCtx()
-            }, { quoted: fakevCard });
-            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            return;
-        } else {
-            console.log('[YTMP4] quick buffer path failed, falling back to yt-dlp:', quickResult.e.message);
-        }
-
-        outPath = path.join('/tmp', `ytvideo_${Date.now()}.mp4`);
-        // 🆕 QUEUE (crash prevention): yt-dlp video download is the
-        // heaviest, slowest path here — bound its concurrency like ytmp3.
+        outPath = path.join('/tmp', `ytvideo_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
         await heavyQueue.run(async () => {
-        const __dlStart2 = Date.now();
-        await dlVideo(video.url, outPath);
-        console.log(`[YTMP4] download took ${Date.now() - __dlStart2}ms`);
-        if (!fs.existsSync(outPath)) throw new Error('Failed');
-        const size = fs.statSync(outPath).size;
-        if (size > 50*1024*1024) { fs.unlinkSync(outPath); return replyWithRetry(conn, from, mek, '❌ Video too large! Try a shorter one.'); }
-        await sendWithRetry(conn, from, {
-            video: fs.readFileSync(outPath),
-            mimetype: 'video/mp4',
-            caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0,50)}`], '🎬'),
-            contextInfo: chanCtx()
-        }, { quoted: fakevCard });
-        fs.unlinkSync(outPath);
-        await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-        }, async (position) => {
-            await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
-            await replyWithRetry(conn, from, mek, `⏳ High demand right now — you're #${position} in line. Hang tight, coming right up!`);
+            await dlVideo(video.url, outPath);
+            if (!fs.existsSync(outPath)) throw new Error('No video file produced');
+            if (fs.statSync(outPath).size > 50 * 1024 * 1024) throw new Error('Video too large');
+            await sendWithRetry(conn, from, { video: fs.readFileSync(outPath), mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
+            try { fs.unlinkSync(outPath); } catch {}
+            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
+        }, async position => {
+            await replyWithRetry(conn, from, mek, `⏳ Download queue position: #${position}`);
         });
     } catch (e) {
-        // 🚨 STORAGE FIX: on any error after download, outPath was never
-        // cleaned up — orphaned video files (up to 50MB each) piled up in
-        // /tmp forever since these download APIs fail often. Now always
-        // cleaned up regardless of where the error happened.
         try { if (outPath && fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
-        await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
+        await conn.sendMessage(from, { react: { text: '❌', key: mek.key } }).catch(() => {});
         console.log('[YTMP4 FINAL ERROR]', e.message);
-        if (String(e.message).startsWith('YTSEARCH_FAILED')) {
-            await replyWithRetry(conn, from, mek, '❌ YouTube search failed (not a download issue) — paste a direct YouTube link instead of a video name and try again.');
-        } else if (/bot-check/i.test(e.message)) {
-            await replyWithRetry(conn, from, mek, '❌ YouTube bot-check blocked this (no cookies.txt) — add cookies.txt to the server root, otherwise this will often fail.');
-        } else {
-            await replyWithRetry(conn, from, mek, '❌ Download failed!');
-        }
+        if (String(e.message).startsWith('YTSEARCH_FAILED')) return replyWithRetry(conn, from, mek, '❌ YouTube search failed. Paste a direct YouTube link and try again.');
+        return replyWithRetry(conn, from, mek, /too large/i.test(e.message) ? '❌ Video is over the 50MB WhatsApp limit.' : '❌ Download failed. Try a direct YouTube link or a shorter video.');
     }
 });
 

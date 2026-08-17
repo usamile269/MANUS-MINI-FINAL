@@ -2321,7 +2321,11 @@ async function ahmadPair(number, res = null) {
                     ? config.OWNER_NUMBER
                     : [config.OWNER_NUMBER]
                 ).map(n => String(n).replace(/[^0-9]/g, '').trim()).filter(Boolean);
-                const isOwner = ownerNumbers.includes(senderNumber)
+                // Start the permission lookup now, in parallel with group
+                // metadata below. On group commands both paths may touch
+                // WhatsApp/Mongo; awaiting them serially added their full
+                // latencies together before dispatch could begin.
+                const ownerCheckPromise = (async () => ownerNumbers.includes(senderNumber)
                     || (sender.endsWith('@lid') && await resolveIsOwner(conn, sender, ownerNumbers))
                     // 🆕 (Bunty: "sudo/listsudo/delsudo add karo") — sudo is
                     // a deliberate, explicit opt-in delegation BY the real
@@ -2330,8 +2334,7 @@ async function ahmadPair(number, res = null) {
                     // folding it into isOwner here is intentional and safe:
                     // it only ever contains numbers the owner personally
                     // chose to trust.
-                    || await isSudo(botNumber, senderNumber);
-                const isCreator = isOwner;
+                    || await isSudo(botNumber, senderNumber))();
 
                 // 🚨 ACCOUNT-SAFETY FIX (Bunty: "account restricted ho gaya,
                 // meri taraf se randomly kisi ki DM mein view-once chala
@@ -2456,6 +2459,9 @@ async function ahmadPair(number, res = null) {
                         ]);
                     } catch (_) {}
                 }
+
+                const isOwner = await ownerCheckPromise;
+                const isCreator = isOwner;
 
                 // 🚨 SPEED FIX (Ahmad: "speed increase karo") — these were
                 // `await`ed, so every single message (even a plain command
