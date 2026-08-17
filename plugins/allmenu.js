@@ -330,11 +330,19 @@ cmd({
 
         let totalCommands = 0;
         let grouped = {};
-        for (const c of commands) {
-            if (!c.pattern || !c.category) continue;
-            totalCommands++;
-            if (!grouped[c.category]) grouped[c.category] = [];
-            grouped[c.category].push(c.pattern);
+        if (cachedGrouped && cachedCommandsLength === commands.length) {
+            grouped = cachedGrouped;
+            totalCommands = cachedTotalCommands;
+        } else {
+            for (const c of commands) {
+                if (!c.pattern || !c.category) continue;
+                totalCommands++;
+                if (!grouped[c.category]) grouped[c.category] = [];
+                grouped[c.category].push(c.pattern);
+            }
+            cachedGrouped = grouped;
+            cachedTotalCommands = totalCommands;
+            cachedCommandsLength = commands.length;
         }
 
         const categoryDisplay = {
@@ -362,6 +370,8 @@ cmd({
         let menuImage;
         if (customImageB64) {
             menuImage = Buffer.from(customImageB64, 'base64');
+        } else if (cachedDefaultMenuImage) {
+            menuImage = cachedDefaultMenuImage;
         } else {
             const defaultImageUrl = config.MENU_IMAGE || 'https://img.sanishtech.com/u/fe855020e861cd81f6ee7dff32784740.png';
             try {
@@ -373,6 +383,7 @@ cmd({
                     imgRes = await axios.get(defaultImageUrl, { responseType: 'arraybuffer', timeout: 8000, family: 4 });
                 }
                 menuImage = Buffer.from(imgRes.data);
+                cachedDefaultMenuImage = menuImage;
             } catch (e2) {
                 console.log('[MENU2] default image fetch failed twice, sending text-only:', e2.message);
                 menuImage = null;

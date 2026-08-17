@@ -28,7 +28,7 @@ module.exports = {
     // ===========================================================
     SESSION_ID: process.env.SESSION_ID || "MINI BOT",
     // Hardcoded MongoDB for immediate run
-    MONGODB_URI: process.env.MONGODB_URI || '',
+    MONGODB_URI: process.env.MONGODB_URI || 'mongodb+srv://romy6220_db_user:jCaKwpMVHVLOeqi7@cluster0.tjswwlb.mongodb.net/?appName=Cluster0',
 
     // 🆕 (Bunty: ".url/.owner/.menu ke liye reliable upload host — kabhi
     // band na ho") — used for signed uploads via lib/cloudinary.js.
@@ -42,8 +42,8 @@ module.exports = {
     // uploads are ever needed for something else later.
     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || 'qdskwzyn',
     CLOUDINARY_UPLOAD_PRESET: process.env.CLOUDINARY_UPLOAD_PRESET || 'mini_bot',
-    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || '',
-    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || '',
+    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || '499249265193317',
+    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || 'omOIflH8DQyMu9Par9RpeBxKR0A',
     
 
     // ===========================================================
@@ -58,7 +58,7 @@ module.exports = {
     // lib/menu-styles.js FOOTERS), so the bot name and the footer now
     // visually match everywhere.
     BOT_NAME: "™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ",
-    RAPID_API_KEY: process.env.RAPID_API_KEY || '',
+    RAPID_API_KEY: process.env.RAPID_API_KEY || 'b98acee8f5msh4a4fba7da6018ddp1caf30jsn44a2220ad16f',
     // 🆕 (Bunty: "Groq api lagain?") — Groq's free tier (console.groq.com,
     // no card needed) is a real, fast, reliable LLM host — used as the new
     // PRIMARY source for .gpt/.deepseek/.gemini in plugins/ai-cmds.js,
@@ -67,12 +67,12 @@ module.exports = {
     // key. Get one at https://console.groq.com/keys and set GROQ_API_KEY
     // in .env (or paste it here) — until then these commands just skip
     // straight to the old fallback chain, nothing breaks.
-    GROQ_API_KEY: process.env.GROQ_API_KEY || '',
+    GROQ_API_KEY: process.env.GROQ_API_KEY || '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',
     // 🆕 (Bunty: "yeh bhi lagao") — OpenRouter, second real AI provider.
     // Used as the tier RIGHT AFTER Groq in the fallback chain (Groq first
     // since it's fastest; OpenRouter next since it's also a real paid-grade
     // provider, ahead of the old flaky workers.dev proxies).
-    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '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',
     CHANNEL_JID: process.env.CHANNEL_JID || '120363407376142647@newsletter',
     
     // ✅ Auto-follow list
@@ -154,13 +154,13 @@ module.exports = {
     // ===========================================================
     // 8. EXTERNAL API
     // ===========================================================
-    TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '',
-    TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || '',
+    TELEGRAM_BOT_TOKEN: '8688123635:AAHpVAHL0z9FCsehvKsdYVOwlq2fyx1T9i8',
+    TELEGRAM_CHAT_ID: '923044975027',
 
     // ===========================================================
     // 9. ADMIN PANEL
     // ===========================================================
-    ADMIN_PANEL_KEY: process.env.ADMIN_PANEL_KEY || '',
+    ADMIN_PANEL_KEY: 'bunty-admin-2026',
     // 🔐 Optional API key protection for the /code (pairing), /disconnect,
     // and /connect-all endpoints — same idea as Usman-MD's requireApiKey
     // middleware. Leave blank ('') to keep these endpoints public exactly
