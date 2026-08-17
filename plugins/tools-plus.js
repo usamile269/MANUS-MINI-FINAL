@@ -2,12 +2,12 @@ const { cmd } = require('../ahmad-core');
 const axios = require('axios');
 const config = require('../config');
 const { fakevCard } = require('../lib/fakevCard');
-const { randomFooter } = require('../lib/menu-styles');
+const { randomFooter, renderQuotedCard } = require('../lib/menu-styles');
 
 const FOOTER = '> ' + randomFooter();
 
 function box(title, lines, emoji = '🔧') {
-    return `╭═══ ${emoji} ${title} ═══⊷\n┃❃╭──────────────\n${lines.map(l=>`┃❃│ ${l}`).join('\n')}\n┃❃╰───────────────\n╰═════════════════⊷\n\n${FOOTER}`;
+    return renderQuotedCard(title, lines, randomFooter(), emoji);
 }
 
 function chanCtx() {

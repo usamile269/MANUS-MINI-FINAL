@@ -1,5 +1,6 @@
 const { cmd } = require('../ahmad-core');
 const config = require('../config');
+const { renderQuotedCard } = require('../lib/menu-styles');
 
 // ==================== TIME ====================
 cmd({
@@ -13,7 +14,7 @@ cmd({
     try {
         const moment = require("moment-timezone");
         const now = moment().tz("Asia/Karachi");
-        reply(`╭═══ 🕐 TIME ═══⊷\n┃❃│ ${now.format("hh:mm:ss A")}\n┃❃│ ${now.format("dddd, DD MMMM YYYY")}\n╰═════════════════⊷`);
+        reply(renderQuotedCard('LOCAL TIME', [`🕘 ${now.format('hh:mm:ss A')}`, `📅 ${now.format('dddd, DD MMMM YYYY')}`, '🌍 Timezone: Asia/Karachi'], undefined, '🕐'));
     } catch (e) {
         reply("❌ Error: " + e.message);
     }
@@ -27,7 +28,7 @@ cmd({
     react: "🆔",
     filename: __filename
 }, async (conn, mek, m, { from, reply }) => {
-    reply(`╭═══ 🆔 JID ═══⊷\n┃❃│ ${from}\n╰═════════════════⊷`);
+    reply(renderQuotedCard('CHAT JID', [`🆔 ${from}`], undefined, '🆔'));
 });
 
 // ==================== MYID ====================
@@ -38,7 +39,7 @@ cmd({
     react: "🆔",
     filename: __filename
 }, async (conn, mek, m, { from, reply }) => {
-    reply(`╭═══ 🆔 YOUR ID ═══⊷\n┃❃│ ${m.sender}\n╰═════════════════⊷`);
+    reply(renderQuotedCard('YOUR ID', [`🆔 ${m.sender}`], undefined, '🆔'));
 });
 
 // ==================== COINFLIP ====================
@@ -51,7 +52,7 @@ cmd({
     filename: __filename
 }, async (conn, mek, m, { from, reply }) => {
     const result = Math.random() < 0.5 ? "Heads 🪙" : "Tails 🪙";
-    reply(`╭═══ 🪙 COIN FLIP ═══⊷\n┃❃│ Result: ${result}\n╰═════════════════⊷`);
+    reply(renderQuotedCard('COIN FLIP', [`🎯 Result: ${result}`], undefined, '🪙'));
 });
 
 // ==================== DICE ====================
@@ -64,7 +65,7 @@ cmd({
     filename: __filename
 }, async (conn, mek, m, { from, reply }) => {
     const result = Math.floor(Math.random() * 6) + 1;
-    reply(`╭═══ 🎲 DICE ROLL ═══⊷\n┃❃│ You rolled: ${result}\n╰═════════════════⊷`);
+    reply(renderQuotedCard('DICE ROLL', [`🎲 You rolled: ${result}`], undefined, '🎲'));
 });
 
 // ==================== 8BALL ====================
@@ -86,7 +87,7 @@ cmd({
         "Cannot predict now.", "Most likely.", "My sources say no."
     ];
     const answer = answers[Math.floor(Math.random() * answers.length)];
-    reply(`╭═══ 🎱 8BALL ═══⊷\n┃❃│ Q: ${question}\n┃❃│ A: ${answer}\n╰═════════════════⊷`);
+    reply(renderQuotedCard('MAGIC 8-BALL', [`❓ Question: ${question}`, `💬 Answer: ${answer}`], undefined, '🎱'));
 });
 
 // ==================== CALCULATE ====================
@@ -104,7 +105,7 @@ cmd({
         if (!expr) return reply("❌ Use: .calc 5+5*2");
         if (!/^[0-9+\-*/().\s]+$/.test(expr)) return reply("❌ Invalid characters.");
         const result = Function(`"use strict"; return (${expr})`)();
-        reply(`╭═══ 🧮 CALCULATOR ═══⊷\n┃❃│ ${expr} = ${result}\n╰═════════════════⊷`);
+        reply(renderQuotedCard('CALCULATOR', [`🧮 ${expr} = ${result}`], undefined, '🧮'));
     } catch (e) {
         reply("❌ Invalid expression.");
     }
@@ -121,7 +122,7 @@ cmd({
 }, async (conn, mek, m, { from, args, reply }) => {
     const text = args.join(" ");
     if (!text) return reply("❌ Use: .reverse <text>");
-    reply(`╭═══ 🔄 REVERSED ═══⊷\n┃❃│ ${text.split('').reverse().join('')}\n╰═════════════════⊷`);
+    reply(renderQuotedCard('REVERSED TEXT', [`🔄 ${text.split('').reverse().join('')}`], undefined, '🔄'));
 });
 
 // ==================== COUNT WORDS ====================
@@ -138,7 +139,7 @@ cmd({
     if (!text) return reply("❌ Use: .wordcount <text>");
     const words = text.trim().split(/\s+/).length;
     const chars = text.length;
-    reply(`╭═══ 📊 WORD COUNT ═══⊷\n┃❃│ Words: ${words}\n┃❃│ Characters: ${chars}\n╰═════════════════⊷`);
+    reply(renderQuotedCard('WORD COUNT', [`📝 Words: ${words}`, `🔤 Characters: ${chars}`], undefined, '📊'));
 });
 
 // ==================== UPPERCASE/LOWERCASE ====================
@@ -152,7 +153,7 @@ cmd({
 }, async (conn, mek, m, { from, args, reply }) => {
     const text = args.join(" ");
     if (!text) return reply("❌ Use: .upper <text>");
-    reply(text.toUpperCase());
+    reply(renderQuotedCard('UPPERCASE', [`🔠 ${text.toUpperCase()}`], undefined, '🔠'));
 });
 
 cmd({
@@ -165,7 +166,7 @@ cmd({
 }, async (conn, mek, m, { from, args, reply }) => {
     const text = args.join(" ");
     if (!text) return reply("❌ Use: .lower <text>");
-    reply(text.toLowerCase());
+    reply(renderQuotedCard('LOWERCASE', [`🔡 ${text.toLowerCase()}`], undefined, '🔡'));
 });
 
 // ==================== RANDOM NUMBER ====================
@@ -181,7 +182,7 @@ cmd({
     const min = parseInt(args[0]) || 1;
     const max = parseInt(args[1]) || 100;
     const result = Math.floor(Math.random() * (max - min + 1)) + min;
-    reply(`╭═══ 🔢 RANDOM ═══⊷\n┃❃│ Between ${min}-${max}: ${result}\n╰═════════════════⊷`);
+    reply(renderQuotedCard('RANDOM NUMBER', [`🎯 Range: ${min}–${max}`, `🔢 Result: ${result}`], undefined, '🔢'));
 });
 
 // ==================== TAGME ====================
@@ -211,7 +212,7 @@ cmd({
     const h = Math.floor(ms / 3600000);
     const mi = Math.floor((ms % 3600000) / 60000);
     const s = Math.floor((ms % 60000) / 1000);
-    reply(`╭═══ ⏳ RUNTIME ═══⊷\n┃❃│ ${h}h ${mi}m ${s}s\n╰═════════════════⊷`);
+    reply(renderQuotedCard('BOT RUNTIME', [`⏳ ${h}h ${mi}m ${s}s`, '🟢 Status: Online'], undefined, '⏳'));
 });
 
 // ==================== STICKER TO TEXT INFO ====================

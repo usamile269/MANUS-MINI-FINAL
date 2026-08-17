@@ -1,9 +1,9 @@
 const { cmd } = require('../ahmad-core');
 const crypto = require('crypto');
-const { randomFooter } = require('../lib/menu-styles');
+const { randomFooter, renderQuotedCard } = require('../lib/menu-styles');
 
 const FOOTER = "\n\n> " + randomFooter();
-const box = (title, body) => `╭═══ ${title} ═══⊷\n${body}\n╰═════════════════⊷${FOOTER}`;
+const box = (title, body) => renderQuotedCard(title, String(body).split('\n').map(line => line.replace(/^┃❃│\s?/, '')), randomFooter(), '✨');
 
 // ==================== BASE64 ====================
 cmd({ pattern: "b64encode", alias: ["encodeb64"], desc: "🔐 Encode text to Base64", category: "tools", react: "🔐", filename: __filename },

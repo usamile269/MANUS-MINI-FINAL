@@ -2,7 +2,7 @@ const { cmd } = require('../ahmad-core');
 const { sleep } = require('../lib/functions');
 const config = require('../config');
 const os = require('os');
-const { randomFooter, ownerOnlyDenied, toSansBoldItalic, renderCuteBox } = require('../lib/menu-styles');
+const { randomFooter, ownerOnlyDenied, toSansBoldItalic, renderCuteBox, renderQuotedCard } = require('../lib/menu-styles');
 const { updateUserConfig, getUserConfigFromMongoDB } = require('../lib/database');
 const axios = require('axios');
 const fs = require('fs');
@@ -107,11 +107,13 @@ cmd({
 
         // 🎀 (Bunty: uptime bhi ping jaisa cute — same 4 random box styles
         // via renderCuteBox) — replaced old fixed box with shared helper.
-        const display = renderCuteBox('UPTIME', [
-            { emoji: '🎀', label: 'LIVE',  value: "YES, I'M HERE" },
-            { emoji: '🥰', label: 'TIME',  value: `${uptimeHours}h ${uptimeMinutes}m` },
-            { emoji: '🌷', label: 'STATE', value: 'SWEET & STABLE' },
-        ]);
+        const display = renderQuotedCard('BOT STATUS', [
+            `🟢 Status: Online`,
+            `⚡ Latency: ${latency} ms`,
+            `⏳ Uptime: ${uptimeHours}h ${uptimeMinutes}m ${uptimeSecs}s`,
+            `💾 Memory: ${usedMem} MB / ${totalMem} MB`,
+            `🌷 State: Stable`
+        ], undefined, '📡');
 
         await conn.sendMessage(from, {
             text: display,

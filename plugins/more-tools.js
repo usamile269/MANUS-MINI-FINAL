@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
-const { randomFooter, renderError } = require('../lib/menu-styles');
+const { randomFooter, renderError, renderQuotedCard } = require('../lib/menu-styles');
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 const FOOTER = "\n\n> " + randomFooter();
@@ -341,7 +341,7 @@ async (conn, mek, m, { q, reply }) => {
         if (!q) return fail(reply, "Usage: .weather <city>");
         const { data } = await axios.get(`https://wttr.in/${encodeURIComponent(q)}?format=j1`, { timeout: 15000 });
         const c = data.current_condition[0];
-        reply(`⛅ *WEATHER — ${q}*\n🌡️ Temp: ${c.temp_C}°C (feels ${c.FeelsLikeC}°C)\n☁️ ${c.weatherDesc[0].value}\n💧 Humidity: ${c.humidity}%\n💨 Wind: ${c.windspeedKmph} km/h${FOOTER}`);
+        reply(renderQuotedCard('WEATHER LIVE', [`📍 ${q}`, `🌡️ Temperature: ${c.temp_C}°C`, `🔥 Feels Like: ${c.FeelsLikeC}°C`, `☁️ Weather: ${c.weatherDesc[0].value}`, `💧 Humidity: ${c.humidity}%`, `💨 Wind: ${c.windspeedKmph} km/h`, `🔽 Pressure: ${c.pressure} hPa`], undefined, '🌤️'));
     } catch (e) { fail(reply, "City nahi mila ya weather service down hai."); }
 });
 
@@ -352,7 +352,7 @@ async (conn, mek, m, { args, q, reply }) => {
         const lang = args[0];
         const text = args.slice(1).join(' ');
         const { data } = await axios.get(`https://api.mymemory.translated.net/get`, { params: { q: text, langpair: `en|${lang}` }, timeout: 15000 });
-        reply(`🌐 *TRANSLATION*\n${data.responseData.translatedText}${FOOTER}`);
+        reply(renderQuotedCard('TRANSLATION', [`🌐 Language: ${lang}`, `📝 ${data.responseData.translatedText}`], undefined, '🌐'));
     } catch (e) { fail(reply, "Translate failed: " + e.message); }
 });
 
@@ -361,7 +361,7 @@ async (conn, mek, m, { q, reply }) => {
     try {
         if (!q) return fail(reply, "Usage: .wikipedia <topic>");
         const { data } = await axios.get(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`, { timeout: 15000 });
-        reply(`📖 ${data.title}\n${data.extract}\n\n🔗 ${data.content_urls?.desktop?.page || ''}${FOOTER}`);
+        reply(renderQuotedCard('WIKIPEDIA', [`📖 ${data.title}`, `📝 ${data.extract}`, `🔗 ${data.content_urls?.desktop?.page || 'N/A'}`], undefined, '📖'));
     } catch (e) { fail(reply, "Topic nahi mila Wikipedia pe."); }
 });
 
@@ -402,7 +402,7 @@ async (conn, mek, m, { args, reply }) => {
         const { data } = await axios.get(`https://api.frankfurter.dev/v2/rate/${from}/${to}`, { timeout: 15000 });
         if (!data || data.rate === undefined) return fail(reply, `${from} → ${to} rate not found. Check the currency code (ISO code like USD, PKR, EUR).`);
         const result = (amount * data.rate).toFixed(2);
-        reply(`💱 ${amount} ${from} = ${result} ${to}${FOOTER}`);
+        reply(renderQuotedCard('CURRENCY CONVERTER', [`💰 Amount: ${amount} ${from}`, `💱 Result: ${result} ${to}`, `📈 Live rate: ${data.rate}`], undefined, '💱'));
     } catch (e) { fail(reply, "Conversion failed — is currency pair ke liye data available nahi hai."); }
 });
 
@@ -412,7 +412,7 @@ async (conn, mek, m, { q, reply }) => {
         if (!q) return fail(reply, "Usage: .dictionary <word>");
         const { data } = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(q)}`, { timeout: 15000 });
         const meaning = data[0].meanings[0];
-        reply(`📚 ${data[0].word} (${meaning.partOfSpeech})\n${meaning.definitions[0].definition}${FOOTER}`);
+        reply(renderQuotedCard('DICTIONARY', [`📚 Word: ${data[0].word}`, `🏷️ Type: ${meaning.partOfSpeech}`, `📝 ${meaning.definitions[0].definition}`], undefined, '📚'));
     } catch (e) { fail(reply, "Word nahi mila dictionary mein."); }
 });
 
@@ -421,7 +421,7 @@ async (conn, mek, m, { from, q, reply }) => {
     try {
         if (!q) return fail(reply, "Usage: .github <username>");
         const { data } = await axios.get(`https://api.github.com/users/${encodeURIComponent(q)}`, { timeout: 15000 });
-        const info = `👤 ${data.name || data.login}\n📝 ${data.bio || 'No bio'}\n📦 Repos: ${data.public_repos}\n👥 Followers: ${data.followers}\n🔗 ${data.html_url}${FOOTER}`;
+        const info = renderQuotedCard('GITHUB PROFILE', [`👤 ${data.name || data.login}`, `📝 ${data.bio || 'No bio'}`, `📦 Repositories: ${data.public_repos}`, `👥 Followers: ${data.followers}`, `🔗 ${data.html_url}`], undefined, '💻');
         await conn.sendMessage(from, { image: { url: data.avatar_url }, caption: info }, { quoted: mek });
     } catch (e) { fail(reply, "GitHub user nahi mila."); }
 });
@@ -431,21 +431,21 @@ async (conn, mek, m, { q, reply }) => {
     try {
         if (!q) return fail(reply, "Usage: .npm <package_name>");
         const { data } = await axios.get(`https://registry.npmjs.org/${encodeURIComponent(q)}/latest`, { timeout: 15000 });
-        reply(`📦 ${data.name} v${data.version}\n${data.description || ''}\n🔗 https://npmjs.com/package/${data.name}${FOOTER}`);
+        reply(renderQuotedCard('NPM PACKAGE', [`📦 ${data.name}`, `🏷️ Version: ${data.version}`, `📝 ${data.description || 'No description'}`, `🔗 https://npmjs.com/package/${data.name}`], undefined, '📦'));
     } catch (e) { fail(reply, "Package nahi mila."); }
 });
 
 cmd({ pattern: "advice", desc: "Random life advice", category: "tools", filename: __filename },
 async (conn, mek, m, { reply }) => {
     try { const { data } = await axios.get("https://api.adviceslip.com/advice", { timeout: 15000 });
-        reply(`💡 *ADVICE:* ${data.slip.advice}${FOOTER}`);
+        reply(renderQuotedCard('DAILY ADVICE', [`💡 ${data.slip.advice}`], undefined, '💡'));
     } catch (e) { fail(reply, "Advice fetch failed."); }
 });
 
 cmd({ pattern: "fact", desc: "Random useless fact", category: "tools", filename: __filename },
 async (conn, mek, m, { reply }) => {
     try { const { data } = await axios.get("https://uselessfacts.jsph.pl/api/v2/facts/random", { timeout: 15000 });
-        reply(`🧠 *FACT:* ${data.text}${FOOTER}`);
+        reply(renderQuotedCard('RANDOM FACT', [`🧠 ${data.text}`], undefined, '🧠'));
     } catch (e) { fail(reply, "Fact fetch failed."); }
 });
 
@@ -456,7 +456,7 @@ async (conn, mek, m, { args, reply }) => {
         const text = args.slice(1).join(' ');
         if (!['encode', 'decode'].includes(mode) || !text) return fail(reply, "Usage: .base64 encode/decode <text>");
         const out = mode === 'encode' ? Buffer.from(text).toString('base64') : Buffer.from(text, 'base64').toString('utf-8');
-        reply(`🔐 ${mode.toUpperCase()}D: ${out}${FOOTER}`);
+        reply(renderQuotedCard(`BASE64 ${mode.toUpperCase()}`, [`🔐 ${out}`], undefined, '🔐'));
     } catch (e) { fail(reply, "Invalid input for base64."); }
 });
 
@@ -466,7 +466,7 @@ async (conn, mek, m, { from, q, reply }) => {
         let hex = (q || '').replace('#', '').trim();
         if (!/^[0-9A-Fa-f]{6}$/.test(hex)) return fail(reply, "Usage: .color <hex code>  e.g. .color ff6600");
         const url = `https://dummyimage.com/300x300/${hex}/${hex}.png`;
-        await conn.sendMessage(from, { image: { url }, caption: `🎨 *#${hex.toUpperCase()}*${FOOTER}` }, { quoted: mek });
+        await conn.sendMessage(from, { image: { url }, caption: renderQuotedCard('COLOR PREVIEW', [`🎨 #${hex.toUpperCase()}`, `🔗 ${url}`], undefined, '🎨') }, { quoted: mek });
     } catch (e) { fail(reply, e.message); }
 });
 
