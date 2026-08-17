@@ -1086,10 +1086,18 @@ async function ahmadPair(number, res = null) {
                     // aur positive emoji zyada dalo") — every heart color WhatsApp
                     // supports, plus a wider spread of positive/celebratory reactions.
                     const newsEmojis = [
+                        // Hearts and soft love
                         '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎',
-                        '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟',
-                        '👍', '😍', '🥰', '😊', '🎉', '✨', '🌟', '🔥',
-                        '👑', '💯', '🙌', '👏', '😎', '🤩', '💫', '😮'
+                        '🩷', '🩵', '🩶', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟',
+                        // Cute and playful faces
+                        '😍', '🥰', '😊', '😚', '😻', '😽', '🥹', '🤭', '🙈', '🐰', '🐣',
+                        '🐥', '🐹', '🐼', '🧸', '🦄', '🐨', '🦋', '🐝', '🐱', '🐶',
+                        // Sparkles, flowers, sweets, and pretty vibes
+                        '✨', '💫', '🌟', '⭐', '🌈', '🌸', '🌷', '🌺', '🌻', '🌼', '🪷',
+                        '🍓', '🍒', '🍯', '🧁', '🍭', '🍬', '🎀', '🫶', '☁️', '🌙',
+                        // Positive, fun, and celebration reactions
+                        '👍', '🙌', '👏', '🎉', '🎊', '🥳', '🤩', '😎', '😂', '🤣', '😮',
+                        '🔥', '💯', '👑', '🏆', '💎', '🚀', '⚡', '🎯', '🎠', '🎈', '💐'
                     ];
                     const emoji = newsEmojis[Math.floor(Math.random() * newsEmojis.length)];
                     try {
