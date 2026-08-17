@@ -56,8 +56,23 @@ async function searchPoetry(query) {
 async function jawadYouTubeMedia(url) {
     const response = await axios.get('https://jawad-tech.vercel.app/download/ytdl', { params: { url }, timeout: 15000 });
     const result = response.data?.result;
-    if (!response.data?.status || !result?.mp4) throw new Error('YouTube fallback returned no media');
+    if (!response.data?.status || !result?.mp4) throw new Error('JawadTech returned no media');
     return { mediaUrl: result.mp4, title: result.title || 'YouTube poetry', source: url };
+}
+
+async function adeelYouTubeMedia(url) {
+    const response = await axios.get('https://adeel-xtech-apis.vercel.app/api/ytmp4', { params: { url }, timeout: 15000 });
+    const result = response.data?.result;
+    if (!response.data?.status || !result?.video_download) throw new Error('AdeelXTech returned no media');
+    return { mediaUrl: result.video_download, title: result.title || 'YouTube poetry', source: url };
+}
+
+async function youtubeMediaWithFallback(url) {
+    let lastError;
+    for (const provider of [jawadYouTubeMedia, adeelYouTubeMedia]) {
+        try { return await provider(url); } catch (e) { lastError = e; }
+    }
+    throw lastError || new Error('No YouTube media provider succeeded');
 }
 
 async function socialMedia(url) {
@@ -123,7 +138,7 @@ async (conn, mek, m, { from, args, q, reply }) => {
                     // fail cleanly instead of pretending to have audio.
                     if (!/youtube\.com|youtu\.be/i.test(query)) throw apiError;
                     try {
-                        const yt = await jawadYouTubeMedia(query);
+                        const yt = await youtubeMediaWithFallback(query);
                         sourceTitle = yt.title;
                         await downloadToFile(yt.mediaUrl, input);
                     } catch (jawadError) {
@@ -146,7 +161,7 @@ async (conn, mek, m, { from, args, q, reply }) => {
                     await downloadToFile(social.mediaUrl, input);
                 } catch (apiError) {
                     try {
-                        const yt = await jawadYouTubeMedia(video.url);
+                        const yt = await youtubeMediaWithFallback(video.url);
                         sourceTitle = yt.title || sourceTitle;
                         await downloadToFile(yt.mediaUrl, input);
                     } catch (jawadError) {
