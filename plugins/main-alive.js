@@ -4,7 +4,7 @@ const config = require('../config');
 const { randomFooter, toSansBoldItalic } = require('../lib/menu-styles');
 
 // 🎨 REDESIGN (Bunty: final .alive layout — locked-in exact template):
-// ✦ AHMAD MINI 👻 is alive and watching 👀
+// ✦ AHMAD MINI 👻 is alive and online ✅
 // 💚 41ms · ⏱️ 3h 5m
 // <random helpful quote>
 // ✦﹒footer
@@ -43,6 +43,16 @@ function uptimeShort() {
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+function buildAliveCaption(speedMs, uptime, quote) {
+    const B = toSansBoldItalic;
+    const cleanQuote = String(quote || '').replace(/^>\s*/, '').trim();
+    const cleanFooter = String(randomFooter() || '').replace(/^>\s*/, '').trim();
+    return `✦ ${B('AHMAD MINI')} 👻 ${B('is alive and online')} ✅\n` +
+        `💚 ${B(String(speedMs))}${B('ms')} · ⏱️ ${B(uptime)}\n\n` +
+        `${B(cleanQuote)}\n\n` +
+        `> ${cleanFooter}`;
+}
+
 cmd({
     pattern: "alive",
     alias: ["status", "live"],
@@ -58,12 +68,7 @@ cmd({
         const speedMs = Math.max(1, Date.now() - start);
 
         const quote = HELPFUL_QUOTES[Math.floor(Math.random() * HELPFUL_QUOTES.length)];
-        const B = toSansBoldItalic;
-
-        const caption = `✦ ${B('AHMAD MINI')} 👻 ${B('is alive and online')} ✅\n` +
-            `💚 ${B(String(speedMs))}${B('ms')} · ⏱️ ${B(uptimeShort())}\n\n` +
-            `${B(quote)}\n\n` +
-            `> ${randomFooter()}`;
+        const caption = buildAliveCaption(speedMs, uptimeShort(), quote);
 
         // Bot's own WhatsApp profile picture — real fetch via Baileys, same
         // call used elsewhere in the bot (admin-plus.js, downloaders.js,
