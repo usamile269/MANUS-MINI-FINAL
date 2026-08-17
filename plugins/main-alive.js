@@ -55,16 +55,15 @@ cmd({
         await conn.sendMessage(from, { react: { text: reactHeart, key: m.key } });
 
         const start = Date.now();
-        await conn.sendPresenceUpdate('available', from).catch(() => {});
         const speedMs = Math.max(1, Date.now() - start);
 
         const quote = HELPFUL_QUOTES[Math.floor(Math.random() * HELPFUL_QUOTES.length)];
         const B = toSansBoldItalic;
 
-        const caption = `✦ ${B('AHMAD MINI')} 👻 ${B('is alive and watching')} 👀\n` +
+        const caption = `✦ ${B('AHMAD MINI')} 👻 ${B('is alive and online')} ✅\n` +
             `💚 ${B(String(speedMs))}${B('ms')} · ⏱️ ${B(uptimeShort())}\n\n` +
             `${B(quote)}\n\n` +
-            `✦﹒${randomFooter()}`;
+            `> ${randomFooter()}`;
 
         // Bot's own WhatsApp profile picture — real fetch via Baileys, same
         // call used elsewhere in the bot (admin-plus.js, downloaders.js,

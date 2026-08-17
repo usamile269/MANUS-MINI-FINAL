@@ -1,99 +1,69 @@
 const { cmd } = require('../ahmad-core');
-const { renderCard, toSansBoldItalic, toBoldItalicSerif } = require('../lib/menu-styles');
+const { toSansBoldItalic } = require('../lib/menu-styles');
 const axios = require('axios');
 
-const hackingLines = [
-    "⚡ 𝐈𝐧𝐢𝐭𝐢𝐚𝐥𝐢𝐳𝐢𝐧𝐠 𝐃𝐞𝐞𝐩 𝐒𝐜𝐚𝐧...",
-    "🛰️ 𝐂𝐨𝐧𝐧𝐞𝐜𝐭𝐢𝐧𝐠 𝐭𝐨 𝐀𝐡𝐦𝐚𝐝'𝐬 𝐏𝐫𝐢𝐯𝐚𝐭𝐞 𝐒𝐚𝐭𝐞𝐥𝐥𝐢𝐭𝐞𝐬...",
-    "🔓 𝐁𝐲𝐩𝐚𝐬𝐬𝐢𝐧𝐠 𝐅𝐢𝐫𝐞𝐰𝐚𝐥𝐥 (𝐀𝐡𝐦𝐚𝐝 𝐒𝐭𝐲𝐥𝐞)...",
-    "🕵️ 𝐀𝐜𝐜𝐞𝐬𝐬𝐢𝐧𝐠 𝐔𝐧𝐝𝐞𝐫𝐠𝐫𝐨𝐮𝐧𝐝 𝐃𝐚𝐭𝐚𝐛𝐚𝐬𝐞𝐬...",
-    "🧬 𝐃𝐞𝐜𝐫𝐲𝐩𝐭𝐢𝐧𝐠 𝐒𝐈𝐌 𝐑𝐞𝐠𝐢𝐬𝐭𝐫𝐚𝐭𝐢𝐨𝐧 𝐏𝐚𝐜𝐤𝐞𝐭𝐬...",
-    "✅ 𝐃𝐚𝐭𝐚 𝐃𝐞𝐜𝐫𝐲𝐩𝐭𝐞𝐝! 𝐒𝐡𝐨𝐰𝐢𝐧𝐠 𝐃𝐞𝐭𝐚𝐢𝐥𝐬..."
-];
+function parseSimPayload(data) {
+    if (data && typeof data === 'object') return data;
+    if (typeof data === 'string') {
+        try { return JSON.parse(data); } catch { return null; }
+    }
+    return null;
+}
 
-const attitudeLines = [
-    "𝐀𝐡𝐦𝐚𝐝 𝐘𝐨𝐮𝐫 𝐃𝐚𝐝 𝐓𝐫𝐚𝐜𝐤 𝐘𝐨𝐮...",
-    "𝐃𝐨𝐧'𝐭 𝐌𝐞𝐬𝐬 𝐖𝐢𝐭𝐡 𝐀𝐡𝐦𝐚𝐝 𝐁𝐨𝐭!",
-    "𝐀𝐡𝐦𝐚𝐝 𝐈𝐬 𝐖𝐚𝐭𝐜𝐡𝐢𝐧𝐠 𝐘𝐨𝐮...",
-    "𝐘𝐨𝐮 𝐀𝐫𝐞 𝐔𝐧𝐝𝐞𝐫 𝐀𝐡𝐦𝐚𝐝'𝐬 𝐒𝐮𝐫𝐯𝐞𝐢𝐥𝐥𝐚𝐧𝐜𝐞!",
-    "𝐀𝐡𝐦𝐚𝐝 𝐅𝐨𝐮𝐧𝐝 𝐘𝐨𝐮, 𝐍𝐨𝐰 𝐑𝐮𝐧...",
-    "𝐄𝐯𝐞𝐫𝐲 𝐒𝐭𝐞𝐩 𝐘𝐨𝐮 𝐓𝐚𝐤𝐞, 𝐀𝐡𝐦𝐚𝐝 𝐊𝐧𝐨𝐰𝐬."
-];
+function simCard(record, searchedNumber) {
+    const B = toSansBoldItalic;
+    const name = record.name || 'N/A';
+    const mobile = record.mobile || record.number || searchedNumber;
+    const cnic = record.cnic || 'N/A';
+    const address = record.address || 'N/A';
+    const network = record.network || record.operator || 'N/A';
+    return `╭━━━〔 📱 ${B('SIM INFORMATION')} 〕━━━╮
+┃
+┃ 👤 ${B('Name')}: ${name}
+┃ 🪪 ${B('CNIC')}: ${cnic}
+┃ 📞 ${B('Number')}: ${mobile}
+┃ 🏠 ${B('Address')}: ${address}
+┃ 📡 ${B('Network')}: ${network}
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯
+> ${B('AHMAD MINI')} ⚡ ${B('Verified information')}`;
+}
 
 cmd({
-    pattern: "sim",
-    alias: ["numberinfo", "siminfo"],
-    desc: "Get SIM owner details with Advanced Ahmad Hacking",
-    category: "tools",
-    use: ".sim 0324xxxxxxx",
-    react: "🕵️"
-}, async (conn, mek, m, { args, reply }) => {
+    pattern: 'sim',
+    alias: ['numberinfo', 'siminfo'],
+    desc: 'Get SIM owner details',
+    category: 'tools',
+    use: '.sim 0324xxxxxxx',
+    react: '📱'
+}, async (conn, mek, m, { args, from, reply }) => {
+    const input = args.join('').trim();
+    if (!input) return reply('❌ Number provide karo.\n📝 Usage: .sim 03249560618');
+
+    let number = input.replace(/[^0-9]/g, '');
+    if (number.startsWith('92')) number = '0' + number.slice(2);
+    if (!number.startsWith('0') && number.length === 10) number = '0' + number;
+    if (number.length < 10 || number.length > 15) return reply('❌ Valid mobile number provide karo.');
+
     try {
-        let input = args.join("");
-        if (!input) return reply("❌ *Please provide a number!*\n💡 Usage: .sim 03249560618");
-
-        let number = input.replace(/[^0-9]/g, '');
-        if (number.startsWith('92')) number = '0' + number.slice(2);
-        if (!number.startsWith('0') && number.length === 10) number = '0' + number;
-
-        const { key } = await conn.sendMessage(m.chat, { text: "💀 *𝐀𝐡𝐦𝐚𝐝 𝐄𝐱𝐭𝐫𝐞𝐦𝐞 𝐇𝐚𝐜𝐤𝐢𝐧𝐠 𝐒𝐭𝐚𝐫𝐭𝐞𝐝...*" });
-
-        // Cool Hacking Simulation
-        for (const line of hackingLines) {
-            await new Promise(resolve => setTimeout(resolve, 800));
-            await conn.sendMessage(m.chat, { text: line, edit: key });
+        await conn.sendMessage(from, { react: { text: '⏳', key: m.key } });
+        const apiUrl = 'https://wasifali.biz.id/public_apis/sim-info-api.php';
+        const response = await axios.get(apiUrl, {
+            params: { search: number },
+            timeout: 15000,
+            validateStatus: status => status >= 200 && status < 500
+        });
+        const data = parseSimPayload(response.data);
+        const records = Array.isArray(data?.records) ? data.records : [];
+        if (data?.success !== true || records.length === 0) {
+            await conn.sendMessage(from, { react: { text: '❌', key: m.key } });
+            return conn.sendMessage(from, { text: '❌ Is number ka koi SIM record nahi mila.' }, { quoted: mek });
         }
-
-        // ✅ SINGLE WORKING API (Requested by user)
-        const apiUrl = `http://wasifali.biz.id/public_apis/sim-info-api.php?search=${number}`;
-        const { data } = await axios.get(apiUrl, { timeout: 15000, validateStatus: () => true });
-
-        if (data && data.success === true && Array.isArray(data.records) && data.records.length > 0) {
-            const res = data.records[0];
-            const randomAttitude = attitudeLines[Math.floor(Math.random() * attitudeLines.length)];
-            
-            const encodedAddress = encodeURIComponent(res.address || '');
-            const mapsLink = res.address && res.address !== 'N/A' 
-                ? `\n📍 𝐆𝐎𝐎𝐆𝐋𝐄 𝐌𝐀𝐏𝐒: https://www.google.com/maps/search/?api=1&query=${encodedAddress}`
-                : '';
-
-            // 🎨 Optimized Aesthetic Card (Branding: Ahmad)
-            const bodyText = `╭───────────────⊷
-│ 👤 ${toSansBoldItalic('Name')}: ${res.name || 'N/A'}
-│ 🆔 ${toSansBoldItalic('CNIC')}: ${res.cnic || 'N/A'}
-│ 📱 ${toSansBoldItalic('Number')}: ${res.mobile || res.number || number}
-│ 🏠 ${toSansBoldItalic('Address')}: ${res.address || 'N/A'}
-│ 📡 ${toSansBoldItalic('Network')}: ${res.network || 'N/A'}${mapsLink}
-╰───────────────⊷
-✨ _${toBoldItalicSerif(randomAttitude)}_`;
-            
-            const aestheticMsg = renderCard(
-                `SIM INFORMATION`,
-                bodyText,
-                `⚡`
-            );
-
-            await conn.sendMessage(m.chat, { text: aestheticMsg });
-
-            // 🆕 FEATURE: Send Live Location (if address exists)
-            if (res.address && res.address !== 'N/A') {
-                await conn.sendMessage(m.chat, {
-                    location: {
-                        degreesLatitude: 31.5204, // Default to Lahore area
-                        degreesLongitude: 74.3587,
-                        name: res.name || 'SIM Owner Location',
-                        address: res.address
-                    }
-                }, { quoted: mek });
-            }
-
-            await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } });
-        } else {
-            await conn.sendMessage(m.chat, { text: "❌ *𝐀𝐡𝐦𝐚𝐝 𝐒𝐚𝐲𝐬: 𝐍𝐨 𝐫𝐞𝐜𝐨𝐫𝐝 𝐟𝐨𝐮𝐧𝐝!*\n\n💡 *Note:* The target might be using a new or protected number.", edit: key });
-        }
-
-    } catch (e) {
-        console.error('[SIM ERROR]', e);
-        reply("❌ *𝐀𝐡𝐦𝐚𝐝 𝐇𝐚𝐜𝐤𝐢𝐧𝐠 𝐄𝐫𝐫𝐨𝐫:* " + e.message);
+        await conn.sendMessage(from, { text: simCard(records[0], number) }, { quoted: mek });
+        await conn.sendMessage(from, { react: { text: '✅', key: m.key } });
+    } catch (error) {
+        console.error('[SIM ERROR]', error.message);
+        await conn.sendMessage(from, { react: { text: '❌', key: m.key } });
+        return conn.sendMessage(from, { text: '❌ SIM API temporarily unavailable. Thori dair baad try karo.' }, { quoted: mek });
     }
 });
