@@ -435,7 +435,8 @@ async function getJawadTechResult(videoUrl) {
     const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
     if (!data?.status || !data?.result?.mp4) throw new Error('JawadTech: no usable result');
     return {
-        mp4: data.result.mp4,
+        mp3: data.result.mp3 || null,
+        mp4: data.result.mp4 || null,
         title: data.result.title || null,
         thumbnail: data.result.thumbnail || null,
         duration: data.result.duration || null
@@ -998,12 +999,14 @@ async (conn, mek, m, { reply, args, from }) => {
         const started = Date.now();
         const video = await ytSearch(query);
         outPath = path.join('/tmp', `ytaudio_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`);
+        // Send the preview before entering the heavy queue so the user gets
+        // immediate feedback even when another media job is already running.
+        await conn.sendMessage(from, {
+            image: { url: video.thumb },
+            caption: dlBox('YOUTUBE MP3', [`🎵 ${video.title?.slice(0, 60)}`, `👤 ${video.author || 'YouTube'}`, '⏳ Downloading...'], '🎵'),
+            contextInfo: chanCtx()
+        }, { quoted: fakevCard }).catch(e => console.log('[YTMP3] preview failed:', e.message));
         await heavyQueue.run(async () => {
-            await conn.sendMessage(from, {
-                image: { url: video.thumb },
-                caption: dlBox('YOUTUBE MP3', [`🎵 ${video.title?.slice(0, 60)}`, `👤 ${video.author || 'YouTube'}`, '⏳ Downloading...'], '🎵'),
-                contextInfo: chanCtx()
-            }, { quoted: fakevCard }).catch(e => console.log('[YTMP3] preview failed:', e.message));
             await dlAudio(video.url, outPath);
             const audio = fs.readFileSync(outPath);
             let sent = false;
