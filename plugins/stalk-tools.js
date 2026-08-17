@@ -22,6 +22,32 @@ const NEX_BASE = 'https://api.nexoracle.com';
 const NEX_KEY = 'free_key@maher_apis';
 const FOOTER = () => `\n\n> ${randomFooter()}`;
 
+function normalizeTikTokUsername(input) {
+    return String(input || '').trim()
+        .replace(/^https?:\/\/(?:www\.)?tiktok\.com\/@?/i, '')
+        .replace(/^@/, '')
+        .split(/[/?#\s]/)[0]
+        .trim();
+}
+
+async function fetchTikTokWebProfile(username) {
+    const { data: html } = await axios.get(`https://www.tiktok.com/@${encodeURIComponent(username)}`, {
+        timeout: 20000,
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9'
+        }
+    });
+    const match = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/);
+    if (!match) throw new Error('TikTok profile payload missing');
+    const payload = JSON.parse(match[1]);
+    const detail = payload?.__DEFAULT_SCOPE__?.['webapp.user-detail']?.userInfo;
+    const user = detail?.user;
+    const stats = detail?.statsV2 || detail?.stats || {};
+    if (!user?.uniqueId) throw new Error('TikTok user not found');
+    return { ...user, ...stats, heartCount: stats.heartCount ?? stats.heart, verified: Boolean(user.verified) };
+}
+
 // ==================== GITHUB STALK ====================
 cmd({
     pattern: 'ghstalk',
@@ -116,12 +142,13 @@ cmd({
     use: '.tiktokstalk <username>',
     filename: __filename
 }, async (conn, mek, m, { from, q, reply }) => {
-    if (!q) return reply(`🎵 *TikTok Stalk*\n\nExample: .tiktokstalk khaby.lame${FOOTER()}`);
+    const username = normalizeTikTokUsername(q);
+    if (!username) return reply(`🎵 *TikTok Stalk*\n\nExample: .tiktokstalk khaby.lame${FOOTER()}`);
 
     const sendResult = async (u) => {
         const caption = `╭━━〔 🎵 TIKTOK STALK 〕━━┈⊷
 ┃
-┃ 👤 Username: ${u.uniqueId || u.username || q}
+┃ 👤 Username: ${u.uniqueId || u.username || username}
 ┃ 📝 Nickname: ${u.nickname || 'N/A'}
 ┃ 👥 Followers: ${u.followerCount ?? 'N/A'}
 ┃ 👤 Following: ${u.followingCount ?? 'N/A'}
@@ -140,24 +167,22 @@ cmd({
         }
     };
 
-    // 🚨 FIX (Bunty's logs: NexOracle tiktok-user2 → 404 "No Results
-    // Found" — endpoint's broken/renamed, not just this one username).
-    // Also fixed: this was hitting www.tikwm.com/api/user/info, a
-    // DIFFERENT subdomain from the plain tikwm.com/api/ that
-    // downloaders.js's .tiktok command (confirmed working on this host)
-    // actually uses — switched to the same bare tikwm.com host + added
-    // a browser User-Agent (tikwm blocks/soft-fails obvious bot requests
-    // without one), matching the confirmed-working call exactly.
+    // TikTok's own public profile page embeds a complete public profile
+    // payload and is currently reachable even when third-party APIs are
+    // blocked by Cloudflare.
+    try {
+        return await sendResult(await fetchTikTokWebProfile(username));
+    } catch (e) {
+        console.log('[TIKTOKSTALK] direct TikTok profile failed:', e.message);
+    }
+
     try {
         const { data } = await axios.get('https://tikwm.com/api/user/info', {
-            params: { unique_id: q },
+            params: { unique_id: username },
             timeout: 15000,
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' }
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36' }
         });
-        if (data?.code === 0 && data?.data?.user) {
-            const u = { ...data.data.user, ...data.data.stats };
-            return await sendResult(u);
-        }
+        if (data?.code === 0 && data?.data?.user) return await sendResult({ ...data.data.user, ...data.data.stats });
         throw new Error(`tikwm: ${data?.msg || 'no user data'}`);
     } catch (e) {
         console.log('[TIKTOKSTALK] tikwm failed:', e.message);
@@ -166,7 +191,7 @@ cmd({
     // Fallback: NexOracle (kept in case it comes back / tikwm rate-limits).
     try {
         const { data } = await axios.get(`${NEX_BASE}/stalking/tiktok-user2`, {
-            params: { apikey: NEX_KEY, user: q },
+            params: { apikey: NEX_KEY, user: username },
             timeout: 20000
         });
         const u = data.result;
