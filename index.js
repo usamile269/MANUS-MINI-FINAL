@@ -58,8 +58,9 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+const BUILD_ID = process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT_SHA || 'source-a1e3cdc';
 app.get('/health', (req, res) => {
-    res.status(200).send('OK');
+    res.status(200).json({ ok: true, service: 'MANUS MINI', build: BUILD_ID, uptime: Math.round(process.uptime()) });
 });
 
 // 🚨 502 FIX (Ahmad screenshot: "Application failed to respond" on Railway):
