@@ -72,7 +72,7 @@ module.exports = {
     // Used as the tier RIGHT AFTER Groq in the fallback chain (Groq first
     // since it's fastest; OpenRouter next since it's also a real paid-grade
     // provider, ahead of the old flaky workers.dev proxies).
-    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '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',
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
     CHANNEL_JID: process.env.CHANNEL_JID || '120363407376142647@newsletter',
     
     // ✅ Auto-follow list
