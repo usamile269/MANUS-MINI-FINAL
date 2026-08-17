@@ -94,7 +94,7 @@ async function socialMedia(url) {
 }
 
 async function downloadToFile(url, outPath) {
-    const response = await axios.get(url, { responseType: 'stream', timeout: 60000, maxContentLength: MAX_BYTES, maxBodyLength: MAX_BYTES, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const response = await axios.get(url, { responseType: 'stream', timeout: 60000, maxContentLength: MAX_BYTES, maxBodyLength: MAX_BYTES, headers: { 'User-Agent': 'Mozilla/5.0', Range: 'bytes=0-' } });
     await new Promise((resolve, reject) => {
         const writer = fs.createWriteStream(outPath);
         let bytes = 0;
@@ -103,6 +103,21 @@ async function downloadToFile(url, outPath) {
         writer.on('finish', resolve); writer.on('error', reject); response.data.on('error', reject);
     });
     if (!fs.existsSync(outPath) || fs.statSync(outPath).size < 10000) throw new Error('The media file is empty or invalid');
+}
+
+async function youtubeDownloadWithFallback(url, outPath) {
+    let lastError;
+    for (const provider of [jawadYouTubeMedia, adeelYouTubeMedia]) {
+        try {
+            const media = await provider(url);
+            await downloadToFile(media.mediaUrl, outPath);
+            return media;
+        } catch (e) {
+            lastError = e;
+            try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
+        }
+    }
+    throw lastError || new Error('No YouTube media stream was downloadable');
 }
 
 async function toAudio(input, output) {
@@ -138,9 +153,8 @@ async (conn, mek, m, { from, args, q, reply }) => {
                     // fail cleanly instead of pretending to have audio.
                     if (!/youtube\.com|youtu\.be/i.test(query)) throw apiError;
                     try {
-                        const yt = await youtubeMediaWithFallback(query);
+                        const yt = await youtubeDownloadWithFallback(query, input);
                         sourceTitle = yt.title;
-                        await downloadToFile(yt.mediaUrl, input);
                     } catch (jawadError) {
                         console.log('[POETRY] YouTube APIs failed, using yt-dlp:', jawadError.message);
                         const bin = await ensureYtDlp();
@@ -161,9 +175,8 @@ async (conn, mek, m, { from, args, q, reply }) => {
                     await downloadToFile(social.mediaUrl, input);
                 } catch (apiError) {
                     try {
-                        const yt = await youtubeMediaWithFallback(video.url);
+                        const yt = await youtubeDownloadWithFallback(video.url, input);
                         sourceTitle = yt.title || sourceTitle;
-                        await downloadToFile(yt.mediaUrl, input);
                     } catch (jawadError) {
                         console.log('[POETRY] YouTube APIs failed, using yt-dlp:', jawadError.message);
                         const bin = await ensureYtDlp();
