@@ -341,7 +341,8 @@ async (conn, mek, m, { q, reply }) => {
         if (!q) return fail(reply, "Usage: .weather <city>");
         const { data } = await axios.get(`https://wttr.in/${encodeURIComponent(q)}?format=j1`, { timeout: 15000 });
         const c = data.current_condition[0];
-        reply(renderQuotedCard('WEATHER LIVE', [`📍 ${q}`, `🌡️ Temperature: ${c.temp_C}°C`, `🔥 Feels Like: ${c.FeelsLikeC}°C`, `☁️ Weather: ${c.weatherDesc[0].value}`, `💧 Humidity: ${c.humidity}%`, `💨 Wind: ${c.windspeedKmph} km/h`, `🔽 Pressure: ${c.pressure} hPa`], undefined, '🌤️'));
+        const day = data.weather?.[0] || {};
+        reply(renderQuotedCard('WEATHER INFORMATION', [`📍 Location: ${q}`, `🌡️ Temperature: ${c.temp_C}°C`, `🔥 Feels Like: ${c.FeelsLikeC}°C`, `📉 Min: ${day.mintempC ?? c.temp_C}°C  •  📈 Max: ${day.maxtempC ?? c.temp_C}°C`, `💧 Humidity: ${c.humidity}%`, `☁️ Weather: ${c.weatherDesc?.[0]?.value || 'N/A'}`, `🌫️ Description: ${c.weatherDesc?.[0]?.value || 'N/A'}`, `💨 Wind Speed: ${c.windspeedKmph} km/h`, `🔽 Pressure: ${c.pressure} hPa`], undefined, '🌤️'));
     } catch (e) { fail(reply, "City nahi mila ya weather service down hai."); }
 });
 
