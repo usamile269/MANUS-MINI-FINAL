@@ -435,8 +435,7 @@ async function getJawadTechResult(videoUrl) {
     const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
     if (!data?.status || !data?.result?.mp4) throw new Error('JawadTech: no usable result');
     return {
-        mp3: data.result.mp3 || null,
-        mp4: data.result.mp4 || null,
+        mp4: data.result.mp4,
         title: data.result.title || null,
         thumbnail: data.result.thumbnail || null,
         duration: data.result.duration || null
@@ -447,7 +446,7 @@ async function getAdeelXtechVideoLink(videoUrl) {
     const apiUrl = `https://adeel-xtech-apis.vercel.app/api/ytmp4?url=${encodeURIComponent(videoUrl)}`;
     // Live-tested pasted endpoint: commonly responds in several seconds,
     // so give it a bounded 12s window instead of the generic 3s API timeout.
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 12000 });
+    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 7000 });
     return (data?.status && data?.result?.video_download) || null;
 }
 
@@ -694,6 +693,8 @@ async function dlVideo(videoUrl, outPath) {
     //    speedup on longer videos even when a merge does still happen.
     const wrap = await ensureYtDlp();
     const args = [videoUrl, '-f', 'best[height<=360][ext=mp4]/best[height<=360]/best[ext=mp4]/best', '--no-playlist',
+        '--extractor-args', 'youtube:player_client=android,web_safari,tv_embedded',
+        '--force-ipv4', '--socket-timeout', '20', '--retries', '2', '--fragment-retries', '2',
         '--merge-output-format', 'mp4', '--concurrent-fragments', '4', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
         await wrap.execPromise(args);
@@ -999,14 +1000,12 @@ async (conn, mek, m, { reply, args, from }) => {
         const started = Date.now();
         const video = await ytSearch(query);
         outPath = path.join('/tmp', `ytaudio_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`);
-        // Send the preview before entering the heavy queue so the user gets
-        // immediate feedback even when another media job is already running.
-        await conn.sendMessage(from, {
-            image: { url: video.thumb },
-            caption: dlBox('YOUTUBE MP3', [`🎵 ${video.title?.slice(0, 60)}`, `👤 ${video.author || 'YouTube'}`, '⏳ Downloading...'], '🎵'),
-            contextInfo: chanCtx()
-        }, { quoted: fakevCard }).catch(e => console.log('[YTMP3] preview failed:', e.message));
         await heavyQueue.run(async () => {
+            await conn.sendMessage(from, {
+                image: { url: video.thumb },
+                caption: dlBox('YOUTUBE MP3', [`🎵 ${video.title?.slice(0, 60)}`, `👤 ${video.author || 'YouTube'}`, '⏳ Downloading...'], '🎵'),
+                contextInfo: chanCtx()
+            }, { quoted: fakevCard }).catch(e => console.log('[YTMP3] preview failed:', e.message));
             await dlAudio(video.url, outPath);
             const audio = fs.readFileSync(outPath);
             let sent = false;
