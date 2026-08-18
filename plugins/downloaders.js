@@ -433,12 +433,16 @@ const MAX_QUICKAPI_VIDEO_BYTES = 20 * 1024 * 1024; // 🚨 (Bunty: ".play thumbn
 async function getJawadTechResult(videoUrl) {
     const apiUrl = `https://jawad-tech.vercel.app/download/ytdl?url=${encodeURIComponent(videoUrl)}`;
     const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
-    if (!data?.status || !data?.result?.mp4) throw new Error('JawadTech: no usable result');
+    const result = data?.result;
+    // The API returns separate mp3 and mp4 fields. Older code validated only
+    // mp4, then discarded mp3, so `.play` always fell through to slow yt-dlp.
+    if (!data?.status || (!result?.mp3 && !result?.mp4)) throw new Error('JawadTech: no usable result');
     return {
-        mp4: data.result.mp4,
-        title: data.result.title || null,
-        thumbnail: data.result.thumbnail || null,
-        duration: data.result.duration || null
+        mp3: result.mp3 || null,
+        mp4: result.mp4 || null,
+        title: result.title || null,
+        thumbnail: result.thumbnail || null,
+        duration: result.duration || null
     };
 }
 
@@ -577,14 +581,32 @@ const MAX_QUICKAPI_AUDIO_BYTES = 20 * 1024 * 1024;
 // JawadTech is restored as the first .play provider because its live endpoint
 // currently returns an MP3 link in about a second. The short media timeout keeps
 // a dead/expired CDN link from delaying the normal fallback chain.
+async function getEliteProTechAudioLink(videoUrl) {
+    const apiUrl = `https://eliteprotech-apis.zone.id/ytdown?url=${encodeURIComponent(videoUrl)}&format=mp3`;
+    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 5000 });
+    if (!data?.success || !data?.downloadURL) throw new Error('EliteProTech: no usable MP3 link');
+    return data.downloadURL;
+}
+
 const AUDIO_LINK_PROVIDERS = [
-    { name: 'JawadTech', method: async url => (await getJawadTechResult(url)).mp3 }
+    { name: 'JawadTech', method: async url => (await getJawadTechResult(url)).mp3 },
+    { name: 'EliteProTech', method: getEliteProTechAudioLink }
 ];
 
 async function getQuickAudioLink(videoUrl) {
-    const result = await getJawadTechResult(videoUrl);
-    if (!result?.mp3) throw new Error('JawadTech: no usable MP3 link');
-    return result.mp3;
+    let lastError;
+    for (const provider of AUDIO_LINK_PROVIDERS) {
+        try {
+            const link = await provider.method(videoUrl);
+            if (!link) throw new Error(`${provider.name}: no usable MP3 link`);
+            console.log(`[YTMP3] ${provider.name} direct MP3 ready`);
+            return link;
+        } catch (e) {
+            console.log(`[YTMP3] ${provider.name} direct path failed:`, e.message);
+            lastError = e;
+        }
+    }
+    throw lastError || new Error('All direct MP3 providers failed');
 }
 
 async function getQuickAudioBuffer(videoUrl) {
