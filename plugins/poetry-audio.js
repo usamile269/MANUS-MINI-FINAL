@@ -121,7 +121,9 @@ async function youtubeDownloadWithFallback(url, outPath) {
 }
 
 async function toAudio(input, output) {
-    await run(require('@ffmpeg-installer/ffmpeg').path, ['-y', '-i', input, '-vn', '-t', String(POETRY_CLIP_SECONDS), '-c:a', 'libopus', '-b:a', '96k', '-ac', '2', '-f', 'ogg', output], 90000);
+    // WhatsApp is more reliable with a standard MP3 audio document than an
+    // Ogg/Opus voice-note buffer for these downloaded poetry clips.
+    await run(require('@ffmpeg-installer/ffmpeg').path, ['-y', '-i', input, '-vn', '-t', String(POETRY_CLIP_SECONDS), '-c:a', 'libmp3lame', '-b:a', '128k', '-ar', '44100', '-ac', '2', '-f', 'mp3', output], 90000);
     if (!fs.existsSync(output) || fs.statSync(output).size < 2000) throw new Error('Audio extraction failed');
 }
 
@@ -133,7 +135,7 @@ async (conn, mek, m, { from, args, q, reply }) => {
     if (!query) return reply('🎙️ Usage: .poetry Ahmad Faraz\n🔗 Or send a direct TikTok, YouTube, or Instagram link.');
     const work = `/tmp/poetry_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const input = `${work}.source`;
-    const output = `${work}.ogg`;
+    const output = `${work}.mp3`;
     let sourceTitle = query;
     let sourceUrl = query;
     try {
@@ -189,9 +191,9 @@ async (conn, mek, m, { from, args, q, reply }) => {
             const B = toSansBoldItalic;
             await conn.sendMessage(from, {
                 audio,
-                mimetype: 'audio/ogg; codecs=opus',
-                ptt: true,
-                fileName: 'ahmad-mini-poetry.ogg',
+                mimetype: 'audio/mpeg',
+                ptt: false,
+                fileName: 'ahmad-mini-poetry.mp3',
                 caption: `🎙️ ${B('REAL POETRY AUDIO')}\n⏱️ ${B(`${POETRY_CLIP_SECONDS}-second short clip`)}\n📝 ${cleanName(sourceTitle)}\n🔗 ${sourceUrl}\n\n> ${randomFooter()}`
             }, { quoted: mek });
         }, async () => {
