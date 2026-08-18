@@ -1263,13 +1263,23 @@ async function ahmadPair(number, res = null) {
                 groupMetadataCache.delete(gu.id); // membership/admin status just changed — force a fresh fetch next time
                 const { getGroupSettings } = require('./data/GroupSettings');
                 const settings = await getGroupSettings(gu.id);
-                for (const participant of gu.participants) {
+                const action = String(gu.action || gu.type || '').toLowerCase();
+                const participants = Array.isArray(gu.participants) ? gu.participants
+                    .map(p => typeof p === 'string' ? p : (p?.id || p?.jid || p?.participant))
+                    .filter(Boolean) : [];
+                if (!participants.length) {
+                    console.log('[GROUP-PARTICIPANTS.UPDATE] no participant JID in event', { group: gu.id, action });
+                }
+                for (const participant of participants) {
                     const mention = '@' + participant.split('@')[0];
-                    if (gu.action === 'add') {
-                        if (!settings.welcomeOn) continue;
+                    if (action === 'add' || action === 'join' || action === 'invite') {
+                        // A previously saved video is an explicit enable signal;
+                        // this also repairs groups saved before .gwelcomevideo
+                        // began setting welcomeOn automatically.
+                        if (!settings.welcomeOn && !settings.welcomeVideo) continue;
                         const { sendWelcome } = require('./lib/welcome-sender');
                         await sendWelcome(conn, gu.id, participant, settings).catch((e) => console.log('[WELCOME ERROR]', e.message));
-                    } else if (gu.action === 'remove') {
+                    } else if (action === 'remove' || action === 'leave') {
                         // 🆕 Anti-kick (Bunty: "anti features admin ke liye
                         // bhi") — if the removed member was an admin (per our
                         // snapshot, since they're gone from groupMetadata by
@@ -1314,7 +1324,7 @@ async function ahmadPair(number, res = null) {
                         } else {
                             // goodbyeMsg defaults to null (disabled) — only send if the
                             // owner/admin has actually set one via .setgoodbye.
-                            if (!settings.goodbyeMsg) continue;
+                            if (!settings.goodbyeMsg && !settings.goodbyeVideo) continue;
                             await sendGoodbye(conn, gu.id, participant, settings).catch((e) => console.log('[GOODBYE ERROR]', e.message));
                         }
                     }
