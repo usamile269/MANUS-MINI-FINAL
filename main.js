@@ -3054,7 +3054,7 @@ router.post('/admin/site-settings', async (req, res) => {
     }
     // Only allow known fields to be written, so a bad payload can't inject
     // arbitrary junk into storage.
-    const allowed = ['botName', 'welcomeMsg', 'welcomeVideo', 'channelLink', 'bgMusicUrl', 'heroTagline', 'botImageUrl', 'audioPopupEnabled'];
+    const allowed = ['botName', 'welcomeMsg', 'welcomeVideo', 'channelLink', 'bgMusicUrl', 'musicUrl', 'heroTagline', 'heroBrightness', 'voiceVolume', 'musicVolume', 'youtubeLink', 'githubLink', 'instagramLink', 'botImageUrl', 'bgVideoUrl', 'bgImageUrl', 'leavesEnabled', 'primaryColor', 'accentColor', 'audioPopupEnabled'];
     const clean = {};
     for (const k of allowed) if (k in settings) clean[k] = settings[k];
     const saved = await setSiteSettings(clean);

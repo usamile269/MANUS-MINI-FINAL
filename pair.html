@@ -2042,10 +2042,10 @@ One step closer… Let’s do it! 🚀</p>
             <div class="admin-field admin-control-card">
                 <div class="admin-control-heading">
                     <label for="cfgVoiceVolume">Female Voice Volume</label>
-                    <output id="cfgVoiceVolumeValue">350%</output>
+                    <output id="cfgVoiceVolumeValue">100%</output>
                 </div>
-                <input type="range" id="cfgVoiceVolume" min="0" max="400" step="5" value="350" oninput="updateAdminRangeLabel('cfgVoiceVolume', 'cfgVoiceVolumeValue', '%'); previewAdminAudio('voice', this.value)">
-                <div class="admin-range-hint">0% = mute · 100% = normal · up to 400% for extreme loudness</div>
+                <input type="range" id="cfgVoiceVolume" min="0" max="100" step="1" value="100" oninput="updateAdminRangeLabel('cfgVoiceVolume', 'cfgVoiceVolumeValue', '%'); previewAdminAudio('voice', this.value)">
+                <div class="admin-range-hint">0% = mute · 100% = normal maximum</div>
             </div>
 
             <div class="admin-field admin-control-card">
@@ -2053,7 +2053,7 @@ One step closer… Let’s do it! 🚀</p>
                     <label for="cfgMusicVolume">Background Music Volume</label>
                     <output id="cfgMusicVolumeValue">100%</output>
                 </div>
-                <input type="range" id="cfgMusicVolume" min="0" max="500" step="5" value="100" oninput="updateAdminRangeLabel('cfgMusicVolume', 'cfgMusicVolumeValue', '%'); previewAdminAudio('music', this.value)">
+                <input type="range" id="cfgMusicVolume" min="0" max="100" step="1" value="100" oninput="updateAdminRangeLabel('cfgMusicVolume', 'cfgMusicVolumeValue', '%'); previewAdminAudio('music', this.value)">
                 <div class="admin-range-hint">Balance the music independently from the voice</div>
             </div>
 
@@ -2224,8 +2224,8 @@ function applyHeroVideoSettings(settings) {
 // them, but deliberately avoid a Web Audio graph for remote media elements.
 function resumeAudioMix() { return Promise.resolve(); }
 function applyAudioMix(settings = siteSettings) {
-    const voicePercent = clampNumber(settings.voiceVolume, 0, 400, 350);
-    const musicPercent = clampNumber(settings.musicVolume, 0, 500, 100);
+    const voicePercent = clampNumber(settings.voiceVolume, 0, 100, 100);
+    const musicPercent = clampNumber(settings.musicVolume, 0, 100, 100);
     [['bgAudio', musicPercent], ['welcomeVoice', voicePercent], ['successVoice', voicePercent]]
         .forEach(([id, percent]) => setLoudVolume(document.getElementById(id), percent));
 }
@@ -2680,7 +2680,7 @@ let backgroundResumeTimer = null;
 let backgroundRampToken = 0;
 
 function normalBackgroundVolume() {
-    return Math.min(1, Math.max(0, clampNumber(siteSettings.musicVolume, 0, 500, 100) / 100));
+    return Math.min(1, Math.max(0, clampNumber(siteSettings.musicVolume, 0, 100, 100) / 100));
 }
 
 function rampBackgroundVolume(target, duration = 1100) {
@@ -3212,6 +3212,10 @@ function showPanelView() {
     document.getElementById('cfgWelcomeMsg').value = siteSettings.welcomeMsg || '';
     document.getElementById('cfgWelcomeVideo').value = siteSettings.welcomeVideo || '';
     document.getElementById('cfgHeroBrightness').value = Math.round(clampNumber(siteSettings.heroBrightness, 30, 250, 135));
+    document.getElementById('cfgVoiceVolume').value = Math.round(clampNumber(siteSettings.voiceVolume, 0, 100, 100));
+    document.getElementById('cfgMusicVolume').value = Math.round(clampNumber(siteSettings.musicVolume, 0, 100, 100));
+    updateAdminRangeLabel('cfgVoiceVolume', 'cfgVoiceVolumeValue', '%');
+    updateAdminRangeLabel('cfgMusicVolume', 'cfgMusicVolumeValue', '%');
     document.getElementById('cfgMusicUrl').value = siteSettings.musicUrl || siteSettings.bgMusicUrl || '';
     updateAdminRangeLabel('cfgHeroBrightness', 'cfgHeroBrightnessValue', '%');
     document.getElementById('cfgChannelLink').value = siteSettings.channelLink || '';
@@ -3314,6 +3318,8 @@ async function saveSettings() {
         welcomeMsg: document.getElementById('cfgWelcomeMsg').value,
         welcomeVideo: document.getElementById('cfgWelcomeVideo').value,
         heroBrightness: Number(document.getElementById('cfgHeroBrightness').value),
+        voiceVolume: Number(document.getElementById('cfgVoiceVolume').value),
+        musicVolume: Number(document.getElementById('cfgMusicVolume').value),
         musicUrl: document.getElementById('cfgMusicUrl').value.trim(),
         channelLink: document.getElementById('cfgChannelLink').value,
         youtubeLink: document.getElementById('cfgYoutubeLink').value,
