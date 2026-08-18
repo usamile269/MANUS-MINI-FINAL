@@ -14,7 +14,7 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 
 // Pitch/speed modifier using ffmpeg
 async function modifyAudio(inputPath, outputPath, opts = {}) {
-    const { pitch = 1.0, speed = 1.0, echo = false, bass = false } = opts;
+    const { pitch = 1.0, speed = 1.0, echo = false, bass = false, outputFormat = 'ogg' } = opts;
     return new Promise((resolve, reject) => {
         let filters = [];
         // 🚨 BUG FIX (requested by Ahmad — "speed boht teez hai, 1x normal ho"):
@@ -35,7 +35,9 @@ async function modifyAudio(inputPath, outputPath, opts = {}) {
         if (speed !== 1.0) filters.push(`atempo=${Math.min(Math.max(speed, 0.5), 2.0)}`);
         if (echo) filters.push('aecho=0.8:0.88:60:0.4');
         if (bass) filters.push('bass=g=10');
-        const cmd = ffmpeg(inputPath).audioCodec('libopus').audioBitrate('64k').audioChannels(1).format('ogg');
+        const codec = outputFormat === 'ogg' ? 'libopus' : 'libmp3lame';
+        const bitrate = outputFormat === 'ogg' ? '64k' : '96k';
+        const cmd = ffmpeg(inputPath).audioCodec(codec).audioBitrate(bitrate).audioChannels(1).format(outputFormat);
         if (filters.length) cmd.audioFilters(filters);
         cmd.on('end', resolve).on('error', reject).save(outputPath);
     });
@@ -131,12 +133,12 @@ async function ttsVoice(conn, from, mek, text, lang, opts = {}) {
                 headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' }
             });
         const inPath = path.join(tmpdir(), `tts_${Date.now()}.mp3`);
-        const outPath = path.join(tmpdir(), `tts_${Date.now()}.ogg`);
+        const outPath = path.join(tmpdir(), `tts_out_${Date.now()}.mp3`);
         fs.writeFileSync(inPath, Buffer.from(res.data));
-        await modifyAudio(inPath, outPath, opts);
+        await modifyAudio(inPath, outPath, { ...opts, outputFormat: 'mp3' });
         await conn.sendMessage(from, {
             audio: fs.readFileSync(outPath),
-            mimetype: 'audio/ogg; codecs=opus', ptt: true
+            mimetype: 'audio/mpeg', ptt: false
         }, { quoted: fakevCard });
         try { fs.unlinkSync(inPath); fs.unlinkSync(outPath); } catch {}
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });

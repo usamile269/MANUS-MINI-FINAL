@@ -721,10 +721,10 @@ async function dlVideo(videoUrl, outPath) {
     //    fragmented/DASH stream at once instead of one at a time — a real
     //    speedup on longer videos even when a merge does still happen.
     const wrap = await ensureYtDlp();
-    const args = [videoUrl, '-f', 'best[height<=360][ext=mp4]/best[height<=360]/best[ext=mp4]/best', '--no-playlist',
-        '--extractor-args', 'youtube:player_client=android_vr,web_safari,tv_embedded',
+    const args = [videoUrl, '-f', '18/best[height<=360][ext=mp4]/best[height<=360]/best[ext=mp4]/best', '--no-playlist',
+        '--extractor-args', 'youtube:player_client=android,ios',
         '--force-ipv4', '--socket-timeout', '25', '--retries', '3', '--fragment-retries', '3',
-        '--merge-output-format', 'mp4', '--remux-video', 'mp4', '--concurrent-fragments', '4', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
+        '--merge-output-format', 'mp4', '--concurrent-fragments', '4', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
         await wrap.execPromise(args);
     } catch (e) {
