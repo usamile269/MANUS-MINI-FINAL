@@ -10,7 +10,7 @@ const { heavyQueue } = require('../lib/queue');
 
 const BIN = path.join(__dirname, '..', 'bin', 'poetry-yt-dlp');
 const MAX_BYTES = 35 * 1024 * 1024;
-const POETRY_CLIP_SECONDS = 18;
+const POETRY_MAX_SECONDS = 60;
 
 function run(cmd, args, timeout = 90000) {
     return new Promise((resolve, reject) => {
@@ -164,10 +164,10 @@ async function directYoutubePoetryDownload(url, outPath) {
 }
 
 async function toAudio(input, output) {
-    // Keep the complete mixed soundtrack from the source (voice, music, and
-    // ambient sounds). Trim by exact audio timestamps rather than relying only
-    // on container duration, then send standard MP3 for WhatsApp compatibility.
-    await run(require('@ffmpeg-installer/ffmpeg').path, ['-y', '-i', input, '-map', '0:a:0', '-vn', '-af', `atrim=start=0:duration=${POETRY_CLIP_SECONDS},asetpts=N/SR/TB`, '-t', String(POETRY_CLIP_SECONDS), '-c:a', 'libmp3lame', '-b:a', '128k', '-ar', '44100', '-ac', '2', '-avoid_negative_ts', 'make_zero', '-f', 'mp3', output], 90000);
+    // Preserve the complete mixed soundtrack and let short edits finish
+    // naturally. Only cap unusually long sources for WhatsApp safety; ffmpeg
+    // never pads or force-cuts a source that is shorter than this cap.
+    await run(require('@ffmpeg-installer/ffmpeg').path, ['-y', '-i', input, '-map', '0:a:0', '-vn', '-af', 'asetpts=N/SR/TB', '-t', String(POETRY_MAX_SECONDS), '-c:a', 'libmp3lame', '-b:a', '128k', '-ar', '44100', '-ac', '2', '-avoid_negative_ts', 'make_zero', '-f', 'mp3', output], 90000);
     if (!fs.existsSync(output) || fs.statSync(output).size < 2000) throw new Error('Audio extraction failed');
 }
 
@@ -235,7 +235,7 @@ async (conn, mek, m, { from, args, q, reply }) => {
                 mimetype: 'audio/mpeg',
                 ptt: false,
                 fileName: 'ahmad-mini-poetry.mp3',
-                caption: `🎙️ ${B('REAL POETRY AUDIO')}\n⏱️ ${B(`${POETRY_CLIP_SECONDS}-second short clip`)}\n📝 ${cleanName(sourceTitle)}\n🔗 ${sourceUrl}\n\n> ${randomFooter()}`
+                caption: `🎙️ ${B('REAL POETRY AUDIO')}\n⏱️ ${B(`Natural edit length (up to ${POETRY_MAX_SECONDS}s)`)}\n📝 ${cleanName(sourceTitle)}\n🔗 ${sourceUrl}\n\n> ${randomFooter()}`
             }, { quoted: mek });
         }, async () => {
             await conn.sendMessage(from, { text: '⏳ Your poetry audio is in the queue. I will send the real source audio as soon as it is ready.' }, { quoted: mek });
