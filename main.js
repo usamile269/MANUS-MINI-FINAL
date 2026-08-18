@@ -691,28 +691,15 @@ function setupAutoRestart(socket, number) {
                 return;
             }
 
-            // 🚨 SPEED FIX (Ahmad: "overall bot slow" — root cause found via
-            // console logs): statusCode 403 ("Connection Failure") almost
-            // always means WhatsApp has banned/blocked that number from
-            // connecting — it will NEVER succeed no matter how many times we
-            // retry. This used to fall through to the generic retry path
-            // below: 8 fast retries (10s apart), then forever after that
-            // every 60s. With multiple numbers hosted in this SAME process
-            // (activeSockets), even ONE banned number stuck in that infinite
-            // loop keeps burning CPU/network/event-loop time forever — which
-            // is exactly why EVERY number's commands (including .ping on a
-            // perfectly healthy number) were slow. Now 403 is treated like a
-            // permanent failure (same as 401): clean up and stop, instead of
-            // fighting a connection that can't ever come back.
+            // A 403/forbidden-looking close is not enough evidence to erase a
+            // valid WhatsApp identity. Providers and WhatsApp can emit transient
+            // 403-like failures during reconnects, maintenance, or overlapping
+            // handoff. Preserve Mongo credentials and Signal keys; only an
+            // explicit 401/logged-out event below is allowed to delete a session.
             const looksBanned = statusCode === 403
                 || (errorMessage && /banned|blocked|forbidden/i.test(errorMessage));
             if (looksBanned) {
-                ahmadLog(`Number ${number} looks banned/blocked (statusCode=${statusCode}, reason="${errorMessage}"). NOT retrying, cleaning up session so it stops burning resources for every other number sharing this process.`, 'error');
-                ahmadStores.delete(sanitizedNumber);
-                await deleteSessionFromMongoDB(sanitizedNumber);
-                await removeNumberFromMongoDB(sanitizedNumber);
-                socket.ev.removeAllListeners();
-                return;
+                ahmadLog(`Transient/banned-looking close for ${number} (statusCode=${statusCode}, reason="${errorMessage}"). Preserving Mongo session and retrying safely.`, 'warning');
             }
 
             // 🚨 BUG FIX (Ahmad: "bot lagate hi auto disconnect ho jata"):
@@ -3160,12 +3147,13 @@ setTimeout(() => { autoReconnectFromMongoDB(); }, 3000);
 
 
 process.on('exit', () => {
+    // Never erase local auth state on a normal process exit. MongoDB is the
+    // durable backup, while this local copy is still useful during graceful
+    // restarts and must not be wiped unless the owner explicitly logs out.
     activeSockets.forEach((socket, number) => {
         try { socket.ws.close(); } catch (_) {}
         activeSockets.delete(number); socketCreationTime.delete(number);
     });
-    const sessionDir = path.join(__dirname, 'session');
-    if (fs.existsSync(sessionDir)) fs.emptyDirSync(sessionDir);
 });
 
 process.on('uncaughtException', async (err) => {
