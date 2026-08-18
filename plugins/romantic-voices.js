@@ -65,7 +65,7 @@ const realShayari = [
 
 cmd({
     pattern: 'shayari',
-    alias: ['urdushayari', 'poetry'],
+    alias: ['urdushayari'],
     desc: '🌹 Real shayari by famous Urdu poets',
     category: 'fun',
     react: '🌹',
