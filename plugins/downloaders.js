@@ -581,6 +581,12 @@ const AUDIO_LINK_PROVIDERS = [
     { name: 'JawadTech', method: async url => (await getJawadTechResult(url)).mp3 }
 ];
 
+async function getQuickAudioLink(videoUrl) {
+    const result = await getJawadTechResult(videoUrl);
+    if (!result?.mp3) throw new Error('JawadTech: no usable MP3 link');
+    return result.mp3;
+}
+
 async function getQuickAudioBuffer(videoUrl) {
     let lastError;
     for (const provider of AUDIO_LINK_PROVIDERS) {
@@ -993,30 +999,45 @@ cmd({ pattern: 'ytmp3', alias: ['song', 'play'], desc: 'Download YouTube as MP3'
 async (conn, mek, m, { reply, args, from }) => {
     const query = args.join(' ').trim();
     if (!query) return reply(dlBox('YOUTUBE MP3', ['❌ Song name or YouTube link required', '📝 .play <song name>', '🔗 .play <YouTube link>'], '🎵'));
-    if (!YTDlpWrapLib) return reply('❌ yt-dlp is unavailable on this server.');
     let outPath;
     try {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const started = Date.now();
         const video = await ytSearch(query);
-        outPath = path.join('/tmp', `ytaudio_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`);
-        // Preview immediately; do not make the user wait behind another heavy
-        // download already running in the shared queue.
+        // Preview immediately, before any heavy queue work.
         await conn.sendMessage(from, {
             image: { url: video.thumb },
             caption: dlBox('YOUTUBE MP3', [`🎵 ${video.title?.slice(0, 60)}`, `👤 ${video.author || 'YouTube'}`, '⏳ Downloading...'], '🎵'),
             contextInfo: chanCtx()
         }, { quoted: fakevCard }).catch(e => console.log('[YTMP3] preview failed:', e.message));
+
+        // Fast path: let WhatsApp fetch the validated MP3 URL directly. This
+        // avoids downloading the whole file into Railway before sending it.
+        try {
+            const directAudioUrl = await getQuickAudioLink(video.url);
+            await sendWithRetry(conn, from, {
+                audio: { url: directAudioUrl },
+                mimetype: 'audio/mpeg',
+                fileName: `${video.title?.slice(0, 35) || 'audio'}.mp3`,
+                ptt: false
+            }, { quoted: fakevCard });
+            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
+            console.log(`[YTMP3] direct provider completed in ${Date.now() - started}ms`);
+            return;
+        } catch (e) {
+            console.log('[YTMP3] direct provider failed; using buffered fallback:', e.message);
+        }
+
+        // Fallback: preserve the existing validated buffered path.
+        if (!YTDlpWrapLib) throw new Error('yt-dlp is unavailable on this server.');
+        outPath = path.join('/tmp', `ytaudio_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`);
         await heavyQueue.run(async () => {
             await dlAudio(video.url, outPath);
             const audio = fs.readFileSync(outPath);
-            // The direct JawadTech path already returns validated MP3 bytes.
-            // Sending them directly avoids an unnecessary ffmpeg MP3→Opus
-            // conversion, which was the main avoidable delay in `.play`.
             await sendWithRetry(conn, from, { audio, mimetype: detectAudioFormat(audio).mimetype, fileName: `${video.title?.slice(0, 35) || 'audio'}.mp3`, ptt: false }, { quoted: fakevCard });
             try { fs.unlinkSync(outPath); } catch {}
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            console.log(`[YTMP3] completed in ${Date.now() - started}ms`);
+            console.log(`[YTMP3] buffered fallback completed in ${Date.now() - started}ms`);
         }, async position => {
             await replyWithRetry(conn, from, mek, `⏳ Download queue position: #${position}`);
         });

@@ -58,6 +58,7 @@ cmd({
         { emoji: '🩷', label: 'SYSTEM', value: 'ONLINE' },
         { emoji: '🦋', label: 'PONG',   value: 'PONG' },
         { emoji: '🌷', label: 'SPEED',  value: `${networkMs}ms` },
+        { emoji: '⏱️', label: 'UPTIME', value: uptimeStr },
     ]);
 
     const resultReaction = "💫";

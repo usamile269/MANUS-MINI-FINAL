@@ -1194,9 +1194,15 @@ cmd({
     const ownerJid = config.OWNER_NUMBER?.replace(/[^0-9]/g,'') + '@s.whatsapp.net';
     const start = Date.now();
     try {
-        await conn.sendMessage(ownerJid, { text: `📡 ${toFancy('Ping from')} ${BOT}\n_${toFancy('Connectivity OK')}_` });
+        const uptimeSec = Math.floor(process.uptime());
+        const days = Math.floor(uptimeSec / 86400);
+        const hours = Math.floor((uptimeSec % 86400) / 3600);
+        const minutes = Math.floor((uptimeSec % 3600) / 60);
+        const seconds = uptimeSec % 60;
+        const uptime = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+        await conn.sendMessage(ownerJid, { text: `📡 ${toFancy('Ping from')} ${BOT}\n_${toFancy('Connectivity OK')}_\n⏱️ ${toFancy('Uptime')}: ${uptime}` });
         const ping = Date.now() - start;
-        reply(`✅ ${toFancy('Owner Pinged')}\n⚡ ${toFancy('Ping')}: ${ping}ms`);
+        reply(`✅ ${toFancy('Owner Pinged')}\n⚡ ${toFancy('Ping')}: ${ping}ms\n⏱️ ${toFancy('Uptime')}: ${uptime}`);
     } catch (e) {
         reply(`❌ ${toFancy('Could not reach owner DM')}: ${e.message}`);
     }
