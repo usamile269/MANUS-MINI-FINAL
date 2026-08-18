@@ -160,7 +160,7 @@ async (conn, mek, m, { from, args, q, reply }) => {
                     } catch (jawadError) {
                         console.log('[POETRY] YouTube APIs failed, using yt-dlp:', jawadError.message);
                         const bin = await ensureYtDlp();
-                        await run(bin, [query, '-f', 'bestaudio/best', '--no-playlist', '--max-filesize', '35M', '-o', input], 120000);
+                        await run(bin, [query, '-f', '18/bestaudio/best', '--no-playlist', '--max-filesize', '35M', '--extractor-args', 'youtube:player_client=android,ios', '--force-ipv4', '--socket-timeout', '25', '--retries', '3', '--fragment-retries', '3', '-o', input], 120000);
                     }
                 }
             } else {
@@ -182,7 +182,7 @@ async (conn, mek, m, { from, args, q, reply }) => {
                     } catch (jawadError) {
                         console.log('[POETRY] YouTube APIs failed, using yt-dlp:', jawadError.message);
                         const bin = await ensureYtDlp();
-                        await run(bin, [video.url, '-f', 'bestaudio/best', '--no-playlist', '--max-filesize', '35M', '-o', input], 120000);
+                        await run(bin, [video.url, '-f', '18/bestaudio/best', '--no-playlist', '--max-filesize', '35M', '--extractor-args', 'youtube:player_client=android,ios', '--force-ipv4', '--socket-timeout', '25', '--retries', '3', '--fragment-retries', '3', '-o', input], 120000);
                     }
                 }
             }
