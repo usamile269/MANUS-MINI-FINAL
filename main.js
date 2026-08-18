@@ -3014,6 +3014,7 @@ async function ahmadPair(number, res = null) {
 
 
 router.get('/', (req, res) => res.sendFile(path.join(__dirname, 'pair.html')));
+router.get('/admin.html', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
 // 🔐 API key protection (Bunty: "Usman ki file mein API key protection hai,
 // hamari mein nahi") — mirrors Usman-MD's requireApiKey middleware. Only

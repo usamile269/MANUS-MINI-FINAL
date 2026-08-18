@@ -3167,14 +3167,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 function openAdmin() {
-    document.body.classList.add('admin-open');
-    document.getElementById('adminOverlay').classList.add('show');
-    const savedKey = localStorage.getItem('admd_admin_key');
-    if (savedKey) {
-        verifyAndEnter(savedKey);
-    } else {
-        showLockView();
-    }
+    window.location.href = '/admin.html';
 }
 function closeAdmin() {
     document.getElementById('adminOverlay').classList.remove('show');
