@@ -3,6 +3,10 @@ const { toSansBoldItalic, randomFooter, renderCuteBox } = require('../lib/menu-s
 const config = require('../config');
 const os = require('os');
 
+const PING_START_REACTIONS = ['🐣', '🐰', '🐼', '🧸', '🌷', '🪽', '🌙', '🍓'];
+const PING_SUCCESS_REACTIONS = ['🦋', '💗', '🤍', '✨', '🌸', '💞'];
+const randomPingReaction = list => list[Math.floor(Math.random() * list.length)];
+
 // 🎨 REDESIGN (Bunty: "channel forward style mein hai hi nahi 🫠"): the
 // previous version only attached the channel-forward contextInfo to the
 // throwaway "calculating..." placeholder message — the SECOND call (the
@@ -27,11 +31,14 @@ cmd({
   pattern: "ping",
   desc: "⚡ Check bot speed",
   category: "main",
-  react: "🎀",
   filename: __filename
 }, async (conn, mek, m, { from, reply, arrivalTs }) => {
 
   try {
+    conn.sendMessage(from, {
+      react: { text: randomPingReaction(PING_START_REACTIONS), key: m.key }
+    }).catch(() => {});
+
     const processMs = Math.max(1, Date.now() - (arrivalTs || Date.now()));
 
     // Cheap, invisible network round-trip probe (a presence update touches
@@ -40,7 +47,10 @@ cmd({
     // reply can be sent once, fully formed, contextInfo included from the
     // start.
     const sendStart = Date.now();
-    await conn.sendPresenceUpdate('available', from).catch(() => {});
+    await Promise.race([
+      conn.sendPresenceUpdate('available', from).catch(() => {}),
+      new Promise(resolve => setTimeout(resolve, 500))
+    ]);
     const networkMs = Math.max(1, Date.now() - sendStart);
 
     const uptimeSec = process.uptime();
@@ -61,7 +71,7 @@ cmd({
         { emoji: '⏱️', label: 'UPTIME', value: uptimeStr },
     ]);
 
-    const resultReaction = "💫";
+    const resultReaction = randomPingReaction(PING_SUCCESS_REACTIONS);
 
     await conn.sendMessage(from, {
       text,
