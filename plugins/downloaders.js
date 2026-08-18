@@ -474,7 +474,8 @@ async function fetchMediaBuffer(mediaUrl, maxBytes, timeout = 60000) {
 async function resolveVideoLink(videoUrl) {
     const providers = [
         { name: 'JawadTech', resolve: async () => (await getJawadTechResult(videoUrl)).mp4 },
-        { name: 'AdeelXTech', resolve: async () => getAdeelXtechVideoLink(videoUrl) }
+        { name: 'AdeelXTech', resolve: async () => getAdeelXtechVideoLink(videoUrl) },
+        { name: 'EliteProTech', resolve: async () => getEliteProTechVideoLink(videoUrl) }
     ];
     const attempts = providers.map(async ({ name, resolve }) => {
         const link = await resolve();
@@ -721,9 +722,9 @@ async function dlVideo(videoUrl, outPath) {
     //    speedup on longer videos even when a merge does still happen.
     const wrap = await ensureYtDlp();
     const args = [videoUrl, '-f', 'best[height<=360][ext=mp4]/best[height<=360]/best[ext=mp4]/best', '--no-playlist',
-        '--extractor-args', 'youtube:player_client=android,web_safari,tv_embedded',
-        '--force-ipv4', '--socket-timeout', '20', '--retries', '2', '--fragment-retries', '2',
-        '--merge-output-format', 'mp4', '--concurrent-fragments', '4', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
+        '--extractor-args', 'youtube:player_client=android_vr,web_safari,tv_embedded',
+        '--force-ipv4', '--socket-timeout', '25', '--retries', '3', '--fragment-retries', '3',
+        '--merge-output-format', 'mp4', '--remux-video', 'mp4', '--concurrent-fragments', '4', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
         await wrap.execPromise(args);
     } catch (e) {
