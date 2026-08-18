@@ -45,6 +45,7 @@ async function modifyAudio(inputPath, outputPath, opts = {}) {
 
 // Send voice note from URL with optional modification
 async function sendVoice(conn, from, mek, url, opts = {}) {
+    const fallbackText = opts.fallbackText;
     await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
     try {
         const res = await axios.get(url, {
@@ -112,6 +113,11 @@ async function sendVoice(conn, from, mek, url, opts = {}) {
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
         } catch (e2) {
             console.log('[VOICE] fallback also failed:', e2.message);
+            if (fallbackText) {
+                console.log('[VOICE] using TTS fallback for sound:', fallbackText);
+                await ttsVoice(conn, from, mek, fallbackText, 'en', { pitch: 0.65, speed: 0.85 });
+                return false;
+            }
             await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
             // 🚨 FIX (Bunty: "ohno/lurk jaisi cheezein kaafi zyada fail hoti
             // hain"): this used to fail completely silent — just a ❌
@@ -212,7 +218,7 @@ async (conn, mek, m, { from }) => {
 // 8. bruh
 cmd({ pattern: 'bruh', alias: ['bruhhh'], desc: 'Bruh sound effect 😐', category: 'fun', react: '😐' },
 async (conn, mek, m, { from }) => {
-    await sendVoice(conn, from, mek, 'https://files.catbox.moe/9ihz8z.mp3');
+    await sendVoice(conn, from, mek, 'https://files.catbox.moe/9ihz8z.mp3', { fallbackText: 'bruh' });
 });
 
 // 9. airhorn

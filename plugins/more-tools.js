@@ -258,11 +258,26 @@ async (conn, mek, m, { from, q, reply }) => {
         let lang = "en", text = q;
         const parts = q.split(' ');
         if (parts[0].length === 2 && parts.length > 1) { lang = parts[0]; text = parts.slice(1).join(' '); }
-        const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text.slice(0, 200))}&tl=${lang}&client=tw-ob`;
-        const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 20000, headers: { 'User-Agent': 'Mozilla/5.0' } });
-        const ogg = await mp3BufferToOggVoice(Buffer.from(res.data));
+        const encoded = encodeURIComponent(text.slice(0, 200));
+        const urls = [
+            `https://translate.google.com/translate_tts?ie=UTF-8&oe=UTF-8&q=${encoded}&tl=${encodeURIComponent(lang)}&client=tw-ob`,
+            `https://translate.google.com/translate_tts?client=tw-ob&ie=UTF-8&oe=UTF-8&tl=${encodeURIComponent(lang)}&q=${encoded}`
+        ];
+        let audio;
+        let lastError;
+        for (const url of urls) {
+            try {
+                const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000, family: 4, headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'audio/mpeg,audio/*;q=0.9,*/*;q=0.8' } });
+                const raw = Buffer.from(res.data);
+                if (raw.length < 1000 || raw.slice(0, 20).toString('utf8').trim().startsWith('<')) throw new Error('invalid audio response');
+                audio = raw;
+                break;
+            } catch (err) { lastError = err; }
+        }
+        if (!audio) throw new Error('TTS provider unavailable');
+        const ogg = await mp3BufferToOggVoice(audio);
         await conn.sendMessage(from, { audio: ogg, mimetype: "audio/ogg; codecs=opus", ptt: true }, { quoted: mek });
-    } catch (e) { fail(reply, "TTS failed: " + e.message); }
+    } catch (e) { fail(reply, "TTS temporarily unavailable — try again shortly."); }
 });
 
 cmd({ pattern: "meme", desc: "Random meme", category: "fun", filename: __filename },

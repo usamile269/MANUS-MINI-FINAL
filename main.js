@@ -3067,6 +3067,21 @@ router.post('/admin/verify-key', (req, res) => {
     res.json({ valid: !!key && key === config.ADMIN_PANEL_KEY });
 });
 
+// 🔐 Read-only owner overview for the separate Control Center page.
+router.post('/admin/overview', async (req, res) => {
+    const { key } = req.body || {};
+    if (!key || key !== config.ADMIN_PANEL_KEY) return res.status(401).json({ status: 'error', message: 'Invalid admin key' });
+    try {
+        const savedNumbers = await getAllNumbersFromMongoDB();
+        const numbers = [...new Set(savedNumbers.map(n => String(n).replace(/[^0-9]/g, '')).filter(Boolean))];
+        const records = numbers.map(number => {
+            const s = getConnectionStatus(number);
+            return { number, active: activeSockets.has(number), status: activeSockets.has(number) ? 'connected' : 'saved', connectionTime: s.connectionTime || null, uptimeSeconds: Number(s.uptime) || 0 };
+        });
+        res.json({ status: 'success', totalNumbers: records.length, activeSessions: activeSockets.size, numbers: records });
+    } catch (e) { res.status(500).json({ status: 'error', message: 'Failed to load overview' }); }
+});
+
 router.get('/code', requireApiKey, async (req, res) => { if (!req.query.number) return res.json({ error: 'Number required' }); await ahmadPair(req.query.number, res); });
 router.get('/status', async (req, res) => {
     const { number } = req.query;

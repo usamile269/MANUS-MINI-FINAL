@@ -1,0 +1,36 @@
+{
+  "rewrites": [
+    {
+      "source": "/code",
+      "destination": "https://web-production-47e23.up.railway.app/code"
+    },
+    {
+      "source": "/active",
+      "destination": "https://web-production-47e23.up.railway.app/active"
+    },
+    {
+      "source": "/status",
+      "destination": "https://web-production-47e23.up.railway.app/status"
+    },
+    {
+      "source": "/site-settings",
+      "destination": "https://web-production-47e23.up.railway.app/site-settings"
+    },
+    {
+      "source": "/admin/verify-key",
+      "destination": "https://web-production-47e23.up.railway.app/admin/verify-key"
+    },
+    {
+      "source": "/admin/site-settings",
+      "destination": "https://web-production-47e23.up.railway.app/admin/site-settings"
+    },
+    {
+      "source": "/admin/overview",
+      "destination": "https://web-production-47e23.up.railway.app/admin/overview"
+    },
+    {
+      "source": "/health",
+      "destination": "https://web-production-47e23.up.railway.app/health"
+    }
+  ]
+}
