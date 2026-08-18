@@ -101,6 +101,7 @@ const lockHeartbeatTimers = new Map(); // number -> setInterval id, so it can be
 const sessionBackupTimers = new Map(); // number -> setInterval id for the full Signal key-store backup (see saveFullSessionFolderToMongoDB)
 const sessionBackupDebounceTimers = new Map(); // number -> short debounce timer for creds/key changes
 const lockRetryTimers = new Map(); // number -> one pending cross-process lock retry
+const credsUpdateQueues = new Map(); // number -> serialized creds.json persistence chain
 const socketCreationTime = new Map();
 // 🚨 BUG FIX (Bunty: ".pair karay to 'already connected' bolta hai, jabke
 // abhi tak actually connect hua hi nahi"): activeSockets gets a number's
@@ -1206,18 +1207,37 @@ async function ahmadPair(number, res = null) {
             }
         }
 
-        // Save creds on update
-        conn.ev.on('creds.update', async () => {
-            await saveCreds();
-            const fileContent = await fs.readFile(path.join(sessionPath, 'creds.json'), 'utf8');
-            const creds = JSON.parse(fileContent);
-            const existingSessionCheck = await getSessionFromMongoDB(sanitizedNumber);
-            const isNewSession = !existingSessionCheck;
-            await saveSessionToMongoDB(sanitizedNumber, creds);
-            scheduleFullSessionBackup(sanitizedNumber, sessionPath);
-            if (isNewSession) {
-                ahmadLog(`🎉 NEW user ${sanitizedNumber} successfully registered!`, 'success');
-            }
+        // Save creds on update. Baileys can emit several updates back-to-back;
+        // serializing them prevents one read from seeing creds.json halfway
+        // through another write (the source of "Unexpected end of JSON input").
+        conn.ev.on('creds.update', () => {
+            const previous = credsUpdateQueues.get(sanitizedNumber) || Promise.resolve();
+            const queued = previous.then(async () => {
+                await saveCreds();
+                let creds = null;
+                const credsPath = path.join(sessionPath, 'creds.json');
+                for (let attempt = 1; attempt <= 3 && !creds; attempt++) {
+                    try {
+                        const fileContent = await fs.readFile(credsPath, 'utf8');
+                        creds = JSON.parse(fileContent);
+                    } catch (e) {
+                        if (attempt === 3) {
+                            ahmadLog(`⚠️ Skipping incomplete creds snapshot for ${sanitizedNumber}: ${e.message}`, 'warn');
+                        } else {
+                            await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+                        }
+                    }
+                }
+                if (!creds) return;
+                const existingSessionCheck = await getSessionFromMongoDB(sanitizedNumber);
+                const isNewSession = !existingSessionCheck;
+                await saveSessionToMongoDB(sanitizedNumber, creds);
+                scheduleFullSessionBackup(sanitizedNumber, sessionPath);
+                if (isNewSession) {
+                    ahmadLog(`🎉 NEW user ${sanitizedNumber} successfully registered!`, 'success');
+                }
+            }).catch(e => ahmadLog(`⚠️ Session persistence skipped for ${sanitizedNumber}: ${e.message}`, 'warn'));
+            credsUpdateQueues.set(sanitizedNumber, queued);
         });
 
         // Anti-delete
