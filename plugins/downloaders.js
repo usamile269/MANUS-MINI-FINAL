@@ -415,7 +415,7 @@ async function replyWithRetry(conn, from, mek, text) {
 // crosses the cap instead of finishing the buffer in memory — it throws and
 // falls through to the safer yt-dlp path below (already capped to 480p and
 // written to disk, not RAM) instead of crashing the process.
-const MAX_QUICKAPI_VIDEO_BYTES = 20 * 1024 * 1024; // 🚨 (Bunty: ".play thumbnail late, phir bot crash") lowered from 30MB — on a memory-constrained host, several of these buffers held in Node memory at once (queue allows up to 4 concurrent) can add up to a real OOM risk. 20MB is still plenty for a short clip's video, smaller worst-case footprint.
+const MAX_QUICKAPI_VIDEO_BYTES = 40 * 1024 * 1024; // Video-only cap: larger clips can use the fast provider path while the shared queue bounds memory.
 
 // 🚀 RE-ENABLED (Bunty confirmed JawadTech is back up and working again,
 // wants it added for real speed on both .play and .video): this was
@@ -1104,7 +1104,7 @@ async (conn, mek, m, { reply, args, from }) => {
         await heavyQueue.run(async () => {
             await dlVideo(video.url, outPath);
             if (!fs.existsSync(outPath)) throw new Error('No video file produced');
-            if (fs.statSync(outPath).size > 50 * 1024 * 1024) throw new Error('Video too large');
+            if (fs.statSync(outPath).size > 100 * 1024 * 1024) throw new Error('Video too large (100 MB limit)');
             await sendWithRetry(conn, from, { video: fs.readFileSync(outPath), mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
             try { fs.unlinkSync(outPath); } catch {}
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });

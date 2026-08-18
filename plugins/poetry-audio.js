@@ -11,7 +11,6 @@ const { heavyQueue } = require('../lib/queue');
 const BIN = path.join(__dirname, '..', 'bin', 'poetry-yt-dlp');
 const MAX_BYTES = 35 * 1024 * 1024;
 const POETRY_CLIP_SECONDS = 18;
-const SEARCH_CACHE = new Map();
 
 function run(cmd, args, timeout = 90000) {
     return new Promise((resolve, reject) => {
@@ -43,14 +42,12 @@ async function ensureYtDlp() {
 }
 
 async function searchPoetry(query) {
-    const key = query.trim().toLowerCase();
-    const cached = SEARCH_CACHE.get(key);
-    if (cached && cached.expires > Date.now()) return cached.video;
+    // Never reuse a stale result: each request gets a fresh search and a
+    // different candidate when several public clips are available.
     const result = await yts(`${query} poetry recitation short`);
-    const video = result.videos?.[0];
-    if (!video) throw new Error('No public poetry clip found');
-    SEARCH_CACHE.set(key, { video, expires: Date.now() + 10 * 60 * 1000 });
-    return video;
+    const candidates = (result.videos || []).filter(v => v?.url).slice(0, 8);
+    if (!candidates.length) throw new Error('No public poetry clip found');
+    return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 async function jawadYouTubeMedia(url) {
