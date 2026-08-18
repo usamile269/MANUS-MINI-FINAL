@@ -117,6 +117,13 @@ async function youtubeDownloadWithFallback(url, outPath) {
     throw lastError || new Error('No YouTube media stream was downloadable');
 }
 
+async function directYoutubePoetryDownload(url, outPath) {
+    const bin = await ensureYtDlp();
+    await run(bin, [url, '-f', '18/bestaudio/best', '--no-playlist', '--max-filesize', '35M', '--extractor-args', 'youtube:player_client=android,ios', '--force-ipv4', '--socket-timeout', '25', '--retries', '3', '--fragment-retries', '3', '-o', outPath], 120000);
+    if (!fs.existsSync(outPath) || fs.statSync(outPath).size < 10000) throw new Error('yt-dlp produced no usable poetry media');
+    return { title: 'YouTube poetry', source: url };
+}
+
 async function toAudio(input, output) {
     // Keep the complete mixed soundtrack from the source (voice, music, and
     // ambient sounds). Trim by exact audio timestamps rather than relying only
@@ -153,12 +160,12 @@ async (conn, mek, m, { from, args, q, reply }) => {
                     // fail cleanly instead of pretending to have audio.
                     if (!/youtube\.com|youtu\.be/i.test(query)) throw apiError;
                     try {
+                        const yt = await directYoutubePoetryDownload(query, input);
+                        sourceTitle = yt.title;
+                    } catch (directError) {
+                        console.log('[POETRY] direct yt-dlp failed, trying media APIs:', directError.message);
                         const yt = await youtubeDownloadWithFallback(query, input);
                         sourceTitle = yt.title;
-                    } catch (jawadError) {
-                        console.log('[POETRY] YouTube APIs failed, using yt-dlp:', jawadError.message);
-                        const bin = await ensureYtDlp();
-                        await run(bin, [query, '-f', '18/bestaudio/best', '--no-playlist', '--max-filesize', '35M', '--extractor-args', 'youtube:player_client=android,ios', '--force-ipv4', '--socket-timeout', '25', '--retries', '3', '--fragment-retries', '3', '-o', input], 120000);
                     }
                 }
             } else {
@@ -175,12 +182,12 @@ async (conn, mek, m, { from, args, q, reply }) => {
                     await downloadToFile(social.mediaUrl, input);
                 } catch (apiError) {
                     try {
+                        const yt = await directYoutubePoetryDownload(video.url, input);
+                        sourceTitle = yt.title || sourceTitle;
+                    } catch (directError) {
+                        console.log('[POETRY] direct yt-dlp failed, trying media APIs:', directError.message);
                         const yt = await youtubeDownloadWithFallback(video.url, input);
                         sourceTitle = yt.title || sourceTitle;
-                    } catch (jawadError) {
-                        console.log('[POETRY] YouTube APIs failed, using yt-dlp:', jawadError.message);
-                        const bin = await ensureYtDlp();
-                        await run(bin, [video.url, '-f', '18/bestaudio/best', '--no-playlist', '--max-filesize', '35M', '--extractor-args', 'youtube:player_client=android,ios', '--force-ipv4', '--socket-timeout', '25', '--retries', '3', '--fragment-retries', '3', '-o', input], 120000);
                     }
                 }
             }
