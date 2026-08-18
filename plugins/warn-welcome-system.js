@@ -194,7 +194,7 @@ cmd({
     // no download/base64 needed, so this is now supported alongside the
     // original reply-to-video flow.
     if (args[0] && /^https?:\/\//i.test(args[0])) {
-        for (const s of applyToScopes) await setGroupSettings(s, { welcomeVideo: args[0] });
+        for (const s of applyToScopes) await setGroupSettings(s, { welcomeVideo: args[0], welcomeOn: true });
         return reply(`✅ Welcome video (from URL) saved${scopeLabel}.`);
     }
 
@@ -212,7 +212,7 @@ cmd({
         // Stored as base64 in each applicable group's own settings doc
         // (local JSON file, no MongoDB) — same approach already used for
         // per-user MENU_IMAGE.
-        for (const s of applyToScopes) await setGroupSettings(s, { welcomeVideo: b64 });
+        for (const s of applyToScopes) await setGroupSettings(s, { welcomeVideo: b64, welcomeOn: true });
         reply(`✅ Welcome video saved${scopeLabel}. It will be sent together with the welcome text from now on.`);
     } catch (e) {
         fail(reply, "Couldn't save that video: " + e.message);
