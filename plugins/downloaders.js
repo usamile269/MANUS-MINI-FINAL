@@ -1000,23 +1000,20 @@ async (conn, mek, m, { reply, args, from }) => {
         const started = Date.now();
         const video = await ytSearch(query);
         outPath = path.join('/tmp', `ytaudio_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`);
+        // Preview immediately; do not make the user wait behind another heavy
+        // download already running in the shared queue.
+        await conn.sendMessage(from, {
+            image: { url: video.thumb },
+            caption: dlBox('YOUTUBE MP3', [`🎵 ${video.title?.slice(0, 60)}`, `👤 ${video.author || 'YouTube'}`, '⏳ Downloading...'], '🎵'),
+            contextInfo: chanCtx()
+        }, { quoted: fakevCard }).catch(e => console.log('[YTMP3] preview failed:', e.message));
         await heavyQueue.run(async () => {
-            await conn.sendMessage(from, {
-                image: { url: video.thumb },
-                caption: dlBox('YOUTUBE MP3', [`🎵 ${video.title?.slice(0, 60)}`, `👤 ${video.author || 'YouTube'}`, '⏳ Downloading...'], '🎵'),
-                contextInfo: chanCtx()
-            }, { quoted: fakevCard }).catch(e => console.log('[YTMP3] preview failed:', e.message));
             await dlAudio(video.url, outPath);
             const audio = fs.readFileSync(outPath);
-            let sent = false;
-            const opusPath = outPath.replace(/\.mp3$/, '.ogg');
-            try {
-                await new Promise((resolve, reject) => ffmpeg(outPath).audioCodec('libopus').audioBitrate('64k').audioChannels(1).format('ogg').on('end', resolve).on('error', reject).save(opusPath));
-                await sendWithRetry(conn, from, { audio: fs.readFileSync(opusPath), mimetype: 'audio/ogg; codecs=opus', ptt: false }, { quoted: fakevCard });
-                sent = true;
-            } catch (e) { console.log('[YTMP3] opus conversion failed:', e.message); }
-            if (!sent) await sendWithRetry(conn, from, { audio, mimetype: detectAudioFormat(audio).mimetype, fileName: `${video.title?.slice(0, 35) || 'audio'}.mp3`, ptt: false }, { quoted: fakevCard });
-            try { fs.unlinkSync(opusPath); } catch {}
+            // The direct JawadTech path already returns validated MP3 bytes.
+            // Sending them directly avoids an unnecessary ffmpeg MP3→Opus
+            // conversion, which was the main avoidable delay in `.play`.
+            await sendWithRetry(conn, from, { audio, mimetype: detectAudioFormat(audio).mimetype, fileName: `${video.title?.slice(0, 35) || 'audio'}.mp3`, ptt: false }, { quoted: fakevCard });
             try { fs.unlinkSync(outPath); } catch {}
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
             console.log(`[YTMP3] completed in ${Date.now() - started}ms`);
