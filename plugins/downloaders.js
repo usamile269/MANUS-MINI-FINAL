@@ -415,7 +415,7 @@ async function replyWithRetry(conn, from, mek, text) {
 // crosses the cap instead of finishing the buffer in memory — it throws and
 // falls through to the safer yt-dlp path below (already capped to 480p and
 // written to disk, not RAM) instead of crashing the process.
-const MAX_QUICKAPI_VIDEO_BYTES = 40 * 1024 * 1024; // Video-only cap: larger clips can use the fast provider path while the shared queue bounds memory.
+const MAX_QUICKAPI_VIDEO_BYTES = 60 * 1024 * 1024; // Video-only cap: above WhatsApp's old 50MB limit while the shared queue bounds memory.
 
 // 🚀 RE-ENABLED (Bunty confirmed JawadTech is back up and working again,
 // wants it added for real speed on both .play and .video): this was
@@ -724,7 +724,7 @@ async function dlVideo(videoUrl, outPath) {
     const args = [videoUrl, '-f', '18/best[height<=360][ext=mp4]/best[height<=360]/best[ext=mp4]/best', '--no-playlist',
         '--extractor-args', 'youtube:player_client=android,ios',
         '--force-ipv4', '--socket-timeout', '25', '--retries', '3', '--fragment-retries', '3',
-        '--merge-output-format', 'mp4', '--concurrent-fragments', '4', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
+        '--merge-output-format', 'mp4', '--concurrent-fragments', '8', '--buffer-size', '1M', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
         await wrap.execPromise(args);
     } catch (e) {
@@ -1116,7 +1116,7 @@ async (conn, mek, m, { reply, args, from }) => {
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } }).catch(() => {});
         console.log('[YTMP4 FINAL ERROR]', e.message);
         if (String(e.message).startsWith('YTSEARCH_FAILED')) return replyWithRetry(conn, from, mek, '❌ YouTube search failed. Paste a direct YouTube link and try again.');
-        return replyWithRetry(conn, from, mek, /too large/i.test(e.message) ? '❌ Video is over the 50MB WhatsApp limit.' : '❌ Download failed. Try a direct YouTube link or a shorter video.');
+        return replyWithRetry(conn, from, mek, /too large/i.test(e.message) ? '❌ Video is over the 100MB limit.' : '❌ Download failed. Try a direct YouTube link or a shorter video.');
     }
 });
 
