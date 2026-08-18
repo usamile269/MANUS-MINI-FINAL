@@ -11,9 +11,10 @@ const GroupSettings = jsondb.model('GroupSettings');
 // placeholders stay untouched here, sendWelcome/sendGoodbye substitute
 // them in later.
 const DEFAULT_WELCOME_MSG =
-    `> ${B('Yayy! @user finally aa hi gaye group mein, sabko khushi ho gayi')} ✨\n` +
-    `> ${B('Ab masti double ho jayegi, welcome karo sab pyaar se')} 💗\n` +
-    `> ${B('Enjoy karo yahan, rules follow karo, aur active raho')} ☁️`;
+    `> ${B('Yayy! @user group mein aa gaye, dil se welcome hai')} ✨\n` +
+    `> ${B('Ab masti aur memories dono double hongi')} 💗\n` +
+    `> ${B('Members: @members  •  Time: @time')} ☁️\n` +
+    `> ${B('Enjoy karo, rules follow karo, aur active raho')} 🌷`;
 
 const DEFAULT_GOODBYE_MSG =
     `> ${B('@user ne group chhod diya, dil thoda udaas ho gaya sabka')} 💔\n` +
