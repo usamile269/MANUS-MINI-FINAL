@@ -99,6 +99,8 @@ const activeSockets = new Map();
 const INSTANCE_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 const lockHeartbeatTimers = new Map(); // number -> setInterval id, so it can be cleared on disconnect
 const sessionBackupTimers = new Map(); // number -> setInterval id for the full Signal key-store backup (see saveFullSessionFolderToMongoDB)
+const sessionBackupDebounceTimers = new Map(); // number -> short debounce timer for creds/key changes
+const lockRetryTimers = new Map(); // number -> one pending cross-process lock retry
 const socketCreationTime = new Map();
 // 🚨 BUG FIX (Bunty: ".pair karay to 'already connected' bolta hai, jabke
 // abhi tak actually connect hua hi nahi"): activeSockets gets a number's
@@ -675,6 +677,10 @@ function setupAutoRestart(socket, number) {
             activeSockets.delete(sanitizedNumber);
             socketCreationTime.delete(sanitizedNumber);
             connectionOpenState.delete(sanitizedNumber);
+            if (lockHeartbeatTimers.has(sanitizedNumber)) { clearInterval(lockHeartbeatTimers.get(sanitizedNumber)); lockHeartbeatTimers.delete(sanitizedNumber); }
+            if (sessionBackupTimers.has(sanitizedNumber)) { clearInterval(sessionBackupTimers.get(sanitizedNumber)); sessionBackupTimers.delete(sanitizedNumber); }
+            if (sessionBackupDebounceTimers.has(sanitizedNumber)) { clearTimeout(sessionBackupDebounceTimers.get(sanitizedNumber)); sessionBackupDebounceTimers.delete(sanitizedNumber); }
+            releaseConnectionLock(sanitizedNumber, INSTANCE_ID).catch(() => {});
 
             if (statusCode === 401 || (errorMessage && errorMessage.includes('401'))) {
                 ahmadLog(`Manual unlink detected for ${number}, cleaning up...`, 'warning');
@@ -800,6 +806,19 @@ async function backupFullSessionFolder(sanitizedNumber, sessionPath) {
     }
 }
 
+// Auth/key files can change several times during pairing and reconnect. Queue
+// one near-immediate full snapshot instead of waiting for the 20s interval,
+// while coalescing bursts so Mongo is not hammered by duplicate writes.
+function scheduleFullSessionBackup(sanitizedNumber, sessionPath) {
+    const previous = sessionBackupDebounceTimers.get(sanitizedNumber);
+    if (previous) clearTimeout(previous);
+    const timer = setTimeout(async () => {
+        sessionBackupDebounceTimers.delete(sanitizedNumber);
+        await backupFullSessionFolder(sanitizedNumber, sessionPath);
+    }, 750);
+    sessionBackupDebounceTimers.set(sanitizedNumber, timer);
+}
+
 async function ahmadPair(number, res = null) {
     let connectionLockKey;
     const sanitizedNumber = number.replace(/[^0-9]/g, '');
@@ -834,6 +853,16 @@ async function ahmadPair(number, res = null) {
         if (!lockResult.acquired) {
             ahmadLog(`⏳ Skipping connect for ${sanitizedNumber} — another instance's session lock is still fresh (${Math.round((lockResult.ageMs || 0) / 1000)}s old). Will retry shortly to avoid a WhatsApp session conflict.`, 'warning');
             global[connectionLockKey] = false;
+            // Only one delayed retry may exist per number. Reconnect, watchdog,
+            // and pairing requests can all observe the same live lock; stacking
+            // timers here creates a self-inflicted reconnect race.
+            if (!lockRetryTimers.has(sanitizedNumber)) {
+                const retryTimer = setTimeout(() => {
+                    lockRetryTimers.delete(sanitizedNumber);
+                    ahmadPair(number, null).catch(e => ahmadLog(`Lock retry failed for ${number}: ${e.message}`, 'error'));
+                }, 8000);
+                lockRetryTimers.set(sanitizedNumber, retryTimer);
+            }
             // 🚨 BUG FIX (Bunty: "Telegram pe code hi nahi aa raha" — this
             // was the "lifetime" lock fix's own regression): a REAL waiting
             // caller (someone requesting a pairing code via /code, which
@@ -848,9 +877,10 @@ async function ahmadPair(number, res = null) {
             if (res && !res.headersSent) {
                 return res.json({ status: 'connection_in_progress', message: 'Another instance is still finishing up this number\'s session — please try again in about 10 seconds.' });
             }
-            setTimeout(() => { ahmadPair(number, null); }, 8000);
             return;
         }
+
+        if (lockRetryTimers.has(sanitizedNumber)) { clearTimeout(lockRetryTimers.get(sanitizedNumber)); lockRetryTimers.delete(sanitizedNumber); }
 
         // Check MongoDB session
         const existingSession = await getSessionFromMongoDB(sanitizedNumber);
@@ -1197,6 +1227,7 @@ async function ahmadPair(number, res = null) {
             const existingSessionCheck = await getSessionFromMongoDB(sanitizedNumber);
             const isNewSession = !existingSessionCheck;
             await saveSessionToMongoDB(sanitizedNumber, creds);
+            scheduleFullSessionBackup(sanitizedNumber, sessionPath);
             if (isNewSession) {
                 ahmadLog(`🎉 NEW user ${sanitizedNumber} successfully registered!`, 'success');
             }
@@ -3190,6 +3221,8 @@ async function closeAllSocketsGracefully() {
         catch (e) { console.log(`[SHUTDOWN] error closing socket for ${number}: ${e.message}`); }
         if (lockHeartbeatTimers.has(number)) { clearInterval(lockHeartbeatTimers.get(number)); lockHeartbeatTimers.delete(number); }
         if (sessionBackupTimers.has(number)) { clearInterval(sessionBackupTimers.get(number)); sessionBackupTimers.delete(number); }
+        if (sessionBackupDebounceTimers.has(number)) { clearTimeout(sessionBackupDebounceTimers.get(number)); sessionBackupDebounceTimers.delete(number); }
+        if (lockRetryTimers.has(number)) { clearTimeout(lockRetryTimers.get(number)); lockRetryTimers.delete(number); }
         // 🚨 "LIFETIME" FIX — release OUR lock on clean shutdown so the
         // next container (about to start, per the deploy that triggered
         // this SIGTERM) doesn't have to wait out the full LOCK_STALE_MS
