@@ -121,9 +121,10 @@ async function youtubeDownloadWithFallback(url, outPath) {
 }
 
 async function toAudio(input, output) {
-    // WhatsApp is more reliable with a standard MP3 audio document than an
-    // Ogg/Opus voice-note buffer for these downloaded poetry clips.
-    await run(require('@ffmpeg-installer/ffmpeg').path, ['-y', '-i', input, '-vn', '-t', String(POETRY_CLIP_SECONDS), '-c:a', 'libmp3lame', '-b:a', '128k', '-ar', '44100', '-ac', '2', '-f', 'mp3', output], 90000);
+    // Keep the complete mixed soundtrack from the source (voice, music, and
+    // ambient sounds). Trim by exact audio timestamps rather than relying only
+    // on container duration, then send standard MP3 for WhatsApp compatibility.
+    await run(require('@ffmpeg-installer/ffmpeg').path, ['-y', '-i', input, '-map', '0:a:0', '-vn', '-af', `atrim=start=0:duration=${POETRY_CLIP_SECONDS},asetpts=N/SR/TB`, '-t', String(POETRY_CLIP_SECONDS), '-c:a', 'libmp3lame', '-b:a', '128k', '-ar', '44100', '-ac', '2', '-avoid_negative_ts', 'make_zero', '-f', 'mp3', output], 90000);
     if (!fs.existsSync(output) || fs.statSync(output).size < 2000) throw new Error('Audio extraction failed');
 }
 
