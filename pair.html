@@ -1760,12 +1760,14 @@ body { overflow-x:hidden; }
 #adminPanelView > .admin-field:nth-of-type(1), #adminPanelView > .admin-field:nth-of-type(2), #adminPanelView > .admin-field:nth-of-type(3), #adminPanelView > .admin-field:nth-of-type(4) { }
 #adminPanelView > .admin-buttons { padding-top:16px; border-top:1px solid rgba(91,75,183,.1); }
 #adminPanelView input { border-radius:12px; }
+body.admin-open { overflow:hidden; overscroll-behavior:none; touch-action:none; }
 @media (max-width:760px) {
-  #adminOverlay { padding:8px; }
-  #adminOverlay .admin-panel { max-height:96vh; border-radius:21px; }
-  #adminPanelView { display:block; min-height:0; }
+  #adminOverlay { position:fixed; inset:0; padding:8px; overflow:hidden; overscroll-behavior:contain; touch-action:none; align-items:flex-start; }
+  #adminOverlay .admin-panel { width:100%; height:calc(100dvh - 16px); max-height:none; border-radius:21px; overflow:hidden; display:flex; flex-direction:column; }
+  #adminLockView { flex:0 0 auto; }
+  #adminPanelView { display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden; }
   .admin-control-center-nav { display:none; }
-  .admin-control-center-main { padding:20px 16px; }
+  .admin-control-center-main { flex:1 1 auto; min-height:0; height:auto; padding:20px 16px 28px; overflow-y:auto; overflow-x:hidden; overscroll-behavior-y:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
   .admin-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .admin-center-topbar { margin-bottom:15px; }
   #adminPanelView > .admin-field, #adminPanelView > .admin-control-card, #adminPanelView > .admin-buttons, #adminPanelView > .admin-msg { display:block; }
@@ -3165,6 +3167,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 function openAdmin() {
+    document.body.classList.add('admin-open');
     document.getElementById('adminOverlay').classList.add('show');
     const savedKey = localStorage.getItem('admd_admin_key');
     if (savedKey) {
@@ -3175,6 +3178,7 @@ function openAdmin() {
 }
 function closeAdmin() {
     document.getElementById('adminOverlay').classList.remove('show');
+    document.body.classList.remove('admin-open');
 }
 function showLockView() {
     document.getElementById('adminLockView').style.display = 'block';
