@@ -41,13 +41,52 @@ async function ensureYtDlp() {
     return BIN;
 }
 
+async function searchSocialPoetry(query) {
+    const terms = encodeURIComponent(`${query} poetry edit music status`);
+    const response = await axios.get(`https://www.bing.com/search?q=${terms}`, {
+        timeout: 12000,
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    const html = String(response.data || '').replace(/&amp;/g, '&');
+    const urls = html.match(/https?:\/\/(?:www\.)?(?:tiktok\.com\/@[^"'<> ]+\/video\/\d+|instagram\.com\/(?:reel|p)\/[^?"'<> ]+)/gi) || [];
+    const unique = [...new Set(urls.map(url => url.replace(/[&].*$/, '')))];
+    if (!unique.length) return null;
+    return { url: unique[Math.floor(Math.random() * unique.length)], title: `${query} social edit` };
+}
+
 async function searchPoetry(query) {
-    // Never reuse a stale result: each request gets a fresh search and a
-    // different candidate when several public clips are available.
-    const result = await yts(`${query} poetry recitation short`);
-    const candidates = (result.videos || []).filter(v => v?.url).slice(0, 8);
-    if (!candidates.length) throw new Error('No public poetry clip found');
-    return candidates[Math.floor(Math.random() * candidates.length)];
+    // Fresh search every time. Prefer the short edited/status-style uploads
+    // that commonly contain music and effects, instead of plain long recitations.
+    try {
+        const social = await searchSocialPoetry(query);
+        if (social) return social;
+    } catch (e) { console.log('[POETRY SEARCH] social search unavailable:', e.message); }
+    const searches = [
+        `${query} poetry edit background music tiktok instagram reel 15 seconds`,
+        `${query} poetry status edit music tiktok instagram short`,
+        `${query} poetry recitation whatsapp status short`
+    ];
+    const all = [];
+    for (const search of searches) {
+        try {
+            const result = await yts(search);
+            for (const video of (result.videos || [])) {
+                if (video?.url && !all.some(x => x.url === video.url)) all.push(video);
+            }
+            if (all.length >= 12) break;
+        } catch (e) { console.log('[POETRY SEARCH] variant failed:', e.message); }
+    }
+    const candidates = all.filter(v => Number(v.seconds || 0) >= 12 && Number(v.seconds || 0) <= 45);
+    const pool = candidates.length ? candidates : all.filter(v => Number(v.seconds || 0) >= 12 && Number(v.seconds || 0) <= 180);
+    if (!pool.length) throw new Error('No public edited poetry clip found');
+    const scored = pool.map(video => {
+        const title = String(video.title || '').toLowerCase();
+        const seconds = Number(video.seconds || 0);
+        const editScore = ['edit', 'status', 'music', 'tiktok', 'instagram', 'reel', 'shorts', 'background', 'whatsapp'].reduce((n, word) => n + (title.includes(word) ? 2 : 0), 0);
+        const durationScore = seconds >= 15 && seconds <= 22 ? 8 : seconds <= 30 ? 3 : seconds <= 45 ? 0 : -5;
+        return { video, score: editScore + durationScore };
+    }).sort((a, b) => b.score - a.score).slice(0, 8);
+    return scored[Math.floor(Math.random() * scored.length)].video;
 }
 
 async function jawadYouTubeMedia(url) {
@@ -172,10 +211,6 @@ async (conn, mek, m, { from, args, q, reply }) => {
                 const video = await searchPoetry(query);
                 sourceTitle = video.title;
                 sourceUrl = video.url;
-                // Prefer the live-tested resolver for searched YouTube clips;
-                // this avoids Railway bot-checks and keeps the real source
-                // audio path fast. yt-dlp remains the fallback if the API is
-                // temporarily rate-limited or cannot resolve the clip.
                 try {
                     const social = await socialMedia(video.url);
                     sourceTitle = social.title || sourceTitle;
@@ -185,7 +220,8 @@ async (conn, mek, m, { from, args, q, reply }) => {
                         const yt = await directYoutubePoetryDownload(video.url, input);
                         sourceTitle = yt.title || sourceTitle;
                     } catch (directError) {
-                        console.log('[POETRY] direct yt-dlp failed, trying media APIs:', directError.message);
+                        if (!/youtube\.com|youtu\.be/i.test(video.url)) throw directError;
+                        console.log('[POETRY] direct yt-dlp failed, trying YouTube media APIs:', directError.message);
                         const yt = await youtubeDownloadWithFallback(video.url, input);
                         sourceTitle = yt.title || sourceTitle;
                     }
