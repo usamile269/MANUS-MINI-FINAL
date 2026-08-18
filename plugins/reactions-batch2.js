@@ -52,6 +52,13 @@ async function getWaifuPicsGifUrl(category) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+async function getUniversalBlushGif() {
+    try { return await getNekoGifUrl('blush'); } catch (e) { console.log('[REACTION2:blush-fallback] nekos failed:', e.message); }
+    try { return await getOtakuGifUrl('blush'); } catch (e) { console.log('[REACTION2:blush-fallback] otakugifs failed:', e.message); }
+    try { return await getWaifuPicsGifUrl('blush'); } catch (e) { console.log('[REACTION2:blush-fallback] waifu failed:', e.message); }
+    return null;
+}
+
 async function getAnyReactionGif(category) {
     // 🚨 FIX (Bunty: ".blush/.happy/.kiss 100% working, .baka/.lurk fail"
     // — both use the exact same nekos.best endpoint/category names, which
@@ -86,7 +93,9 @@ async function getAnyReactionGif(category) {
         catch (e) { console.log(`[REACTION2:${category}] waifu.pics attempt ${attempt} failed:`, e.message); }
         if (attempt < 2) await sleep(1200);
     }
-    return null;
+    // Never fail solely because a reaction-specific tag is unavailable.
+    // Use the same known-good `.blush` source chain as the primary reactions.
+    return await getUniversalBlushGif();
 }
 
 // 🚨 REPLACED (Bunty: "baka/lurk ab bhi fail, koi aur SFW category laga

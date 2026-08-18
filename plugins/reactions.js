@@ -54,7 +54,7 @@ const NEKO_CATEGORY_MAP = {
     // reaching the CATEGORY_FALLBACK→smug retry at the bottom. Mapping it
     // here directly means .cringe now hits nekos.best (same reliable
     // source blush uses) on the very FIRST try, just like blush does.
-    cringe: 'smug'
+    cringe: 'blush', bonk: 'blush'
 };
 
 async function getNekoGifUrl(pattern) {
@@ -69,6 +69,26 @@ async function getNekoGifUrl(pattern) {
     const url = data?.results?.[0]?.url;
     if (!url) throw new Error('No GIF found on nekos.best');
     return url;
+}
+
+// Universal fallback for unsupported or temporarily unavailable reaction tags.
+// The `.blush` route is the known-good behavior; OtakuGIFs is a working
+// secondary source when Nekos is rate-limited or returns 403.
+async function getBlushFallbackUrl() {
+    try { return await getNekoGifUrl('blush'); }
+    catch (e) { console.log('[REACTION:blush-fallback] nekos failed:', e.message); }
+    try {
+        const { data } = await axios.get('https://api.otakugifs.xyz/gif', {
+            params: { reaction: 'blush' }, timeout: 12000, family: 4,
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+        });
+        if (data?.url) return data.url;
+    } catch (e) { console.log('[REACTION:blush-fallback] otakugifs failed:', e.message); }
+    const { data } = await axios.get('https://api.waifu.pics/sfw/blush', {
+        timeout: 12000, family: 4, headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    if (!data?.url) throw new Error('No blush GIF available');
+    return data.url;
 }
 
 const reactions = [
@@ -151,20 +171,10 @@ for (const r of reactions) {
             }
         }
 
-        if (!imageUrl && CATEGORY_FALLBACK[r.pattern]) {
-            const altPattern = CATEGORY_FALLBACK[r.pattern];
-            console.log(`[REACTION:${r.pattern}] all 3 sources failed for exact tag — trying fallback category "${altPattern}"`);
-            try { imageUrl = await getNekoGifUrl(altPattern); }
-            catch (e) { console.log(`[REACTION:${r.pattern}] nekos.best fallback(${altPattern}) failed:`, e.message); }
-            if (!imageUrl) {
-                try {
-                    const { data } = await axios.get(`https://api.waifu.pics/sfw/${altPattern}`, {
-                        timeout: 12000, family: 4,
-                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-                    });
-                    if (data && data.url) imageUrl = data.url;
-                } catch (e) { console.log(`[REACTION:${r.pattern}] waifu.pics fallback(${altPattern}) failed:`, e.message); }
-            }
+        if (!imageUrl) {
+            console.log(`[REACTION:${r.pattern}] specific providers failed — using reliable blush fallback`);
+            try { imageUrl = await getBlushFallbackUrl(); }
+            catch (e) { console.log(`[REACTION:${r.pattern}] blush fallback failed:`, e.message); }
         }
 
         if (!imageUrl) {
