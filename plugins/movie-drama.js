@@ -144,10 +144,28 @@ async function downloadDramaFromYouTube(query, dir) {
     const output = path.join(dir, 'drama.%(ext)s');
     const source = /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)\//i.test(query)
         ? query : `ytsearch1:${query} drama scene short clip`;
-    await dramaProcess(bin, [source, '--no-playlist', '--no-warnings', '--max-filesize', '45M', '--match-filter', 'duration <= 180', '--extract-audio', '--audio-format', 'mp3', '--audio-quality', '128K', '-o', output], 120000);
+    await dramaProcess(bin, [
+        source,
+        '--no-playlist',
+        '--no-warnings',
+        '--ignore-config',
+        '--restrict-filenames',
+        '--max-filesize', '45M',
+        '--match-filter', 'duration <= 180',
+        '--socket-timeout', '30',
+        '--retries', '2',
+        '--fragment-retries', '2',
+        '--concurrent-fragments', '2',
+        '--extractor-args', 'youtube:player_client=android,web',
+        '-f', 'bv*[height<=480]+ba/b[height<=480]/b',
+        '--merge-output-format', 'mp4',
+        '-o', output
+    ], 120000);
     const files = await fsp.readdir(dir);
-    const file = files.map(x => path.join(dir, x)).find(x => /\.mp3$/i.test(x));
-    if (!file) throw new Error('YouTube did not create an audio file');
+    const file = files.map(x => path.join(dir, x)).find(x => /\.(mp4|mkv|webm)$/i.test(x));
+    if (!file) throw new Error('YouTube did not create a video file');
+    const stat = await fsp.stat(file);
+    if (stat.size < 10000 || stat.size > 45 * 1024 * 1024) throw new Error('drama file exceeded safe limit');
     return file;
 }
 
@@ -222,27 +240,27 @@ cmd({
 }, async (conn, mek, m, { from, q, reply }) => {
     const query = (q || '').trim();
     if (!query) return reply(renderError('Usage: .drama <title/keyword>'));
+    const dir = path.join(require('os').tmpdir(), `ahmad-drama-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     try {
         await conn.sendMessage(from, { react: { text: '🎭', key: mek.key } });
-        const dir = path.join(require('os').tmpdir(), `ahmad-drama-${Date.now()}`);
         await fsp.mkdir(dir, { recursive: true });
-        let clip;
-        try {
-            const localFile = await downloadDramaFromYouTube(query, dir);
-            const bytes = await fsp.readFile(localFile);
-            if (!bytes.length || bytes.length > 45 * 1024 * 1024) throw new Error('drama file exceeded safe limit');
-            clip = { buffer: bytes, title: query };
-        } finally {
-            await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
-        }
+        const localFile = await downloadDramaFromYouTube(query, dir);
+        const title = query.replace(/[\\/:*?"<>|\u0000-\u001F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Ahmad Mini Drama';
         await conn.sendMessage(from, {
-            audio: clip.buffer,
-            mimetype: 'audio/mpeg',
-            fileName: `${clip.title || query}.mp3`
+            document: fs.createReadStream(localFile),
+            fileName: `${title}.mp4`,
+            mimetype: 'video/mp4',
+            caption: `🎬 *${title}*\n\n© AHMAD MINI`
         }, { quoted: mek });
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
     } catch (e) {
-        console.log('[DRAMA] social provider error:', e.message);
-        reply(renderError('YouTube drama clip fetch failed. Try a different title or send a direct YouTube link.'));
+        console.log('[DRAMA] YouTube download failed:', e.message);
+        const blocked = /sign in|not a bot|captcha|403|timed out/i.test(e.message);
+        await reply(renderError(blocked
+            ? 'YouTube blocked this server request. Send a direct YouTube link or try again later.'
+            : 'Drama download failed. Try another title or a shorter YouTube clip.'));
+        await conn.sendMessage(from, { react: { text: '❌', key: mek.key } }).catch(() => {});
+    } finally {
+        await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
 });
