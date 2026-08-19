@@ -77,6 +77,62 @@ async function sendResult(conn, mek, m, from, reply, result, cardTitle) {
     await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
 }
 
+function directSocialUrl(value) {
+    const hit = String(value || '').match(/https?:\/\/(?:www\.)?(?:tiktok\.com\/[^\s]+|instagram\.com\/(?:reel|p)\/[^\s]+)/i);
+    return hit ? hit[0].replace(/[),.!?]+$/, '') : null;
+}
+
+function socialLinksFromHtml(html) {
+    const text = String(html || '').replace(/&amp;/g, '&').replace(/\\u002F/g, '/');
+    const links = text.match(/https?:\/\/(?:www\.)?(?:tiktok\.com\/@[^"'<>\s]+\/video\/\d+|instagram\.com\/(?:reel|p)\/[A-Za-z0-9_-]+)/gi) || [];
+    return [...new Set(links.map(x => x.replace(/[),.!?]+$/, '')))];
+}
+
+async function discoverDramaSocialLinks(query) {
+    const q = encodeURIComponent(`${query} drama scene short clip`);
+    const urls = [
+        `https://html.duckduckgo.com/html/?q=site%3Atiktok.com%2F%40+${q}`,
+        `https://html.duckduckgo.com/html/?q=site%3Ainstagram.com%2Freel+${q}`
+    ];
+    const pages = await Promise.allSettled(urls.map(url => axios.get(url, {
+        timeout: 9000, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AhmadMiniBot/1.0)' }
+    })));
+    return pages.flatMap(x => x.status === 'fulfilled' ? socialLinksFromHtml(x.value.data) : []);
+}
+
+async function resolveDramaClip(query) {
+    const direct = directSocialUrl(query);
+    const links = direct ? [direct] : await discoverDramaSocialLinks(query);
+    if (!links.length) throw new Error('no public TikTok/Instagram drama clip found');
+    const candidates = links.slice(0, 6);
+    const attempts = await Promise.allSettled(candidates.map(async url => {
+        if (/tiktok\.com/i.test(url)) {
+            const { data } = await axios.get(`https://tikwm.com/api/?url=${encodeURIComponent(url)}`, {
+                timeout: 12000, headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            const item = data?.data || data?.result || {};
+            const audio = item.music || item.music_info?.play_url;
+            if (!audio) throw new Error('TikTok returned no audio');
+            return { url: audio, title: item.title || query, source: url };
+        }
+        const methods = [
+            `https://api.vreden.my.id/api/igdl?url=${encodeURIComponent(url)}`,
+            `https://api.vreden.my.id/api/igdownload?url=${encodeURIComponent(url)}`
+        ];
+        for (const endpoint of methods) {
+            try {
+                const { data } = await axios.get(endpoint, { timeout: 12000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+                const item = data?.result?.data?.[0] || data?.result?.[0] || data?.data?.[0];
+                if (item?.url) return { url: item.url, title: query, source: url };
+            } catch {}
+        }
+        throw new Error('Instagram returned no media');
+    }));
+    const winner = attempts.find(x => x.status === 'fulfilled');
+    if (!winner) throw new Error('all social drama providers failed');
+    return winner.value;
+}
+
 cmd({
     pattern: "movie",
     desc: "Look up a movie — summary, poster (tries multiple sources)",
@@ -117,22 +173,15 @@ cmd({
     if (!query) return reply(renderError('Usage: .drama <title/keyword>'));
     try {
         await conn.sendMessage(from, { react: { text: '🎭', key: mek.key } });
-        const { data } = await axios.get('https://jawad-tech.vercel.app/download/drama', {
-            params: { q: query }, timeout: 30000
-        });
-
-        const result = data?.result || data;
-        const dl = result?.url || result?.download;
-        if (!dl) return reply(renderError(`Couldn't find a drama clip for "${query}".`));
-
+        const clip = await resolveDramaClip(query);
         await conn.sendMessage(from, {
-            audio: { url: dl },
+            audio: { url: clip.url },
             mimetype: 'audio/mpeg',
-            fileName: `${result?.title || query}.mp3`
+            fileName: `${clip.title || query}.mp3`
         }, { quoted: mek });
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
     } catch (e) {
-        console.log('[DRAMA] error:', e.message);
-        reply(renderError("Couldn't fetch that drama clip right now, try again shortly."));
+        console.log('[DRAMA] social provider error:', e.message);
+        reply(renderError('No public TikTok/Instagram drama clip was available right now. Try another title or send a direct TikTok/Instagram link.'));
     }
 });
