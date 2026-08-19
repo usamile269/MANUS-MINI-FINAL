@@ -11,7 +11,14 @@
 
 const { cmd } = require('../ahmad-core');
 const axios = require('axios');
+const { spawn } = require('child_process');
+const fs = require('fs');
+const fsp = fs.promises;
+const path = require('path');
 const { renderLuxe, renderError } = require('../lib/menu-styles');
+const YTDlpWrap = require('yt-dlp-wrap').default || require('yt-dlp-wrap');
+const YTDLP_BIN = path.join(__dirname, '..', 'bin', `yt-dlp${process.platform === 'win32' ? '.exe' : ''}`);
+const YTDLP_MARKER = `${YTDLP_BIN}.linux-verified`;
 const { runFallbackChain } = require('../lib/fallback-chain');
 
 const stripHtml = (s) => String(s || '').replace(/<[^>]+>/g, '').trim();
@@ -100,6 +107,50 @@ async function discoverDramaSocialLinks(query) {
     return pages.flatMap(x => x.status === 'fulfilled' ? socialLinksFromHtml(x.value.data) : []);
 }
 
+async function ensureDramaYtDlp() {
+    if (process.platform === 'win32') {
+        if (!fs.existsSync(YTDLP_BIN)) await YTDlpWrap.downloadFromGithub(YTDLP_BIN);
+        return YTDLP_BIN;
+    }
+    if (!fs.existsSync(YTDLP_BIN) || !fs.existsSync(YTDLP_MARKER)) {
+        await fsp.mkdir(path.dirname(YTDLP_BIN), { recursive: true });
+        const tmp = `${YTDLP_BIN}.part`;
+        const response = await axios.get('https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux', { responseType: 'stream', timeout: 60000 });
+        await new Promise((resolve, reject) => {
+            const writer = fs.createWriteStream(tmp);
+            response.data.pipe(writer);
+            writer.on('finish', resolve); writer.on('error', reject); response.data.on('error', reject);
+        });
+        await fsp.chmod(tmp, 0o755);
+        await fsp.rename(tmp, YTDLP_BIN);
+        await fsp.writeFile(YTDLP_MARKER, new Date().toISOString());
+    }
+    return YTDLP_BIN;
+}
+
+function dramaProcess(command, args, timeoutMs = 120000) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+        let err = '';
+        child.stderr.on('data', chunk => { err = (err + chunk.toString()).slice(-5000); });
+        const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('drama download timed out')); }, timeoutMs);
+        child.on('error', e => { clearTimeout(timer); reject(e); });
+        child.on('close', code => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error(err || `yt-dlp exited ${code}`)); });
+    });
+}
+
+async function downloadDramaFromYouTube(query, dir) {
+    const bin = await ensureDramaYtDlp();
+    const output = path.join(dir, 'drama.%(ext)s');
+    const source = /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)\//i.test(query)
+        ? query : `ytsearch1:${query} drama scene short clip`;
+    await dramaProcess(bin, [source, '--no-playlist', '--no-warnings', '--max-filesize', '45M', '--match-filter', 'duration <= 180', '--extract-audio', '--audio-format', 'mp3', '--audio-quality', '128K', '-o', output], 120000);
+    const files = await fsp.readdir(dir);
+    const file = files.map(x => path.join(dir, x)).find(x => /\.mp3$/i.test(x));
+    if (!file) throw new Error('YouTube did not create an audio file');
+    return file;
+}
+
 async function resolveDramaClip(query) {
     const direct = directSocialUrl(query);
     const links = direct ? [direct] : await discoverDramaSocialLinks(query);
@@ -173,15 +224,25 @@ cmd({
     if (!query) return reply(renderError('Usage: .drama <title/keyword>'));
     try {
         await conn.sendMessage(from, { react: { text: '🎭', key: mek.key } });
-        const clip = await resolveDramaClip(query);
+        const dir = path.join(require('os').tmpdir(), `ahmad-drama-${Date.now()}`);
+        await fsp.mkdir(dir, { recursive: true });
+        let clip;
+        try {
+            const localFile = await downloadDramaFromYouTube(query, dir);
+            const bytes = await fsp.readFile(localFile);
+            if (!bytes.length || bytes.length > 45 * 1024 * 1024) throw new Error('drama file exceeded safe limit');
+            clip = { buffer: bytes, title: query };
+        } finally {
+            await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+        }
         await conn.sendMessage(from, {
-            audio: { url: clip.url },
+            audio: clip.buffer,
             mimetype: 'audio/mpeg',
             fileName: `${clip.title || query}.mp3`
         }, { quoted: mek });
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
     } catch (e) {
         console.log('[DRAMA] social provider error:', e.message);
-        reply(renderError('No public TikTok/Instagram drama clip was available right now. Try another title or send a direct TikTok/Instagram link.'));
+        reply(renderError('YouTube drama clip fetch failed. Try a different title or send a direct YouTube link.'));
     }
 });

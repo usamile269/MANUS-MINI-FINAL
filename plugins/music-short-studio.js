@@ -39,8 +39,14 @@ function socialUrlFromQuery(query) {
 
 function extractSocialLinks(html) {
     const text = String(html || '').replace(/&amp;/g, '&').replace(/\\u002F/g, '/');
-    const links = text.match(/https?:\/\/(?:www\.)?(?:tiktok\.com\/@[^"'<>\s]+\/video\/\d+|instagram\.com\/(?:reel|p)\/[A-Za-z0-9_-]+)/gi) || [];
-    return [...new Set(links.map(x => x.replace(/[),.!?]+$/, '')))];
+    const candidates = [];
+    const direct = text.match(/https?:\/\/(?:www\.)?(?:tiktok\.com\/[^"'<>\s]+|instagram\.com\/(?:reel|p)\/[^"'<>\s]+)/gi) || [];
+    candidates.push(...direct);
+    for (const match of text.matchAll(/uddg=([^&"'<>\s]+)/gi)) {
+        try { candidates.push(decodeURIComponent(match[1])); } catch {}
+    }
+    return [...new Set(candidates.map(x => x.replace(/[),.!?]+$/, '')))]
+        .filter(x => /tiktok\.com|instagram\.com/i.test(x));
 }
 
 async function discoverSocialLinks(query) {
@@ -64,9 +70,10 @@ async function findShort(query) {
     if (cached) return cached;
     const direct = socialUrlFromQuery(q);
     const links = direct ? [direct] : await discoverSocialLinks(q);
-    if (!links.length) throw new Error('No public TikTok/Instagram short found. Try a direct TikTok or Instagram link.');
-    const fresh = links.filter(url => !getRemembered(usedSources, url));
-    const pool = fresh.length ? fresh : links;
+    const normalizedLinks = links.map(url => url.replace(/\\u0026/g, '&')).filter(url => /tiktok\.com|instagram\.com/i.test(url));
+    if (!normalizedLinks.length) throw new Error('No public TikTok/Instagram short found. Try a different song or mood.');
+    const fresh = normalizedLinks.filter(url => !getRemembered(usedSources, url));
+    const pool = fresh.length ? fresh : normalizedLinks;
     const selectedUrl = pool[Math.floor(Math.random() * pool.length)];
     remember(usedSources, selectedUrl, true, 30 * 60 * 1000);
     const out = { url: selectedUrl, title: q, author: '' };
