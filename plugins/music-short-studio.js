@@ -1,10 +1,10 @@
 'use strict';
 
 // Ahmad Mini Music Short Studio
-// Separate from .play, .video and .poetry: bounded downloads, short output,
-// automatic cleanup, and no permanent media library.
+// Social-only source path: TikTok/Instagram discovery and extraction.
+// Separate from .play, .video and .poetry.
 const { cmd } = require('../ahmad-core');
-const yts = require('yt-search');
+const axios = require('axios');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const fsp = fs.promises;
@@ -32,32 +32,44 @@ function getRemembered(map, key) {
 }
 function hash(s) { return crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 12); }
 
+function socialUrlFromQuery(query) {
+    const match = String(query || '').match(/https?:\/\/(?:www\.)?(?:tiktok\.com\/@[^\s]+|instagram\.com\/(?:reel|p)\/[^\s]+)/i);
+    return match ? match[0].replace(/[),.!?]+$/, '') : null;
+}
+
+function extractSocialLinks(html) {
+    const text = String(html || '').replace(/&amp;/g, '&').replace(/\\u002F/g, '/');
+    const links = text.match(/https?:\/\/(?:www\.)?(?:tiktok\.com\/@[^"'<>\s]+\/video\/\d+|instagram\.com\/(?:reel|p)\/[A-Za-z0-9_-]+)/gi) || [];
+    return [...new Set(links.map(x => x.replace(/[),.!?]+$/, '')))];
+}
+
+async function discoverSocialLinks(query) {
+    const encoded = encodeURIComponent(`${query} viral short`);
+    const searches = [
+        `https://html.duckduckgo.com/html/?q=site%3Atiktok.com%2F%40+${encoded}`,
+        `https://html.duckduckgo.com/html/?q=site%3Ainstagram.com%2Freel+${encoded}`
+    ];
+    const pages = await Promise.allSettled(searches.map(url => axios.get(url, {
+        timeout: 9000,
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AhmadMiniBot/1.0)' }
+    })));
+    return pages.flatMap(x => x.status === 'fulfilled' ? extractSocialLinks(x.value.data) : []);
+}
+
 async function findShort(query) {
     const q = String(query || '').trim();
-    if (!q) throw new Error('Tell me a song, poet, artist, or mood.');
+    if (!q) throw new Error('Send a TikTok/Instagram link, song, poet, artist, or mood.');
     const key = q.toLowerCase();
     const cached = getRemembered(searchCache, key);
     if (cached) return cached;
-    const searches = [
-        `${q} short audio`,
-        `${q} lofi short`,
-        `${q} viral edit`
-    ];
-    const all = [];
-    for (const term of searches) {
-        const result = await yts(term);
-        for (const v of (result.videos || []).slice(0, 5)) {
-            if (!v.url || !v.seconds || v.seconds > 12 * 60) continue;
-            if (!all.some(x => x.url === v.url)) all.push(v);
-        }
-        if (all.length >= 8) break;
-    }
-    if (!all.length) throw new Error('No short public result found. Try another name or mood.');
-    const fresh = all.filter(v => !getRemembered(usedSources, v.url));
-    const pool = fresh.length ? fresh : all;
-    const selected = pool[Math.floor(Math.random() * pool.length)];
-    remember(usedSources, selected.url, true, 30 * 60 * 1000);
-    const out = { url: selected.url, title: selected.title || q, author: selected.author?.name || '', seconds: selected.seconds || 0 };
+    const direct = socialUrlFromQuery(q);
+    const links = direct ? [direct] : await discoverSocialLinks(q);
+    if (!links.length) throw new Error('No public TikTok/Instagram short found. Try a direct TikTok or Instagram link.');
+    const fresh = links.filter(url => !getRemembered(usedSources, url));
+    const pool = fresh.length ? fresh : links;
+    const selectedUrl = pool[Math.floor(Math.random() * pool.length)];
+    remember(usedSources, selectedUrl, true, 30 * 60 * 1000);
+    const out = { url: selectedUrl, title: q, author: '' };
     remember(searchCache, key, out, RESULT_TTL);
     return out;
 }
@@ -73,27 +85,48 @@ function runProcess(command, args, timeoutMs = 90000) {
     });
 }
 
-async function resolveYtDlp() {
-    const local = path.join(__dirname, '..', 'bin', process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
-    if (fs.existsSync(local)) return local;
-    return process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+async function downloadSocialAudio(url, dir) {
+    let audioUrl = null;
+    if (/tiktok\.com/i.test(url)) {
+        const res = await axios.get(`https://tikwm.com/api/?url=${encodeURIComponent(url)}`, { timeout: 12000 });
+        audioUrl = res.data?.data?.music;
+    } else if (/instagram\.com/i.test(url)) {
+        const methods = [
+            async () => {
+                const res = await axios.get(`https://api.vreden.my.id/api/igdl?url=${encodeURIComponent(url)}`, { timeout: 12000 });
+                return res.data?.result?.data?.[0]?.url || res.data?.result?.[0]?.url;
+            },
+            async () => {
+                const res = await axios.get(`https://api.vreden.my.id/api/igdownload?url=${encodeURIComponent(url)}`, { timeout: 12000 });
+                return res.data?.result?.[0]?.url;
+            },
+            async () => {
+                const res = await axios.post('https://api.cobalt.tools/', { url, downloadMode: 'audio' }, {
+                    headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, timeout: 12000
+                });
+                return res.data?.url;
+            }
+        ];
+        const results = await Promise.allSettled(methods.map(fn => fn()));
+        audioUrl = results.find(x => x.status === 'fulfilled' && x.value)?.value;
+    }
+    if (!audioUrl) throw new Error('TikTok/Instagram source did not return audio');
+    const response = await axios.get(audioUrl, {
+        responseType: 'arraybuffer', timeout: 30000,
+        maxContentLength: MAX_SOURCE_BYTES, maxBodyLength: MAX_SOURCE_BYTES,
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    const input = path.join(dir, 'social-source.bin');
+    await fsp.writeFile(input, Buffer.from(response.data));
+    return input;
 }
 
 async function downloadAndRender(source, mode, query) {
     const dir = path.join(ROOT, `${Date.now()}-${hash(source.url + mode + query)}`);
     await fsp.mkdir(dir, { recursive: true });
-    const input = path.join(dir, 'source.%(ext)s');
-    const raw = path.join(dir, 'source.mp3');
     const output = path.join(dir, `${safeName(mode)}.mp3`);
     try {
-        const ytdlp = await resolveYtDlp();
-        await runProcess(ytdlp, [
-            '--no-playlist', '--no-part', '--no-warnings', '--max-filesize', `${MAX_SOURCE_BYTES}`,
-            '--extract-audio', '--audio-format', 'mp3', '--audio-quality', '128K',
-            '--ffmpeg-location', ffmpegPath, '-o', input, source.url
-        ], 100000);
-        const downloaded = fs.existsSync(raw) ? raw : (await fsp.readdir(dir)).map(x => path.join(dir, x)).find(x => /\.(mp3|m4a|webm|opus)$/i.test(x));
-        if (!downloaded) throw new Error('audio source was not created');
+        const downloaded = await downloadSocialAudio(source.url, dir);
         const modeArgs = {
             lofiwave: ['-af', 'lowpass=f=4200,highpass=f=90,aecho=0.8:0.7:65:0.22,volume=0.88'],
             reverbdrop: ['-af', 'aecho=0.8:0.72:75:0.32,acompressor=threshold=-18dB:ratio=2:attack=20:release=250,volume=0.9'],
@@ -104,7 +137,7 @@ async function downloadAndRender(source, mode, query) {
         await runProcess(ffmpegPath, ['-y', '-i', downloaded, '-t', String(MAX_SECONDS), '-vn', '-map_metadata', '-1', ...modeArgs, '-c:a', 'libmp3lame', '-b:a', '128k', output], 90000);
         const stat = await fsp.stat(output);
         if (!stat.size || stat.size > 12 * 1024 * 1024) throw new Error('output size exceeded safe limit');
-        return { output, title: source.title, author: source.author };
+        return { output, title: source.title, author: source.author, sourceUrl: source.url };
     } catch (e) {
         await cleanupDir(dir);
         throw e;
@@ -120,28 +153,27 @@ const MODE_INFO = {
 };
 
 for (const [mode, info] of Object.entries(MODE_INFO)) {
-    cmd({ pattern: mode, alias: info.aliases, desc: `Create a ${info.hint} from a public search`, category: 'download', react: info.emoji }, async (conn, mek, m, { from, args, reply }) => {
+    cmd({ pattern: mode, alias: info.aliases, desc: `Create a ${info.hint} from TikTok/Instagram`, category: 'download', react: info.emoji }, async (conn, mek, m, { from, args, reply }) => {
         const query = (args || []).join(' ').trim();
-        if (!query) return reply(`> ${info.emoji} *${info.title}*\n> Send a song, poet, artist, or mood.\n> Example: .${mode} Pakistani sad song`);
+        if (!query) return reply(`> ${info.emoji} *${info.title}*\n> Send a TikTok/Instagram link, song, poet, artist, or mood.\n> Example: .${mode} Pakistani sad song`);
         const key = `${mode}:${query.toLowerCase()}`;
         if (activeKeys.has(key)) return reply('> ⏳ This edit is already being prepared. Please wait for the current one.');
         activeKeys.add(key);
         let result;
         try {
             result = await heavyQueue.run(async () => {
-                await reply(`> ${info.emoji} *${info.title}*\n> Finding a fresh short for: *${query}*…`);
+                await reply(`> ${info.emoji} *${info.title}*\n> Finding a fresh TikTok/Instagram short for: *${query}*…`);
                 const source = await findShort(query);
                 const rendered = await downloadAndRender(source, mode, query);
                 await conn.sendMessage(from, { audio: fs.readFileSync(rendered.output), mimetype: 'audio/mpeg', ptt: false }, { quoted: mek });
                 return rendered;
             }, position => reply(`> ⏳ Music Studio queue position: ${position}`));
-            return reply(`> ✅ *${info.title} ready*\n> ${result.title}${result.author ? `\n> ${result.author}` : ''}\n> ${MAX_SECONDS}s max short edit • use authorised/public content only.`);
+            return reply(`> ✅ *${info.title} ready*\n> ${result.title}\n> ${MAX_SECONDS}s max short edit • TikTok/Instagram source • use authorised/public content only.`);
         } catch (e) {
             console.error(`[${mode}]`, e.message);
-            return reply(`> ❌ ${info.title} failed: ${e.message}\n> Try a shorter name or a direct authorised link.`);
+            return reply(`> ❌ ${info.title} failed: ${e.message}\n> Try another mood or send a direct TikTok/Instagram link.`);
         } finally {
             activeKeys.delete(key);
-            // Remove the temporary render after the send has completed.
             if (result?.output) await cleanupDir(path.dirname(result.output));
         }
     });
