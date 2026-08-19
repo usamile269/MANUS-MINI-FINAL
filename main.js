@@ -102,6 +102,10 @@ const sessionBackupTimers = new Map(); // number -> setInterval id for the full 
 const sessionBackupDebounceTimers = new Map(); // number -> short debounce timer for creds/key changes
 const sessionBackupInFlight = new Set(); // number -> prevents overlapping full-folder reads/Mongo writes
 const lockRetryTimers = new Map(); // number -> one pending cross-process lock retry
+const reconnectTimers = new Map(); // number -> one pending self-healing reconnect timer
+const reconnectBackoff = new Map(); // number -> consecutive non-401 close count
+const reconnectInFlight = new Set(); // number -> prevents overlapping retry calls
+const uptimeLogCooldowns = new Map(); // number -> last close/reconnect log timestamp
 const credsUpdateQueues = new Map(); // number -> serialized creds.json persistence chain
 const socketCreationTime = new Map();
 // 🚨 BUG FIX (Bunty: ".pair karay to 'already connected' bolta hai, jabke
@@ -641,9 +645,48 @@ function registerStaleSocketWatchdog(socket, number, sanitizedNumber) {
     }, CHECK_EVERY_MS);
 }
 
+function shouldLogUptimeEvent(number, cooldownMs = 5 * 60 * 1000) {
+    const key = number.replace(/[^0-9]/g, '');
+    const now = Date.now();
+    const previous = uptimeLogCooldowns.get(key) || 0;
+    if (now - previous < cooldownMs) return false;
+    uptimeLogCooldowns.set(key, now);
+    return true;
+}
+
+function scheduleSelfHealingReconnect(number, statusCode, errorMessage) {
+    const sanitizedNumber = number.replace(/[^0-9]/g, '');
+    if (reconnectTimers.has(sanitizedNumber) || reconnectInFlight.has(sanitizedNumber)) return;
+    const previous = reconnectBackoff.get(sanitizedNumber) || 0;
+    const attempt = previous + 1;
+    reconnectBackoff.set(sanitizedNumber, attempt);
+    const is403 = statusCode === 403 || /forbidden|banned|connection failure/i.test(String(errorMessage || ''));
+    const waitMs = is403
+        ? Math.min(10 * 60 * 1000, 60 * 1000 * Math.pow(2, Math.min(attempt - 1, 3)))
+        : Math.min(5 * 60 * 1000, 15 * 1000 * Math.pow(2, Math.min(attempt - 1, 4)));
+    if (shouldLogUptimeEvent(number)) {
+        ahmadLog(`Self-healing active for ${number}: retry in ${Math.round(waitMs / 1000)}s (status ${statusCode || 'unknown'}).`, 'warning');
+    }
+    const timer = setTimeout(async () => {
+        reconnectTimers.delete(sanitizedNumber);
+        if (reconnectInFlight.has(sanitizedNumber) || activeSockets.has(sanitizedNumber)) return;
+        reconnectInFlight.add(sanitizedNumber);
+        try {
+            const mockRes = { headersSent: false, send: () => {}, status: () => mockRes, setHeader: () => {}, json: () => {} };
+            await ahmadPair(number, mockRes);
+        } catch (e) {
+            ahmadLog(`Self-healing reconnect failed for ${number}: ${e.message}`, 'error');
+            scheduleSelfHealingReconnect(number, statusCode, e.message);
+        } finally {
+            reconnectInFlight.delete(sanitizedNumber);
+        }
+    }, waitMs);
+    reconnectTimers.set(sanitizedNumber, timer);
+}
+
 function setupAutoRestart(socket, number) {
     let restartAttempts = 0;
-    const maxRestartAttempts = 8; // was 3 — too easy to exhaust and end up needing a manual reconnect
+    const maxRestartAttempts = 8; // legacy counter retained for log compatibility
     const sanitizedNumber = number.replace(/[^0-9]/g, '');
     lastActivityAt.set(sanitizedNumber, Date.now());
     registerStaleSocketWatchdog(socket, number, sanitizedNumber);
@@ -657,7 +700,9 @@ function setupAutoRestart(socket, number) {
             // Full disconnect reason logged every time — if the bot drops again,
             // this line tells us exactly why (e.g. was it WhatsApp closing the
             // stream, a timeout, a stream:error, etc).
-            ahmadLog(`Connection closed for ${number}: statusCode=${statusCode} reason="${errorMessage}"`, 'warning');
+            if (shouldLogUptimeEvent(number)) {
+                ahmadLog(`Connection closed for ${number}: statusCode=${statusCode} reason="${errorMessage}"`, 'warning');
+            }
 
             const sanitizedNumber = number.replace(/[^0-9]/g, '');
 
@@ -726,46 +771,19 @@ function setupAutoRestart(socket, number) {
             const isNormalError = statusCode === 408 || (errorMessage && errorMessage.includes('QR refs attempts ended'));
             if (isNormalError) { ahmadLog(`Normal closure for ${number}, no restart needed.`, 'info'); return; }
 
-            if (restartAttempts < maxRestartAttempts) {
-                restartAttempts++;
-                // 515 = restartRequired — Baileys expects an IMMEDIATE reconnect
-                // here (it's a normal part of the connection handshake, not a
-                // real failure), so don't sit through the usual 10s delay for it.
-                const isRestartRequired = statusCode === 515;
-                const waitMs = isRestartRequired ? 500 : 10000;
-                ahmadLog(`Reconnecting ${number} (${restartAttempts}/${maxRestartAttempts}) in ${waitMs}ms...`, 'warning');
-                socket.ev.removeAllListeners();
-                await delay(waitMs);
-                try {
-                    const mockRes = { headersSent: false, send: () => {}, status: () => mockRes, setHeader: () => {}, json: () => {} };
-                    await ahmadPair(number, mockRes);
-                } catch (e) { ahmadLog(`Reconnection failed for ${number}: ${e.message}`, 'error'); }
-            } else {
-                // 🚨 BUG FIX (24/7 uptime — bot going offline after ~10-20 min
-                // and never coming back on its own): previously, once
-                // maxRestartAttempts was hit, the bot just gave up silently
-                // and stayed offline until someone manually re-paired. Free/
-                // shared hosts (Railway, Render, Katabump, etc.) restart or
-                // drop connections far more often than 8 retries can absorb.
-                // Now, after exhausting the fast-retry attempts, it backs off
-                // to a longer interval and keeps trying indefinitely instead
-                // of permanently giving up — this is what actually makes the
-                // bot behave like it's online 24/7 on flaky free hosting.
-                ahmadLog(`Max fast-restart attempts reached for ${number}. Switching to slow-retry mode (every 60s) so the bot keeps trying to come back online instead of staying offline.`, 'error');
-                const slowRetry = setInterval(async () => {
-                    if (activeSockets.has(sanitizedNumber)) { clearInterval(slowRetry); return; } // already reconnected some other way
-                    ahmadLog(`Slow-retry reconnect attempt for ${number}...`, 'warning');
-                    clearInterval(slowRetry);
-                    try {
-                        const mockRes = { headersSent: false, send: () => {}, status: () => mockRes, setHeader: () => {}, json: () => {} };
-                        await ahmadPair(number, mockRes);
-                    } catch (e) {
-                        ahmadLog(`Slow-retry reconnect failed for ${number}: ${e.message}`, 'error');
-                    }
-                }, 60000);
-            }
+            // One deduplicated scheduler now handles 403/515/network closes.
+            // It retries indefinitely with bounded exponential backoff instead
+            // of creating overlapping timers or exhausting a finite retry count.
+            socket.ev.removeAllListeners();
+            scheduleSelfHealingReconnect(number, statusCode, errorMessage);
         }
-        if (connection === 'open') { restartAttempts = 0; connectionOpenState.set(sanitizedNumber, true); connectionOpenedAt.set(sanitizedNumber, Date.now()); }
+        if (connection === 'open') {
+            restartAttempts = 0;
+            reconnectBackoff.delete(sanitizedNumber);
+            if (reconnectTimers.has(sanitizedNumber)) { clearTimeout(reconnectTimers.get(sanitizedNumber)); reconnectTimers.delete(sanitizedNumber); }
+            connectionOpenState.set(sanitizedNumber, true);
+            connectionOpenedAt.set(sanitizedNumber, Date.now());
+        }
     });
 }
 
