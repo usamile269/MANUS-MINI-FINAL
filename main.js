@@ -100,6 +100,7 @@ const INSTANCE_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 const lockHeartbeatTimers = new Map(); // number -> setInterval id, so it can be cleared on disconnect
 const sessionBackupTimers = new Map(); // number -> setInterval id for the full Signal key-store backup (see saveFullSessionFolderToMongoDB)
 const sessionBackupDebounceTimers = new Map(); // number -> short debounce timer for creds/key changes
+const sessionBackupInFlight = new Set(); // number -> prevents overlapping full-folder reads/Mongo writes
 const lockRetryTimers = new Map(); // number -> one pending cross-process lock retry
 const credsUpdateQueues = new Map(); // number -> serialized creds.json persistence chain
 const socketCreationTime = new Map();
@@ -776,6 +777,8 @@ function setupAutoRestart(socket, number) {
 // the creds.update event — otherwise the backup would go stale between
 // creds bumps and we'd be back to losing sessions on restart.
 async function backupFullSessionFolder(sanitizedNumber, sessionPath) {
+    if (sessionBackupInFlight.has(sanitizedNumber)) return;
+    sessionBackupInFlight.add(sanitizedNumber);
     try {
         if (!fs.existsSync(sessionPath)) return;
         const fileNames = await fs.readdir(sessionPath);
@@ -791,6 +794,8 @@ async function backupFullSessionFolder(sanitizedNumber, sessionPath) {
         }
     } catch (e) {
         console.log(`[SESSION-BACKUP] failed for ${sanitizedNumber}: ${e.message}`);
+    } finally {
+        sessionBackupInFlight.delete(sanitizedNumber);
     }
 }
 

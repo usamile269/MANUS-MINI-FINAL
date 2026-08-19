@@ -36,15 +36,24 @@ process.on('uncaughtException', (err) => {
 // force-kills the container. Also checks more often (2 min) so it catches
 // spikes sooner.
 const STABILITY_CHECK_INTERVAL = 2 * 60 * 1000; // 2 minutes
-const RSS_LIMIT_MB = parseInt(process.env.RSS_LIMIT_MB, 10) || 400; // stay safely under Railway's 512MB
+// A single media spike should not restart the bot; the process must exceed the
+// limit on two consecutive checks before the emergency exit is allowed.
+let rssLimitBreaches = 0;
+const RSS_LIMIT_MB = parseInt(process.env.RSS_LIMIT_MB, 10) || 480; // leave a controlled 32MB margin under Railway's 512MB container limit
 setInterval(() => {
     const mem = process.memoryUsage();
     const rssMB = mem.rss / 1024 / 1024;
     const heapMB = mem.heapUsed / 1024 / 1024;
     console.log(`📊 Memory — RSS: ${rssMB.toFixed(1)}MB | Heap: ${heapMB.toFixed(1)}MB`);
     if (rssMB > RSS_LIMIT_MB) {
-        console.error(`🚨 RSS (${rssMB.toFixed(1)}MB) crossed ${RSS_LIMIT_MB}MB limit! Restarting cleanly before host force-kills us...`);
-        process.exit(1);
+        rssLimitBreaches += 1;
+        console.error(`⚠️ RSS (${rssMB.toFixed(1)}MB) crossed ${RSS_LIMIT_MB}MB limit (${rssLimitBreaches}/2 consecutive checks).`);
+        if (rssLimitBreaches >= 2) {
+            console.error('🚨 RSS stayed above the safe limit. Restarting cleanly before host force-kills us...');
+            process.exit(1);
+        }
+    } else {
+        rssLimitBreaches = 0;
     }
 }, STABILITY_CHECK_INTERVAL);
 
