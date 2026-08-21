@@ -2,35 +2,35 @@
   "rewrites": [
     {
       "source": "/code",
-      "destination": "https://web-production-47e23.up.railway.app/code"
+      "destination": "https://web-production-f33e1.up.railway.app/code"
     },
     {
       "source": "/active",
-      "destination": "https://web-production-47e23.up.railway.app/active"
+      "destination": "https://web-production-f33e1.up.railway.app/active"
     },
     {
       "source": "/status",
-      "destination": "https://web-production-47e23.up.railway.app/status"
+      "destination": "https://web-production-f33e1.up.railway.app/status"
     },
     {
       "source": "/site-settings",
-      "destination": "https://web-production-47e23.up.railway.app/site-settings"
+      "destination": "https://web-production-f33e1.up.railway.app/site-settings"
     },
     {
       "source": "/admin/verify-key",
-      "destination": "https://web-production-47e23.up.railway.app/admin/verify-key"
+      "destination": "https://web-production-f33e1.up.railway.app/admin/verify-key"
     },
     {
       "source": "/admin/site-settings",
-      "destination": "https://web-production-47e23.up.railway.app/admin/site-settings"
+      "destination": "https://web-production-f33e1.up.railway.app/admin/site-settings"
     },
     {
       "source": "/admin/overview",
-      "destination": "https://web-production-47e23.up.railway.app/admin/overview"
+      "destination": "https://web-production-f33e1.up.railway.app/admin/overview"
     },
     {
       "source": "/health",
-      "destination": "https://web-production-47e23.up.railway.app/health"
+      "destination": "https://web-production-f33e1.up.railway.app/health"
     }
   ]
 }
