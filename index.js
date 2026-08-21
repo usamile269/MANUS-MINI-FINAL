@@ -36,20 +36,27 @@ process.on('uncaughtException', (err) => {
 // force-kills the container. Also checks more often (2 min) so it catches
 // spikes sooner.
 const STABILITY_CHECK_INTERVAL = 2 * 60 * 1000; // 2 minutes
-// A single media spike should not restart the bot; the process must exceed the
-// limit on two consecutive checks before the emergency exit is allowed.
+// A single media spike should not restart the bot. First request a V8 GC pass
+// (Node is started with --expose-gc below), then require three consecutive
+// breaches before a controlled restart. This prevents the old 480MB/2-check
+// restart loop while still leaving Railway a safety exit for a real leak.
 let rssLimitBreaches = 0;
-const RSS_LIMIT_MB = parseInt(process.env.RSS_LIMIT_MB, 10) || 480; // leave a controlled 32MB margin under Railway's 512MB container limit
+let lastMemoryWarningAt = 0;
+const RSS_LIMIT_MB = parseInt(process.env.RSS_LIMIT_MB, 10) || 450;
+const RSS_HARD_LIMIT_MB = parseInt(process.env.RSS_HARD_LIMIT_MB, 10) || 500;
 setInterval(() => {
     const mem = process.memoryUsage();
     const rssMB = mem.rss / 1024 / 1024;
     const heapMB = mem.heapUsed / 1024 / 1024;
-    console.log(`📊 Memory — RSS: ${rssMB.toFixed(1)}MB | Heap: ${heapMB.toFixed(1)}MB`);
     if (rssMB > RSS_LIMIT_MB) {
         rssLimitBreaches += 1;
-        console.error(`⚠️ RSS (${rssMB.toFixed(1)}MB) crossed ${RSS_LIMIT_MB}MB limit (${rssLimitBreaches}/2 consecutive checks).`);
-        if (rssLimitBreaches >= 2) {
-            console.error('🚨 RSS stayed above the safe limit. Restarting cleanly before host force-kills us...');
+        if (Date.now() - lastMemoryWarningAt > 10 * 60 * 1000) {
+            lastMemoryWarningAt = Date.now();
+            console.error(`⚠️ RSS high (${rssMB.toFixed(1)}MB, heap ${heapMB.toFixed(1)}MB); cleanup pass ${rssLimitBreaches}/3.`);
+        }
+        if (typeof global.gc === 'function') global.gc();
+        if (rssMB >= RSS_HARD_LIMIT_MB && rssLimitBreaches >= 3) {
+            console.error('🚨 RSS remained at the Railway danger level after cleanup; exiting once so Railway can perform a clean replacement.');
             process.exit(1);
         }
     } else {
