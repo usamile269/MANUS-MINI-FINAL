@@ -14,7 +14,7 @@
 
 const { cmd } = require('../ahmad-core');
 const { renderLuxe, renderError } = require('../lib/menu-styles');
-const { addChannelRelay, removeChannelRelay, listChannelRelays } = require('../lib/database');
+const { addChannelRelay, removeChannelRelay, listChannelRelays, wouldCreateChannelRelayCycle } = require('../lib/database');
 
 cmd({
     pattern: "chanpost",
@@ -113,7 +113,8 @@ cmd({
         const src = await resolveChannelJid(conn, args[1] || '');
         const tgt = await resolveChannelJid(conn, args[2] || '');
         if (!src || !tgt) return reply(renderError('Usage: .chnfor remove <source link/jid> <target link/jid>'));
-        await removeChannelRelay(src, tgt, isOwner ? null : sender);
+        const result = await removeChannelRelay(src, tgt, isOwner ? null : sender);
+        if (!result?.deletedCount) return reply(renderError('No matching relay was found for your account.'));
         return reply(renderLuxe('Channel Relay Removed', [`${src.split('@')[0]} → ${tgt.split('@')[0]}`]));
     }
 
@@ -151,6 +152,9 @@ cmd({
         // infinite, ever-escalating loop, all inside one channel. Reject it.
         if (sourceJid === targetJid) {
             return reply(renderError("Source and target are the same channel — that would spam-loop the channel with its own posts. Pick a different target."));
+        }
+        if (await wouldCreateChannelRelayCycle(sourceJid, targetJid)) {
+            return reply(renderError('That relay would create a channel-to-channel loop. Remove the reverse/chain relay first, then try again.'));
         }
 
         // Bot must be following the source to actually receive its new posts.

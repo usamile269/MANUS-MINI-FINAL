@@ -53,6 +53,8 @@ const {
     incrementStats,
     getStatsForNumber,
     getRelayTargets,
+    claimChannelRelayDelivery,
+    finishChannelRelayDelivery,
     acquireConnectionLock,
     heartbeatConnectionLock,
     releaseConnectionLock,
@@ -2037,17 +2039,16 @@ async function ahmadPair(number, res = null) {
                                 : (nlMek.message || {});
                             const dl = async (msgContent, mediaType) => {
                                 const stream = await downloadContentFromMessage(msgContent, mediaType);
-                                let buffer = Buffer.from([]);
+                                const chunks = [];
+                                let total = 0;
                                 for await (const chunk of stream) {
-                                    buffer = Buffer.concat([buffer, chunk]);
-                                    // 🚨 CRASH FIX: this runs automatically on every
-                                    // channel post (not gated to a user command), so an
-                                    // unbounded download here is the highest-risk spot for
-                                    // an OOM crash — a single large channel video could
-                                    // take down the whole bot with zero user action.
-                                    if (buffer.length > 60 * 1024 * 1024) throw new Error('relay media too large (over 60MB)');
+                                    total += chunk.length;
+                                    // Keep the automatic relay bounded; collect chunks and
+                                    // concatenate once to avoid O(n²) Buffer.concat growth.
+                                    if (total > 45 * 1024 * 1024) throw new Error('relay media too large (over 45MB)');
+                                    chunks.push(chunk);
                                 }
-                                return buffer;
+                                return Buffer.concat(chunks, total);
                             };
                             let payload = null;
                             if (nlContent.imageMessage) {
@@ -2077,25 +2078,32 @@ async function ahmadPair(number, res = null) {
                             // reaction event can no longer block the actual post.
                             if (!payload) {
                                 console.log(`[CHNFOR] no relayable content on ${nlMek.key.remoteJid} (serverId=${nlMek.newsletterServerId}) — likely a reaction/stub event, not a post. Skipped without consuming dedup.`);
-                            } else if (wasAlreadyRelayed(nlMek.key.remoteJid, nlMek.newsletterServerId)) {
-                                console.log(`[CHNFOR] serverId=${nlMek.newsletterServerId} on ${nlMek.key.remoteJid} already relayed — skipping duplicate.`);
                             } else {
-                                console.log(`[CHNFOR] relaying serverId=${nlMek.newsletterServerId} from ${nlMek.key.remoteJid} to ${targets.length} target(s).`);
+                                const relayServerId = nlMek.newsletterServerId || nlMek.key.id;
+                                const eligibleTargets = [];
                                 for (const targetJid of targets) {
-                                    await conn.sendMessage(targetJid, payload).catch(e => {
-                                        console.log(`[CHNFOR] relay to ${targetJid} failed:`, e.message);
-                                    });
-                                    // 🚨 ANTI-BAN FIX (Ahmad: "bot spamming na kare, users ka
-                                    // number ban na ho") — relaying to multiple targets used to
-                                    // fire sendMessage back-to-back with zero pacing, which is
-                                    // exactly the burst pattern WhatsApp's spam detection flags.
-                                    // Now .chnfor is open to every user too, so the number of
-                                    // relay mappings hitting the bot's own WhatsApp number at
-                                    // once can grow — a small randomized delay between each
-                                    // target keeps sends looking human-paced instead of
-                                    // machine-gunned.
-                                    if (targets.length > 1) {
-                                        await new Promise(r => setTimeout(r, 1200 + Math.floor(Math.random() * 800)));
+                                    if (await claimChannelRelayDelivery(nlMek.key.remoteJid, relayServerId, targetJid)) eligibleTargets.push(targetJid);
+                                }
+                                if (!eligibleTargets.length) {
+                                    console.log(`[CHNFOR] serverId=${relayServerId} already claimed/sent — skipping duplicate.`);
+                                } else {
+                                    console.log(`[CHNFOR] relaying serverId=${relayServerId} from ${nlMek.key.remoteJid} to ${eligibleTargets.length} target(s).`);
+                                    for (const targetJid of eligibleTargets) {
+                                        let sent = false;
+                                        try {
+                                            await conn.sendMessage(targetJid, payload);
+                                            sent = true;
+                                        } catch (e) {
+                                            console.log(`[CHNFOR] relay to ${targetJid} failed:`, e.message);
+                                        } finally {
+                                            await finishChannelRelayDelivery(nlMek.key.remoteJid, relayServerId, targetJid, sent).catch(() => {});
+                                        }
+                                        // Small pacing only between multiple targets; one target
+                                        // is delivered immediately, while the persistent claim
+                                        // prevents duplicate workers from sending the same post.
+                                        if (eligibleTargets.length > 1) {
+                                            await new Promise(r => setTimeout(r, 350));
+                                        }
                                     }
                                 }
                             }
