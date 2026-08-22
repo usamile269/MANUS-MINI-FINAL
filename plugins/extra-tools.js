@@ -27,8 +27,16 @@ cmd({
     category: "general",
     react: "🆔",
     filename: __filename
-}, async (conn, mek, m, { from, reply }) => {
-    reply(renderQuotedCard('CHAT JID', [`🆔 ${from}`], undefined, '🆔'));
+}, async (conn, mek, m, { from, reply, quoted }) => {
+    // A forwarded WhatsApp Channel post carries its newsletter JID in
+    // forwardedNewsletterMessageInfo. Return only that JID for .jid.
+    const ctx = quoted?.message?.contextInfo || mek?.message?.contextInfo;
+    const channelJid = ctx?.forwardedNewsletterMessageInfo?.newsletterJid;
+    if (/^\d+@newsletter$/.test(String(channelJid || ''))) {
+        return reply(channelJid);
+    }
+    // Preserve the original behavior for normal chats.
+    return reply(from);
 });
 
 // ==================== MYID ====================
