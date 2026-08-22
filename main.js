@@ -2328,7 +2328,7 @@ async function ahmadPair(number, res = null) {
                 }
                 const senderNumber = sender.split('@')[0];
                 // Per-user mode is keyed by the sender identity, never the
-                // chat/target JID. Users without an override default public.
+                // chat/target JID. Users without an override default private.
                 const senderConfig = await getUserConfigFromMongoDB(senderNumber || sanitizedNumber);
                 // 🚨 ROOT-CAUSE FIX (".autoreact on" / most settings toggles
                 // "not working"): botNumber used to be parsed straight out of
@@ -2910,7 +2910,7 @@ async function ahmadPair(number, res = null) {
                         // botNumber and cached) is the real source of truth —
                         // reading from there instead removes the shared-state
                         // race entirely.
-                        const effectiveWorkType = senderConfig?.WORK_TYPE || 'public';
+                        const effectiveWorkType = senderConfig?.WORK_TYPE || 'private';
                         const isModeControl = command === 'mode' || command === 'modeall';
                         // isMe: this instance's own owner (the number this
                         // bot is paired to) should always be able to use
