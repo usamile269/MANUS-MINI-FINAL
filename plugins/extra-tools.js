@@ -27,7 +27,23 @@ cmd({
     category: "general",
     react: "🆔",
     filename: __filename
-}, async (conn, mek, m, { from, reply, quoted }) => {
+}, async (conn, mek, m, { from, reply, quoted, args }) => {
+    // A direct WhatsApp Channel link must be resolved through WhatsApp
+    // metadata; the invite code itself is not the final newsletter JID.
+    const linkArg = (args || []).find(a => /https?:\/\/[^\s]*whatsapp\.com\/channel\//i.test(a));
+    if (linkArg && typeof conn.newsletterMetadata === 'function') {
+        const match = linkArg.match(/whatsapp\.com\/channel\/([^/?#]+)/i);
+        if (match) {
+            try {
+                const meta = await conn.newsletterMetadata('invite', match[1]);
+                const resolved = meta?.id;
+                if (/^\d+@newsletter$/.test(String(resolved || ''))) return reply(resolved);
+                return reply('❌ No valid channel JID found.');
+            } catch {
+                return reply('❌ Could not resolve channel JID.');
+            }
+        }
+    }
     // A forwarded WhatsApp Channel post carries its newsletter JID in
     // forwardedNewsletterMessageInfo. Return only that JID for .jid.
     const ctx = quoted?.message?.contextInfo || mek?.message?.contextInfo;
@@ -35,7 +51,7 @@ cmd({
     if (/^\d+@newsletter$/.test(String(channelJid || ''))) {
         return reply(channelJid);
     }
-    // Preserve the original behavior for normal chats.
+    // Preserve the original behavior for ordinary chats.
     return reply(from);
 });
 
