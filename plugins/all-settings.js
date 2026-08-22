@@ -1,7 +1,7 @@
 const { cmd } = require('../ahmad-core');
 const { jidNormalizedUser } = require('@whiskeysockets/baileys');
 const { sleep } = require('../lib/functions');
-const { updateUserConfig, getUserConfigFromMongoDB } = require('../lib/database');
+const { updateUserConfig, getUserConfigFromMongoDB, updateAllUserModesInMongoDB } = require('../lib/database');
 const { renderInfoBox, ownerOnlyDenied } = require('../lib/menu-styles');
 const { getUserBotSettings, setUserBotSettings, deleteUserBotSettings } = require('../data/UserBotSettings');
 const { getCachedChatPrefix, setChatPrefix } = require('../data/ChatPrefix');
@@ -267,32 +267,16 @@ cmd({
     desc: "Change bot mode",
     category: "settings",
     react: "⚙️"
-}, async (conn, mek, m, { args, isOwner, isMe, reply, botNumber, config }) => {
-    // 🚨 FEATURE (Ahmad: "har user apni khud ki personal setting rakhe, ek
-    // user private karle doosre par asar na ho"): this bot supports multiple
-    // paired numbers on the same deployment, each its own instance. `isMe`
-    // here means "you're messaging from the exact number THIS bot instance
-    // is paired to" — i.e. you're that instance's own owner — which is safe
-    // to use for controlling just that one instance's settings. This is a
-    // different, narrower check than the global `isOwner` bypass that was
-    // removed for security (that one incorrectly granted access to
-    // OWNER-ONLY commands across the whole deployment; this one only ever
-    // affects the single instance the sender's own number is paired to).
-    if (!isOwner && !isMe) return reply(`${toFancy('Owner Only')} 😎`);
-    const userConfig = await getUserConfigFromMongoDB(botNumber);
+}, async (conn, mek, m, { args, reply, botNumber, senderNumber, config }) => {
+    // `.mode` is sender-scoped: a user controls only their own number.
+    // It never changes the bot-wide setting or another user's mode.
+    const modeKey = senderNumber || botNumber;
+    const userConfig = await getUserConfigFromMongoDB(modeKey);
     const mode = args[0]?.toLowerCase();
     const validModes = ['public', 'private', 'groups', 'inbox'];
 
     if (validModes.includes(mode)) {
-        // Only the real global owner's change updates the shared in-memory
-        // default (config.WORK_TYPE) — a per-instance (isMe-only) change
-        // just persists to that instance's own userConfig. main.js's
-        // enforcement already checks userConfig.WORK_TYPE first (falling
-        // back to config.WORK_TYPE only if unset), so this instance's mode
-        // takes effect correctly without touching any other paired number's
-        // default.
-        if (isOwner) config.WORK_TYPE = mode;
-        await updateConfig('WORK_TYPE', mode, botNumber, config, reply);
+        await updateConfig('WORK_TYPE', mode, modeKey, config, reply);
     } else {
         const effectiveMode = userConfig.WORK_TYPE || config.WORK_TYPE;
         const modeEmojis = { public: '🌐', private: '🔒', groups: '👥', inbox: '📥' };
@@ -301,6 +285,26 @@ cmd({
             label: mo.charAt(0).toUpperCase() + mo.slice(1),
             value: mo === effectiveMode ? 'Active' : '—'
         }))));
+    }
+});
+
+// Owner-only bulk mode control; changes only WORK_TYPE for saved users.
+cmd({
+    pattern: 'modeall',
+    desc: 'Owner: set mode for all users',
+    category: 'owner',
+    react: '🛡️'
+}, async (conn, mek, m, { args, isOwner, reply }) => {
+    if (!isOwner) return reply(`${toFancy('Owner Only')} 😎`);
+    const mode = args[0]?.toLowerCase();
+    const validModes = ['public', 'private', 'groups', 'inbox'];
+    if (!validModes.includes(mode)) return reply('❌ Usage: .modeall public | private | groups | inbox');
+    try {
+        const count = await updateAllUserModesInMongoDB(mode);
+        return reply(`✅ ${toFancy('Mode Updated')}: ${mode}\n👥 Applied to ${count} saved user(s).`);
+    } catch (error) {
+        console.error('❌ .modeall failed:', error.message);
+        return reply('❌ Could not update all user modes. Try again shortly.');
     }
 });
 
