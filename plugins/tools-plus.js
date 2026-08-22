@@ -44,25 +44,19 @@ async (conn, mek, m, { from, args, reply, quoted }) => {
             // "GraphQL server error: Bad Request" on .followchannel).
             const meta = await conn.newsletterMetadata('invite', code);
             const jid = meta?.id;
-            if (!jid) return reply(box('CHANNEL JID', ['❌ Could not resolve this link — it may be wrong or expired.'], '📢'));
-            const name = meta?.name?.text || meta?.name || 'Unknown';
-            return conn.sendMessage(from, {
-                text: box('CHANNEL JID', [`📢 Name: ${name}`, `🆔 JID: ${jid}`, `💡 Set this in config:`, `   CHANNEL_JID: '${jid}'`], '📢'),
-                contextInfo: chanCtx()
-            }, { quoted: fakevCard });
+            if (!/^\d+@newsletter$/.test(String(jid || ''))) return reply('❌ No valid channel JID found.');
+            return reply(jid);
         } catch (e) {
-            return reply(box('CHANNEL JID', [`❌ Couldn't resolve this link: ${e.message}`], '📢'));
+            return reply('❌ Could not resolve channel JID.');
         }
     }
 
     const ctx = quoted?.message?.contextInfo || mek?.message?.contextInfo;
     const jid = ctx?.forwardedNewsletterMessageInfo?.newsletterJid;
-    const name = ctx?.forwardedNewsletterMessageInfo?.newsletterName;
-    if (!jid) return reply(box('CHANNEL JID', ['❌ Usage: .channeljid <channel link>', '💡 Or forward a post from the channel and reply to it with .channeljid'], '📢'));
-    await conn.sendMessage(from, {
-        text: box('CHANNEL JID', [`📢 Name: ${name || 'Unknown'}`, `🆔 JID: ${jid}`, `💡 Set this in config:`, `   CHANNEL_JID: '${jid}'`], '📢'),
-        contextInfo: chanCtx()
-    }, { quoted: fakevCard });
+    if (!/^\d+@newsletter$/.test(String(jid || ''))) {
+        return reply('❌ Reply to a forwarded WhatsApp Channel post or provide a channel link.');
+    }
+    return reply(jid);
 });
 
 // 3. grouplink
