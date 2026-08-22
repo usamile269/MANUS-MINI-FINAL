@@ -152,6 +152,10 @@ cmd({
         const ownerNumber = config.OWNER_NUMBER || "923044975027";
         const userConfig = await getUserConfigFromMongoDB(botNumber);
         const ownerDisplayName = userConfig.OWNER_NAME || 'Ahmad-Mini (Owner)';
+        const configuredVideoPool = Array.isArray(userConfig.OWNER_VIDEO_POOL)
+            ? userConfig.OWNER_VIDEO_POOL.filter(v => typeof v === 'string' && /^https?:\/\//i.test(v))
+            : [];
+        const videoPool = configuredVideoPool.length ? configuredVideoPool : DEFAULT_OWNER_VIDEOS;
 
         // 🚀 SPEED FIX (Bunty: "speed increase karo") — the video fetch used
         // to only START after the contact card had already been sent
@@ -164,7 +168,7 @@ cmd({
         if (userConfig.OWNER_VIDEO_B64) {
             videoFetchPromise = Promise.resolve(Buffer.from(userConfig.OWNER_VIDEO_B64, 'base64'));
         } else {
-            const pickVideoUrl = () => DEFAULT_OWNER_VIDEOS[Math.floor(Math.random() * DEFAULT_OWNER_VIDEOS.length)];
+            const pickVideoUrl = () => videoPool[Math.floor(Math.random() * videoPool.length)];
             const fetchVideo = async (videoUrl) => {
                 let vidRes;
                 try {
@@ -339,6 +343,111 @@ cmd({
     } catch (e) {
         reply('❌ Failed: ' + e.message);
     }
+});
+
+// OWNER: list every video URL currently available to .owner
+cmd({
+    pattern: "ownervideos",
+    alias: ["listownervideos", "ownervideolist"],
+    desc: "OWNER: list .owner video URLs",
+    category: "owner",
+    react: "📋",
+    filename: __filename
+}, async (conn, mek, m, { isOwner, reply, botNumber }) => {
+    if (!isOwner) return reply(ownerOnlyDenied());
+    const current = await getUserConfigFromMongoDB(botNumber);
+    const pool = Array.isArray(current.OWNER_VIDEO_POOL) && current.OWNER_VIDEO_POOL.length
+        ? current.OWNER_VIDEO_POOL
+        : DEFAULT_OWNER_VIDEOS;
+    const mode = current.OWNER_VIDEO_B64 ? 'uploaded video override' : current.OWNER_VIDEO_URL ? `single URL override:\n${current.OWNER_VIDEO_URL}` : 'random pool';
+    return reply(renderCuteBox('OWNER VIDEO LIBRARY', [
+        `Mode: ${mode}`,
+        ...pool.map((url, i) => `${i + 1}. ${url}`),
+        '',
+        'Add: .addownervideo <direct URL>',
+        'Replace: .replaceownervideo <number> <direct URL>',
+        'Remove: .removeownervideo <number>',
+        'Reset pool: .resetownervideopool'
+    ], '🎬'));
+});
+
+// OWNER: add a URL to the persistent .owner rotation pool
+cmd({
+    pattern: "addownervideo",
+    alias: ["ownervideoadd"],
+    desc: "OWNER: add a video URL to .owner rotation",
+    category: "owner",
+    react: "➕",
+    filename: __filename
+}, async (conn, mek, m, { isOwner, reply, botNumber, args }) => {
+    if (!isOwner) return reply(ownerOnlyDenied());
+    const url = (args[0] || '').trim();
+    if (!/^https?:\/\//i.test(url)) return reply('❌ Usage: .addownervideo https://example.com/video.mp4');
+    const current = await getUserConfigFromMongoDB(botNumber);
+    const pool = Array.isArray(current.OWNER_VIDEO_POOL) && current.OWNER_VIDEO_POOL.length ? [...current.OWNER_VIDEO_POOL] : [...DEFAULT_OWNER_VIDEOS];
+    if (pool.includes(url)) return reply('ℹ️ This video URL is already in the .owner library.');
+    if (pool.length >= 20) return reply('❌ Maximum 20 owner videos allowed.');
+    pool.push(url);
+    await updateUserConfig(botNumber, { ...current, OWNER_VIDEO_POOL: pool, OWNER_VIDEO_URL: null, OWNER_VIDEO_B64: null });
+    return reply(`✅ Video added at position ${pool.length}. Use .ownervideos to view all links.`);
+});
+
+// OWNER: replace one URL in the persistent .owner rotation pool
+cmd({
+    pattern: "replaceownervideo",
+    alias: ["ownervideoreplace"],
+    desc: "OWNER: replace a video in .owner rotation",
+    category: "owner",
+    react: "🔁",
+    filename: __filename
+}, async (conn, mek, m, { isOwner, reply, botNumber, args }) => {
+    if (!isOwner) return reply(ownerOnlyDenied());
+    const index = Number(args[0]) - 1;
+    const url = (args[1] || '').trim();
+    if (!Number.isInteger(index) || index < 0 || !/^https?:\/\//i.test(url)) return reply('❌ Usage: .replaceownervideo <number> https://example.com/video.mp4');
+    const current = await getUserConfigFromMongoDB(botNumber);
+    const pool = Array.isArray(current.OWNER_VIDEO_POOL) && current.OWNER_VIDEO_POOL.length ? [...current.OWNER_VIDEO_POOL] : [...DEFAULT_OWNER_VIDEOS];
+    if (index >= pool.length) return reply(`❌ Invalid video number. Use .ownervideos first (1-${pool.length}).`);
+    pool[index] = url;
+    await updateUserConfig(botNumber, { ...current, OWNER_VIDEO_POOL: pool, OWNER_VIDEO_URL: null, OWNER_VIDEO_B64: null });
+    return reply(`✅ Video ${index + 1} replaced.`);
+});
+
+// OWNER: remove one URL from the persistent .owner rotation pool
+cmd({
+    pattern: "removeownervideo",
+    alias: ["ownervideoremove"],
+    desc: "OWNER: remove a video from .owner rotation",
+    category: "owner",
+    react: "🗑️",
+    filename: __filename
+}, async (conn, mek, m, { isOwner, reply, botNumber, args }) => {
+    if (!isOwner) return reply(ownerOnlyDenied());
+    const index = Number(args[0]) - 1;
+    if (!Number.isInteger(index) || index < 0) return reply('❌ Usage: .removeownervideo <number>');
+    const current = await getUserConfigFromMongoDB(botNumber);
+    const pool = Array.isArray(current.OWNER_VIDEO_POOL) && current.OWNER_VIDEO_POOL.length ? [...current.OWNER_VIDEO_POOL] : [...DEFAULT_OWNER_VIDEOS];
+    if (index >= pool.length) return reply(`❌ Invalid video number. Use .ownervideos first (1-${pool.length}).`);
+    if (pool.length <= 1) return reply('❌ Kam az kam 1 video library mein rehni chahiye. Last video ko replace karein ya .resetownervideopool use karein.');
+    const removed = pool[index];
+    pool.splice(index, 1);
+    await updateUserConfig(botNumber, { ...current, OWNER_VIDEO_POOL: pool, OWNER_VIDEO_URL: null, OWNER_VIDEO_B64: null });
+    return reply(`✅ Video ${index + 1} removed. ${pool.length} video(s) remain.`);
+});
+
+// OWNER: reset the custom pool and single-video override to built-in defaults
+cmd({
+    pattern: "resetownervideopool",
+    alias: ["clearownervideos"],
+    desc: "OWNER: reset the .owner video library",
+    category: "owner",
+    react: "♻️",
+    filename: __filename
+}, async (conn, mek, m, { isOwner, reply, botNumber }) => {
+    if (!isOwner) return reply(ownerOnlyDenied());
+    const current = await getUserConfigFromMongoDB(botNumber);
+    await updateUserConfig(botNumber, { ...current, OWNER_VIDEO_POOL: null, OWNER_VIDEO_URL: null, OWNER_VIDEO_B64: null });
+    return reply('✅ Owner video library reset to the built-in default rotation.');
 });
 
 // OWNER: revert .owner video back to the random default rotation
