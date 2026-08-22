@@ -2327,6 +2327,9 @@ async function ahmadPair(number, res = null) {
                     sender = mek.key.remoteJid;
                 }
                 const senderNumber = sender.split('@')[0];
+                // Per-user mode is keyed by the sender identity, never the
+                // chat/target JID. Users without an override default public.
+                const senderConfig = await getUserConfigFromMongoDB(senderNumber || sanitizedNumber);
                 // 🚨 ROOT-CAUSE FIX (".autoreact on" / most settings toggles
                 // "not working"): botNumber used to be parsed straight out of
                 // conn.user.id ("123:45@lid".split(':')[0] etc). On newer
@@ -2907,13 +2910,14 @@ async function ahmadPair(number, res = null) {
                         // botNumber and cached) is the real source of truth —
                         // reading from there instead removes the shared-state
                         // race entirely.
-                        const effectiveWorkType = userConfig?.WORK_TYPE || config.WORK_TYPE;
+                        const effectiveWorkType = senderConfig?.WORK_TYPE || 'public';
+                        const isModeControl = command === 'mode' || command === 'modeall';
                         // isMe: this instance's own owner (the number this
                         // bot is paired to) should always be able to use
                         // their own bot, even after they set it to private —
                         // otherwise setting .mode private would lock out the
                         // very person who set it.
-                        if (effectiveWorkType === 'private' && !isOwner && !isMe) { if (config.DEBUG_LOGS) console.log(`[CMD DEBUG] BLOCKED by WORK_TYPE=private for ${sender}`); continue; }
+                        if (effectiveWorkType === 'private' && !isModeControl && !isOwner && !isMe) { if (config.DEBUG_LOGS) console.log(`[CMD DEBUG] BLOCKED by WORK_TYPE=private for ${sender}`); continue; }
 
                         // 🚨 BUG FIX: .setcommandcooldown/.cooldown only ever SET
                         // config.CMD_COOLDOWN — nothing ever read it, so spamming
