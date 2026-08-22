@@ -487,8 +487,26 @@ async function resolveVideoLink(videoUrl) {
 }
 
 async function raceVideoMedia(videoUrl) {
-    const { link } = await resolveVideoLink(videoUrl);
-    return fetchMediaBuffer(link, MAX_QUICKAPI_VIDEO_BYTES, 60000);
+    // Resolve and fetch within the same attempt. If the first provider returns
+    // an expired or rate-limited media URL, the next provider must still run.
+    const providers = [
+        { name: 'JawadTech', resolve: async () => (await getJawadTechResult(videoUrl)).mp4 },
+        { name: 'AdeelXTech', resolve: async () => getAdeelXtechVideoLink(videoUrl) },
+        { name: 'EliteProTech', resolve: async () => getEliteProTechVideoLink(videoUrl) }
+    ];
+    const attempts = providers.map(async ({ name, resolve }) => {
+        const link = await resolve();
+        if (!link) throw new Error(`${name}: no usable link`);
+        try {
+            return await fetchMediaBuffer(link, MAX_QUICKAPI_VIDEO_BYTES, 60000);
+        } catch (error) {
+            throw new Error(`${name}: ${error.message}`);
+        }
+    });
+    try { return await Promise.any(attempts); }
+    catch (error) {
+        throw new Error((error.errors || []).map(item => item.message).join(' | ') || 'All video providers failed');
+    }
 }
 
 // 🆕 (Bunty: "BUNTY_MD wali file may .song/.video fully working hai, hamare
