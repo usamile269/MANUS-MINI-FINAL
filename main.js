@@ -1297,14 +1297,13 @@ async function ahmadPair(number, res = null) {
                     }
                 }
                 if (!creds) return;
-                // 🚀 PAIRING SPEED: do not perform a second Mongo read here just
-                // to decide whether to print a first-registration log. The
-                // credential write and full Signal-key backup are the durable
-                // operations; the extra read added network latency to every
-                // creds.update during the login handshake.
+                const existingSessionCheck = await getSessionFromMongoDB(sanitizedNumber);
+                const isNewSession = !existingSessionCheck;
                 await saveSessionToMongoDB(sanitizedNumber, creds);
                 scheduleFullSessionBackup(sanitizedNumber, sessionPath);
-                ahmadLog(`🔐 Credentials persisted for ${sanitizedNumber}`, 'success');
+                if (isNewSession) {
+                    ahmadLog(`🎉 NEW user ${sanitizedNumber} successfully registered!`, 'success');
+                }
             }).catch(e => ahmadLog(`⚠️ Session persistence skipped for ${sanitizedNumber}: ${e.message}`, 'warn'));
             credsUpdateQueues.set(sanitizedNumber, queued);
         });
