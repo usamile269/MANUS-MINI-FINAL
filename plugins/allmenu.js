@@ -40,7 +40,9 @@ cmd({
             getUserBotSettings(sender),
             getUserConfigFromMongoDB(botNumber)
         ]);
-        const botName = myConfig.BOT_NAME || userConfig.BOT_NAME || config.BOT_NAME || '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ';
+        // Owner global name wins for every user; personal settings remain available
+        // only when no global name has been configured.
+        const botName = userConfig.BOT_NAME || myConfig.BOT_NAME || config.BOT_NAME || '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ';
 
         let totalCommands = 0;
         let grouped = {};
@@ -326,7 +328,8 @@ cmd({
             getUserBotSettings(sender),
             getUserConfigFromMongoDB(botNumber)
         ]);
-        const botName = myConfig.BOT_NAME || userConfig.BOT_NAME || config.BOT_NAME || 'AHMAD MINI';
+        // Keep the owner’s overall name consistent in the alternate menu too.
+        const botName = userConfig.BOT_NAME || myConfig.BOT_NAME || config.BOT_NAME || 'AHMAD MINI';
 
         let totalCommands = 0;
         let grouped = {};

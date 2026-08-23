@@ -95,7 +95,8 @@ cmd({
 }, async (conn, mek, m, { from, sender, reply, botNumber }) => {
     try {
         const [myConfig, userConfig] = await Promise.all([getUserBotSettings(sender), getUserConfigFromMongoDB(botNumber)]);
-        const botName = myConfig.BOT_NAME || userConfig.BOT_NAME || config.BOT_NAME || '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝐍𝑰 ᥫᩣ';
+        // The owner’s overall name applies to every user-facing menu/help view.
+        const botName = userConfig.BOT_NAME || myConfig.BOT_NAME || config.BOT_NAME || '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝐍𝑰 ᥫᩣ';
         const bugCommands = require('../ahmad-core').commands.filter(c => c.category === 'bug' && c.pattern);
         let grouped = { 'bug': bugCommands.map(c => c.pattern) };
         const categoryDisplay = { 'bug': { emoji: '💀', name: 'Ahmad Bug & Ban' } };
