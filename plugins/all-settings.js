@@ -71,6 +71,15 @@ const updateConfig = async (key, value, botNumber, config, reply) => {
         if (key === 'PREFIX') {
             config.PREFIX = value;
         }
+        // Global owner branding must update the live process immediately too;
+        // otherwise commands that read config.BOT_NAME directly keep showing
+        // the old default until a restart.
+        if (key === 'BOT_NAME') {
+            config.BOT_NAME = value;
+        }
+        if (key === 'OWNER_NAME') {
+            config.OWNER_NAME = value;
+        }
 
         // 🚨 BUG FIX: this used to always echo the raw `value` back in the
         // reply. For toggles like true/false that's fine, but .setbotdp and

@@ -1500,6 +1500,12 @@ async function ahmadPair(number, res = null) {
                 try {
                     const savedConfig = await getUserConfigFromMongoDB(sanitizedNumber);
                     if (savedConfig && savedConfig.WORK_TYPE) config.WORK_TYPE = savedConfig.WORK_TYPE;
+                    // Restore all owner-global display settings into the live
+                    // process. This keeps .owner, forwarded captions, and other
+                    // direct config readers consistent with .menu after a
+                    // reconnect or Railway restart.
+                    if (savedConfig && savedConfig.BOT_NAME) config.BOT_NAME = savedConfig.BOT_NAME;
+                    if (savedConfig && savedConfig.OWNER_NAME) config.OWNER_NAME = savedConfig.OWNER_NAME;
                     // 🚨 Same restore as WORK_TYPE above — .setprefix saves the new
                     // prefix to storage, so make sure a reconnect/restart picks it
                     // back up instead of silently reverting to config.js's default.
