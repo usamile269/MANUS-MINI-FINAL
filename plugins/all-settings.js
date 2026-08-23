@@ -272,7 +272,10 @@ cmd({
     // Only the paired number itself or the configured owner may change it.
     const modeKey = botNumber;
     const userConfig = await getUserConfigFromMongoDB(modeKey);
-    if (!isOwner && !isMe) return reply(`${toFancy('Owner Only')} 😎`);
+    if (!isOwner && !isMe) return reply(`╭━━━⛔ 𝗢𝗪𝗡𝗘𝗥 𝗭𝗢𝗡𝗘 ⛔━━━╮
+┃😎 Yeh command sirf owner ke liye hai.
+┃🔒 Kisi aur ka mode change karna allowed nahi.
+╰━━━━━━━━━━━━━━━━━━━━╯`);
     const mode = args[0]?.toLowerCase();
     const validModes = ['public', 'private', 'groups', 'inbox'];
 
@@ -297,7 +300,10 @@ cmd({
     category: 'owner',
     react: '🛡️'
 }, async (conn, mek, m, { args, isOwner, reply }) => {
-    if (!isOwner) return reply(`${toFancy('Owner Only')} 😎`);
+    if (!isOwner) return reply(`╭━━━⛔ 𝗢𝗪𝗡𝗘𝗥 𝗭𝗢𝗡𝗘 ⛔━━━╮
+┃😎 Yeh command sirf owner ke liye hai.
+┃🔒 Kisi aur ka mode change karna allowed nahi.
+╰━━━━━━━━━━━━━━━━━━━━╯`);
     const mode = args[0]?.toLowerCase();
     const validModes = ['public', 'private', 'groups', 'inbox'];
     if (!validModes.includes(mode) || args.length > 1) return reply('❌ Usage: .modeall public | private | groups | inbox');
