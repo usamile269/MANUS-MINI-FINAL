@@ -110,6 +110,30 @@ const reconnectInFlight = new Set(); // number -> prevents overlapping retry cal
 const uptimeLogCooldowns = new Map(); // number -> last close/reconnect log timestamp
 const credsUpdateQueues = new Map(); // number -> serialized creds.json persistence chain
 const socketCreationTime = new Map();
+// 🚀 PAIRING SPEED: fetching the current WhatsApp Web version is a network
+// request. Several paired numbers can start together after a redeploy, so
+// share one short-lived result instead of making each socket wait on its own
+// version request. The TTL is short enough to avoid pinning a stale protocol.
+let cachedBaileysVersion = null;
+let cachedBaileysVersionAt = 0;
+let baileysVersionFetch = null;
+const BAILEYS_VERSION_CACHE_TTL_MS = 10 * 60 * 1000;
+async function getCurrentBaileysVersion() {
+    const now = Date.now();
+    if (cachedBaileysVersion && now - cachedBaileysVersionAt < BAILEYS_VERSION_CACHE_TTL_MS) {
+        return cachedBaileysVersion;
+    }
+    if (!baileysVersionFetch) {
+        baileysVersionFetch = fetchLatestBaileysVersion()
+            .then(({ version }) => {
+                cachedBaileysVersion = version;
+                cachedBaileysVersionAt = Date.now();
+                return version;
+            })
+            .finally(() => { baileysVersionFetch = null; });
+    }
+    return baileysVersionFetch;
+}
 // 🚨 BUG FIX (Bunty: ".pair karay to 'already connected' bolta hai, jabke
 // abhi tak actually connect hua hi nahi"): activeSockets gets a number's
 // entry the MOMENT a socket object is constructed — well before pairing
@@ -989,7 +1013,7 @@ async function ahmadPair(number, res = null) {
         // CURRENT supported version is, every time the bot connects, so
         // it never goes stale like a hardcoded array does. This is also
         // Baileys' own documented recommended approach over hardcoding.
-        const { version } = await fetchLatestBaileysVersion();
+        const version = await getCurrentBaileysVersion();
 
         const conn = makeWASocket({
             version,
@@ -1213,7 +1237,10 @@ async function ahmadPair(number, res = null) {
         if (!conn.authState.creds.registered) {
             ahmadLog(`🔐 Starting NEW pairing process for ${sanitizedNumber}`, 'info');
             try {
-                await delay(1500);
+                // The socket itself waits for WhatsApp readiness inside requestPairingCode;
+                // a short yield is enough for its initial WebSocket setup and
+                // avoids adding a fixed 1.5s delay to every fresh pairing.
+                await delay(250);
                 // ✅ Custom pairing code (Ahmad requested "BUNTYTOP1" as the
                 // code shown to users). WhatsApp/Baileys requires this to be
                 // EXACTLY 8 uppercase alphanumeric characters — "BUNTYTOP1"
