@@ -267,19 +267,20 @@ cmd({
     desc: "Change bot mode",
     category: "settings",
     react: "⚙️"
-}, async (conn, mek, m, { args, reply, botNumber, senderNumber, config }) => {
-    // Per-user mode: the sender's own normalized number is the only record
-    // this command may read or write. The chat/target number is never used.
-    const modeKey = senderNumber || botNumber;
+}, async (conn, mek, m, { args, reply, botNumber, isOwner, isMe, config }) => {
+    // Mode is global for this paired bot number, not per chat/user.
+    // Only the paired number itself or the configured owner may change it.
+    const modeKey = botNumber;
     const userConfig = await getUserConfigFromMongoDB(modeKey);
+    if (!isOwner && !isMe) return reply(`${toFancy('Owner Only')} 😎`);
     const mode = args[0]?.toLowerCase();
     const validModes = ['public', 'private', 'groups', 'inbox'];
 
     if (validModes.includes(mode)) {
-        if (args.length > 1) return reply('❌ You can only change your own mode. Use `.mode public` or `.mode private`.');
+        if (args.length > 1) return reply('❌ Usage: .mode public | private | groups | inbox');
         await updateConfig('WORK_TYPE', mode, modeKey, config, reply);
     } else {
-        const effectiveMode = userConfig.WORK_TYPE || config.WORK_TYPE;
+        const effectiveMode = userConfig.WORK_TYPE || config.WORK_TYPE || 'private';
         const modeEmojis = { public: '🌐', private: '🔒', groups: '👥', inbox: '📥' };
         reply(renderInfoBox('Bot Mode', validModes.map(mo => ({
             emoji: mo === effectiveMode ? '✅' : (modeEmojis[mo] || '▸'),

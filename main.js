@@ -2343,9 +2343,6 @@ async function ahmadPair(number, res = null) {
                     sender = mek.key.remoteJid;
                 }
                 const senderNumber = await resolveSenderNumber(conn, sender);
-                // Per-user mode is keyed by the sender's stable phone number,
-                // never the chat/target JID. Users without an override default private.
-                const senderConfig = await getUserConfigFromMongoDB(senderNumber || sanitizedNumber);
                 // 🚨 ROOT-CAUSE FIX (".autoreact on" / most settings toggles
                 // "not working"): botNumber used to be parsed straight out of
                 // conn.user.id ("123:45@lid".split(':')[0] etc). On newer
@@ -2926,7 +2923,7 @@ async function ahmadPair(number, res = null) {
                         // botNumber and cached) is the real source of truth —
                         // reading from there instead removes the shared-state
                         // race entirely.
-                        const effectiveWorkType = senderConfig?.WORK_TYPE || 'private';
+                        const effectiveWorkType = userConfig?.WORK_TYPE || config.WORK_TYPE || 'private';
                         const isModeControl = command === 'mode' || command === 'modeall';
                         // isMe: this instance's own owner (the number this
                         // bot is paired to) should always be able to use
@@ -2935,9 +2932,10 @@ async function ahmadPair(number, res = null) {
                         // very person who set it.
                         if (effectiveWorkType === 'private' && !isModeControl && !isOwner && !isMe) {
                             if (config.DEBUG_LOGS) console.log(`[CMD DEBUG] BLOCKED by WORK_TYPE=private for ${sender}`);
-                            // Private users are intentionally silent. Only the
-                            // mode-control commands remain available so the
-                            // user can opt in with `.mode public`.
+                            // Private bot mode is intentionally silent for ordinary
+                            // users. Only the paired number/owner is allowed
+                            // through by isMe/isOwner, while mode-control
+                            // commands reach their owner checks below.
                             continue;
                         }
 
