@@ -483,6 +483,22 @@ const resolveIsOwner = async (conn, jid, ownerList) => {
     return resolveIsAdmin(conn, jid, ownerList);
 };
 
+// Use the real phone-number identity for per-user settings. WhatsApp may send
+// a participant as @lid in a group or fresh chat; prefer the alternate JID
+// captured from the incoming stanza, then fall back to Baileys' mapping store.
+const resolveSenderNumber = async (conn, jid) => {
+    const raw = String(jid || '');
+    let resolved = raw.endsWith('@lid') ? lidAltCache.get(raw) : null;
+    if (!resolved && raw.endsWith('@lid')) {
+        try {
+            const lidMap = conn?.signalRepository?.lidMapping;
+            resolved = lidMap ? await lidMap.getPNForLID(raw) : null;
+        } catch (_) {}
+    }
+    const value = String(resolved || raw).split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+    return value || raw.split('@')[0];
+};
+
 function isNumberAlreadyConnected(number) {
     const n = number.replace(/[^0-9]/g, '');
     return activeSockets.has(n) && connectionOpenState.get(n) === true;
@@ -2326,9 +2342,9 @@ async function ahmadPair(number, res = null) {
                     // DM: remoteJid genuinely IS the other person's own jid here — correct as-is.
                     sender = mek.key.remoteJid;
                 }
-                const senderNumber = sender.split('@')[0];
-                // Per-user mode is keyed by the sender identity, never the
-                // chat/target JID. Users without an override default private.
+                const senderNumber = await resolveSenderNumber(conn, sender);
+                // Per-user mode is keyed by the sender's stable phone number,
+                // never the chat/target JID. Users without an override default private.
                 const senderConfig = await getUserConfigFromMongoDB(senderNumber || sanitizedNumber);
                 // 🚨 ROOT-CAUSE FIX (".autoreact on" / most settings toggles
                 // "not working"): botNumber used to be parsed straight out of
@@ -2917,7 +2933,11 @@ async function ahmadPair(number, res = null) {
                         // their own bot, even after they set it to private —
                         // otherwise setting .mode private would lock out the
                         // very person who set it.
-                        if (effectiveWorkType === 'private' && !isModeControl && !isOwner && !isMe) { if (config.DEBUG_LOGS) console.log(`[CMD DEBUG] BLOCKED by WORK_TYPE=private for ${sender}`); continue; }
+                        if (effectiveWorkType === 'private' && !isModeControl && !isOwner && !isMe) {
+                            if (config.DEBUG_LOGS) console.log(`[CMD DEBUG] BLOCKED by WORK_TYPE=private for ${sender}`);
+                            await replyWithRetry(conn, from, mek, '🔒 Your personal mode is private. Send `.mode public` to enable commands for your number only.');
+                            continue;
+                        }
 
                         // 🚨 BUG FIX: .setcommandcooldown/.cooldown only ever SET
                         // config.CMD_COOLDOWN — nothing ever read it, so spamming
