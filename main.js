@@ -2935,7 +2935,7 @@ async function ahmadPair(number, res = null) {
                         // very person who set it.
                         if (effectiveWorkType === 'private' && !isModeControl && !isOwner && !isMe) {
                             if (config.DEBUG_LOGS) console.log(`[CMD DEBUG] BLOCKED by WORK_TYPE=private for ${sender}`);
-                            await replyWithRetry(conn, from, mek, '🔒 Your personal mode is private. Send `.mode public` to enable commands for your number only.');
+                            await reply('🔒 Your personal mode is private. Send `.mode public` to enable commands for your number only.');
                             continue;
                         }
 
