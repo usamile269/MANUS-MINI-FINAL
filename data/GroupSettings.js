@@ -21,7 +21,7 @@ const DEFAULT_GOODBYE_MSG =
     `> ${B('Jo bhi vajah ho, hum yahi kahenge — take care apna khayal rakhna')} 🌙\n` +
     `> ${B('Phir kabhi mauka mila to wapis aa jaana, darwaza khula hai')} ✨`;
 
-const DEFAULTS = { welcomeOn: false, welcomeMsg: DEFAULT_WELCOME_MSG, welcomeVideo: null, goodbyeMsg: DEFAULT_GOODBYE_MSG, goodbyeVideo: null, kickMsg: null, warnLimit: 3, antilink: false, antilinkAction: 'delete', rules: null, badwords: [], slowmodeSec: 0, nightMode: null, mediaLock: false, groupEmoji: null, antiforward: false, antiforwardAction: 'delete' };
+const DEFAULTS = { welcomeOn: false, welcomeMsg: DEFAULT_WELCOME_MSG, welcomeVideo: null, goodbyeMsg: DEFAULT_GOODBYE_MSG, goodbyeVideo: null, kickMsg: null, warnLimit: 3, antilink: false, antilinkAction: 'delete', rules: null, badwords: [], slowmodeSec: 0, nightMode: null, mediaLock: false, groupEmoji: null, antiforward: false, antiforwardAction: 'delete', aiGroupAutoReply: false };
 
 // 🚨 SPEED FIX (same class as getUserConfigFromMongoDB in lib/database.js):
 // this was hitting the DB fresh on every antilink/slowmode/nightmode-relevant

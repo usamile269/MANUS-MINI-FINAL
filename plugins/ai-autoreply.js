@@ -61,3 +61,35 @@ cmd({
         ]));
     }
 });
+
+// Group AI auto-reply — stored per group, so enabling it here never affects
+// another group or private chats. Only group admins/owner may change it.
+cmd({
+    pattern: "aigc",
+    alias: ["gcautoai", "groupai", "gcautoreply"],
+    desc: "AI auto-reply in this group — on/off",
+    category: "group",
+    react: "🧠",
+    use: ".aigc on/off"
+}, async (conn, mek, m, { isGroup, isAdmins, isOwner, args, reply, from }) => {
+    if (!isGroup) return reply(box('GROUP AI', ['❌ Yeh command sirf group mein use hoti hai.']));
+    if (!isAdmins && !isOwner) return reply(box('GROUP AI', ['⛔ Sirf group admins ya owner is setting ko change kar sakte hain.']));
+    const { getGroupSettings, setGroupSettings } = require('../data/GroupSettings');
+    const sub = (args[0] || '').toLowerCase();
+    const current = await getGroupSettings(from);
+    if (sub === 'on' || sub === 'off') {
+        const enabled = sub === 'on';
+        const saved = await setGroupSettings(from, { aiGroupAutoReply: enabled });
+        if (!saved) return reply(box('GROUP AI', ['❌ Setting save nahi hui, dobara try karo.']));
+        require('../lib/group-extra-cache').invalidate(from);
+        return reply(box('GROUP AI', [enabled ? '✅ Group AI Auto-Reply: ON' : '❌ Group AI Auto-Reply: OFF', '🛡️ Sirf non-admin messages par reply karega.', '⏱️ Anti-spam cooldown active rahega.']));
+    }
+    return reply(box('GROUP AI', [
+        `Status: ${current.aiGroupAutoReply ? '✅ ON' : '❌ OFF'}`,
+        '💡 .aigc on',
+        '💡 .aigc off'
+    ]));
+});
+
+module.exports = {};
+
