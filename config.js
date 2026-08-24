@@ -102,8 +102,9 @@ module.exports = {
     // ===========================================================
     // 3. FONCTIONNALITÉS AUTOMATIQUES (STATUTS)
     // ===========================================================
-    AUTO_VIEW_STATUS: 'true', 
-    AUTO_LIKE_STATUS: 'true', 
+    // Automatic status actions are opt-in and OFF by default.
+    AUTO_VIEW_STATUS: 'false', 
+    AUTO_LIKE_STATUS: 'false', 
     AUTO_LIKE_EMOJI: ['❤️', '🌹', '✨', '🥰', '🌹', '😍', '💞', '💕', '☺️', '🤗'], 
     
     AUTO_STATUS_REPLY: 'false', 
