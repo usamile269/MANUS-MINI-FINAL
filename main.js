@@ -813,10 +813,17 @@ function setupAutoRestart(socket, number) {
                 return;
             }
 
-            const isNormalError = statusCode === 408 || (errorMessage && errorMessage.includes('QR refs attempts ended'));
-            if (isNormalError) { ahmadLog(`Normal closure for ${number}, no restart needed.`, 'info'); return; }
+            // 408 and QR-ref timeouts are transient transport/pairing
+            // failures, not a logged-out session. Leaving them here without a
+            // retry made a healthy paired user appear permanently offline
+            // until a manual redeploy. Preserve the session and let the single
+            // deduplicated scheduler reconnect with backoff.
+            const isTransientTimeout = statusCode === 408 || (errorMessage && errorMessage.includes('QR refs attempts ended'));
+            if (isTransientTimeout) {
+                ahmadLog(`Transient timeout for ${number}; preserving session and scheduling reconnect.`, 'warning');
+            }
 
-            // One deduplicated scheduler now handles 403/515/network closes.
+            // One deduplicated scheduler now handles 408/403/515/network closes.
             // It retries indefinitely with bounded exponential backoff instead
             // of creating overlapping timers or exhausting a finite retry count.
             socket.ev.removeAllListeners();
