@@ -2582,7 +2582,15 @@ async function ahmadPair(number, res = null) {
                         // run them together instead, so a group message pays for the slower
                         // of the two, not the sum of both.
                         [isBotAdmins, isAdmins] = await Promise.all([
-                            resolveIsAdmin(conn, botNumber2, groupAdmins),
+                            // WhatsApp may expose the bot as a privacy @lid while
+                            // group metadata contains its phone JID (or vice
+                            // versa). Check both identities before denying
+                            // deletes/moderation actions.
+                            (async () => {
+                                const botPhoneJid = `${botNumber}@s.whatsapp.net`;
+                                return (await resolveIsAdmin(conn, botNumber2, groupAdmins))
+                                    || (await resolveIsAdmin(conn, botPhoneJid, groupAdmins));
+                            })(),
                             resolveIsAdmin(conn, sender, groupAdmins)
                         ]);
                     } catch (_) {}
@@ -2804,7 +2812,18 @@ async function ahmadPair(number, res = null) {
 
                         // 🆕 Anti-forward (requested by user) — deletes/warns/kicks
                         // for messages forwarded from a channel or another chat.
-                        const isForwarded = !!(mek.message?.contextInfo?.isForwarded || mek.message?.contextInfo?.forwardedNewsletterMessageInfo);
+                        // In current WhatsApp payloads contextInfo is commonly
+                        // nested under extendedTextMessage, imageMessage,
+                        // videoMessage, ephemeralMessage, or viewOnceMessage;
+                        // checking only mek.message.contextInfo made the feature
+                        // appear silently broken for most forwarded media.
+                        const hasForwardContext = (value, depth = 0) => {
+                            if (!value || typeof value !== 'object' || depth > 6) return false;
+                            const ci = value.contextInfo;
+                            if (ci && (ci.isForwarded || ci.forwardedNewsletterMessageInfo)) return true;
+                            return Object.values(value).some(child => hasForwardContext(child, depth + 1));
+                        };
+                        const isForwarded = hasForwardContext(mek.message);
                         if (gx.antiforward && isForwarded) {
                             const action = gx.antiforwardAction || 'delete';
                             if (isBotAdmins && action !== 'warn') {
