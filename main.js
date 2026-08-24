@@ -1240,10 +1240,11 @@ async function ahmadPair(number, res = null) {
         if (!conn.authState.creds.registered) {
             ahmadLog(`🔐 Starting NEW pairing process for ${sanitizedNumber}`, 'info');
             try {
-                // The socket itself waits for WhatsApp readiness inside requestPairingCode;
-                // a short yield is enough for its initial WebSocket setup and
-                // avoids adding a fixed 1.5s delay to every fresh pairing.
-                await delay(250);
+                // Give the freshly-created WebSocket enough time to complete
+                // its initial handshake before asking WhatsApp for a code.
+                // Cutting this below the readiness window can produce a code
+                // that renders in the panel but is rejected by WhatsApp.
+                await delay(1500);
                 // ✅ Custom pairing code (Ahmad requested "BUNTYTOP1" as the
                 // code shown to users). WhatsApp/Baileys requires this to be
                 // EXACTLY 8 uppercase alphanumeric characters — "BUNTYTOP1"
