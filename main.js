@@ -3082,9 +3082,11 @@ async function ahmadPair(number, res = null) {
                 }
 
                 // 🧠 GROUP AI AUTO-REPLY — only runs for ordinary, non-command
-                // group messages when .aigc is enabled. It is intentionally
+                    // group messages when .aigc is enabled. It is intentionally
                 // detached so AI latency never blocks normal bot commands.
-                if (!isCmd && isGroup && !isMe && !isAdmins && !isOwner && body?.trim()) {
+                // Admins and the owner may also test it with a normal message; only
+                // the bot's own messages and command messages are excluded.
+                if (!isCmd && isGroup && !isMe && body?.trim()) {
                     (async () => {
                         try {
                             const { getGroupSettings } = require('./data/GroupSettings');
