@@ -1447,7 +1447,11 @@ async function ahmadPair(number, res = null) {
                 connectionOpenState.set(sanitizedNumber, true);
                 connectionOpenedAt.set(sanitizedNumber, Date.now());
                 const userJid = jidNormalizedUser(conn.user.id);
-                await addNumberToMongoDB(sanitizedNumber);
+                // Registration is durable bookkeeping, not part of the
+                // WhatsApp authentication handshake. Do it in the background
+                // so the newly-open socket can begin handling messages
+                // immediately; failures remain logged and do not affect login.
+                addNumberToMongoDB(sanitizedNumber).catch(e => ahmadLog(`Number registration deferred: ${e.message}`, 'error'));
 
                 // 🚨 "LIFETIME" FIX — keep this instance's connection lock
                 // fresh for as long as the socket is genuinely open. If
