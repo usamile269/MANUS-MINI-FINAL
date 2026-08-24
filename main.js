@@ -808,8 +808,15 @@ function setupAutoRestart(socket, number) {
             // stops retrying immediately and logs clearly instead, so it's
             // obvious in the logs when this is the cause.
             if (statusCode === DisconnectReason.connectionReplaced) {
-                ahmadLog(`Connection REPLACED for ${number} — another session/instance connected with the same credentials (e.g. overlapping redeploy, or logged in elsewhere). NOT retrying, to avoid fighting the new session. If this wasn't intentional, make sure only ONE instance of the bot is running for this number.`, 'error');
+                // An overlapping Railway deploy can briefly make the old
+                // container lose the slot. Do not erase the valid session or
+                // leave this number permanently offline; the deduplicated
+                // scheduler retries with backoff after the old instance has
+                // had time to exit. If another device truly owns the slot,
+                // backoff prevents a tight reconnect fight.
+                ahmadLog(`Connection REPLACED for ${number} — preserving session and scheduling a single backoff reconnect.`, 'warning');
                 socket.ev.removeAllListeners();
+                scheduleSelfHealingReconnect(number, statusCode, errorMessage);
                 return;
             }
 
