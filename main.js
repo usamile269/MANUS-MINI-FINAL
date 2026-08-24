@@ -2238,8 +2238,20 @@ async function ahmadPair(number, res = null) {
                 const args = body.trim().split(/ +/).slice(1);
                 const q = args.join(' ');
                 const text = q;
-                const isGroup = from.endsWith('@g.us');
-
+                                const isGroup = from.endsWith('@g.us');
+                // PRIVATE MODE MUST SILENCE ALL GROUP FEATURES. The command
+                // dispatcher has its own permission check, but automated group
+                // handlers (AI auto-reply, antilink, antiflood, etc.) run
+                // outside that dispatcher and could still answer unauthorized
+                // members. Stop the entire group pipeline here, while allowing
+                // .mode/.modeall through so unauthorized attempts receive the
+                // existing owner-only response instead of an unexpected silent
+                // failure. isOwner/isMe are resolved per paired bot above.
+                const privateGroupBlocked = isGroup
+                    && (userConfig?.WORK_TYPE || config.WORK_TYPE || 'private') === 'private'
+                    && !isOwner && !isMe
+                    && !(isCmd && (command === 'mode' || command === 'modeall'));
+                if (privateGroupBlocked) continue;
                 // AUTO_REACT for normal chats (DM/group/personal) — controlled
                 // by the user's .autoreact on/off toggle. This is SEPARATE
                 // from channel/newsletter autoreact, which is its own
