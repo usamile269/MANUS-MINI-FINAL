@@ -14,6 +14,10 @@ assert.match(pairHtml, /const fullNumber = digitsOnly/);
 assert.match(mainJs, /String\(number \?\? ''\)\.replace\(\/\\D\/g, ''\)\.replace\(\/\^00\//);
 assert.match(mainJs, /sanitizedNumber\.length < 8 \|\| sanitizedNumber\.length > 15/);
 assert.match(mainJs, /requestPairingCode\(sanitizedNumber\)/);
+assert.match(mainJs, /waitForPairingSocketReady\(conn, sanitizedNumber\)/);
+assert.match(mainJs, /waitForSocketOpen\(\)/);
+assert.match(mainJs, /PAIRING_SOCKET_READY_TIMEOUT_MS = 15000/);
+assert.doesNotMatch(mainJs, /await delay\(1500\)/);
 
 const normalize = value => String(value ?? '').replace(/\D/g, '').replace(/^00/, '');
 assert.equal(normalize('+1 202-555-0100'), '12025550100');
@@ -21,4 +25,4 @@ assert.equal(normalize('0044 20 7946 0958'), '442079460958');
 assert.equal(normalize('923044975027'), '923044975027');
 assert.equal(normalize('  +81-90-1234-5678 '), '819012345678');
 
-console.log('international pairing normalization regression: PASS');
+console.log('international pairing normalization and socket-readiness regression: PASS');
