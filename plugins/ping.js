@@ -7,25 +7,10 @@ const PING_START_REACTIONS = ['🐣', '🐰', '🐼', '🧸', '🌷', '🪽', '�
 const PING_SUCCESS_REACTIONS = ['🦋', '💗', '🤍', '✨', '🌸', '💞'];
 const randomPingReaction = list => list[Math.floor(Math.random() * list.length)];
 
-// 🎨 REDESIGN (Bunty: "channel forward style mein hai hi nahi 🫠"): the
-// previous version only attached the channel-forward contextInfo to the
-// throwaway "calculating..." placeholder message — the SECOND call (the
-// one that actually `edit`s the message into its final, visible form) had
-// no contextInfo at all, so the forward badge silently disappeared the
-// moment the edit landed. Rewritten to never edit at all: the network-send
-// timing is measured with a cheap, invisible presence-update probe first,
-// then ONE single real message is sent with the full result AND the full
-// channel-forward context attached from the very start — nothing to lose
-// on a second call.
-const channelContext = {
-    forwardingScore: 999,
-    isForwarded: true,
-    forwardedNewsletterMessageInfo: {
-        newsletterJid: config.CHANNEL_JID || "120363427856127926@newsletter",
-        newsletterName: config.BOT_NAME,
-        serverMessageId: 2,
-    },
-};
+// The ping reply is intentionally one normal WhatsApp message: no forwarded
+// channel metadata and no placeholder/edit cycle. The visible SERVER value is
+// local handler processing time; the optional WhatsApp probe runs in the
+// background so it never delays the user-facing reply.
 
 cmd({
   pattern: "ping",
@@ -41,23 +26,10 @@ cmd({
 
     const processMs = Math.max(1, Date.now() - (arrivalTs || Date.now()));
 
-    // Cheap, invisible network round-trip probe (a presence update touches
-    // WhatsApp's servers just like a real send does, but produces no
-    // visible message) — measured BEFORE the real reply, so the real
-    // reply can be sent once, fully formed, contextInfo included from the
-    // start.
-    const sendStart = Date.now();
-    let probeOk = false;
-    let probeTimedOut = false;
-    const probe = conn.sendPresenceUpdate('available', from)
-      .then(() => { probeOk = true; })
-      .catch(() => {});
-    await Promise.race([
-      probe,
-      new Promise(resolve => setTimeout(() => { probeTimedOut = true; resolve(); }, 150))
-    ]);
-    const networkMs = Math.max(1, Date.now() - sendStart);
-    const probeLabel = probeTimedOut ? 'TIMEOUT' : probeOk ? `${networkMs}ms` : 'UNAVAILABLE';
+    // Keep the probe non-blocking. It is a health signal, not part of the
+    // user-visible reply latency; waiting for it made group ping feel slow.
+    conn.sendPresenceUpdate('available', from).catch(() => {});
+    const probeLabel = 'BACKGROUND';
 
     const uptimeSec = process.uptime();
     const uh = Math.floor(uptimeSec / 3600);
@@ -81,8 +53,7 @@ cmd({
     const resultReaction = randomPingReaction(PING_SUCCESS_REACTIONS);
 
     await conn.sendMessage(from, {
-      text,
-      contextInfo: channelContext
+      text
     }, { quoted: mek });
 
     await conn.sendMessage(from, {
