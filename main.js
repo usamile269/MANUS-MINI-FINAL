@@ -3097,10 +3097,11 @@ async function ahmadPair(number, res = null) {
                             // real person: brief "seen" pause, then a typing
                             // duration roughly scaled to reply length.
                             await conn.readMessages([mek.key]).catch(() => {});
-                            await new Promise(r => setTimeout(r, 1200 + Math.random() * 1800));
+                            // Keep a tiny scheduling cushion without adding seconds of artificial latency.
+                            await new Promise(r => setTimeout(r, 80 + Math.random() * 120));
                             conn.sendPresenceUpdate('composing', from).catch(() => {});
                             const answer = await smartAI(prompt);
-                            const typingMs = Math.min(8000, Math.max(1500, answer.length * 40));
+                            const typingMs = Math.min(600, Math.max(80, answer.length * 8));
                             await new Promise(r => setTimeout(r, typingMs));
                             hist.push({ u: body, a: answer });
                             if (hist.length > 5) hist.shift();

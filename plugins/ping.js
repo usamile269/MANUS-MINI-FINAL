@@ -49,7 +49,7 @@ cmd({
     const sendStart = Date.now();
     await Promise.race([
       conn.sendPresenceUpdate('available', from).catch(() => {}),
-      new Promise(resolve => setTimeout(resolve, 500))
+      new Promise(resolve => setTimeout(resolve, 150))
     ]);
     const networkMs = Math.max(1, Date.now() - sendStart);
 
