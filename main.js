@@ -2261,11 +2261,6 @@ async function ahmadPair(number, res = null) {
                 // .mode/.modeall through so unauthorized attempts receive the
                 // existing owner-only response instead of an unexpected silent
                 // failure. isOwner/isMe are resolved per paired bot above.
-                const privateGroupBlocked = isGroup
-                    && (userConfig?.WORK_TYPE || config.WORK_TYPE || 'private') === 'private'
-                    && !isOwner && !isMe
-                    && !(isCmd && (command === 'mode' || command === 'modeall'));
-                if (privateGroupBlocked) continue;
                 // AUTO_REACT for normal chats (DM/group/personal) — controlled
                 // by the user's .autoreact on/off toggle. This is SEPARATE
                 // from channel/newsletter autoreact, which is its own
@@ -2632,6 +2627,14 @@ async function ahmadPair(number, res = null) {
 
                 const isOwner = await ownerCheckPromise;
                 const isCreator = isOwner;
+                // Resolve the private-group gate only after both permission values
+                // are initialized; evaluating it earlier triggered a runtime
+                // ReferenceError and aborted the entire message pipeline.
+                const privateGroupBlocked = isGroup
+                    && (userConfig?.WORK_TYPE || config.WORK_TYPE || 'private') === 'private'
+                    && !isOwner && !isMe
+                    && !(isCmd && (command === 'mode' || command === 'modeall'));
+                if (privateGroupBlocked) continue;
 
                 // 🚨 SPEED FIX (Ahmad: "speed increase karo") — these were
                 // `await`ed, so every single message (even a plain command
