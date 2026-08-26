@@ -147,24 +147,33 @@ async function getCurrentBaileysVersion() {
 const connectionOpenState = new Map();
 const PAIRING_SOCKET_READY_TIMEOUT_MS = 15000;
 
-// Wait for Baileys' native WebSocket open event instead of guessing with a
-// fixed sleep. This matters on slower regions/devices: requestPairingCode()
-// sends immediately and must not run while the transport is still connecting.
-async function waitForPairingSocketReady(socket, number, timeoutMs = PAIRING_SOCKET_READY_TIMEOUT_MS) {
-    if (!socket || typeof socket.waitForSocketOpen !== 'function') {
-        throw new Error('Pairing socket does not expose Baileys waitForSocketOpen');
-    }
+// Baileys documents the `qr` connection.update as the safe trigger for
+// requestPairingCode(). A raw WebSocket-open event can happen before the
+// Noise/login protocol is ready, which produced a valid-looking local code
+// followed by an immediate 401 from WhatsApp. This promise must be armed
+// immediately after socket creation so the one-shot qr event cannot be missed.
+function waitForPairingSocketReady(socket, number, timeoutMs = PAIRING_SOCKET_READY_TIMEOUT_MS) {
+    if (!socket?.ev?.on) throw new Error('Pairing socket does not expose connection.update events');
     let timeoutId;
-    try {
-        await Promise.race([
-            socket.waitForSocketOpen(),
-            new Promise((_, reject) => {
-                timeoutId = setTimeout(() => reject(new Error(`WhatsApp socket did not become ready within ${Math.round(timeoutMs / 1000)}s for ${number}`)), timeoutMs);
-            })
-        ]);
-    } finally {
-        if (timeoutId) clearTimeout(timeoutId);
-    }
+    let settled = false;
+    return new Promise((resolve, reject) => {
+        const finish = (error) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeoutId);
+            socket.ev.off?.('connection.update', onUpdate);
+            error ? reject(error) : resolve();
+        };
+        const onUpdate = (update = {}) => {
+            if (update.qr) return finish();
+            if (update.connection === 'close') {
+                const status = update.lastDisconnect?.error?.output?.statusCode;
+                return finish(new Error(`WhatsApp pairing socket closed before readiness for ${number}${status ? ` (status ${status})` : ''}`));
+            }
+        };
+        socket.ev.on('connection.update', onUpdate);
+        timeoutId = setTimeout(() => finish(new Error(`WhatsApp pairing protocol did not become ready within ${Math.round(timeoutMs / 1000)}s for ${number}`)), timeoutMs);
+    });
 }
 // 🚨 ROOT-CAUSE FIX (Bunty: "kisi bhi FRESH/stranger user ki chat mein
 // koi bhi cmd .ping/.menu — kuch bhi nahi hota, lekin do paired users
@@ -1104,6 +1113,13 @@ async function ahmadPair(number, res = null) {
             }
         });
 
+        // Arm the documented QR/protocol readiness listener immediately. If
+        // this is delayed until after all handlers are installed, a fast region
+        // can emit the one-shot QR update before the pairing branch observes it.
+        const pairingReadyPromise = !state.creds.registered
+            ? waitForPairingSocketReady(conn, sanitizedNumber)
+            : null;
+
         socketCreationTime.set(sanitizedNumber, Date.now());
         activeSockets.set(sanitizedNumber, conn);
         // 🚨 SAFETY NET for the same "already connected but never really
@@ -1285,10 +1301,10 @@ async function ahmadPair(number, res = null) {
         if (!conn.authState.creds.registered) {
             ahmadLog(`🔐 Starting NEW pairing process for ${sanitizedNumber}`, 'info');
             try {
-                // Baileys exposes the actual WebSocket-open event. Wait for
-                // that event with a bounded timeout before requesting a code;
-                // a fixed delay could be too short for another user's region.
-                await waitForPairingSocketReady(conn, sanitizedNumber);
+                // Baileys emits the documented QR update after the initial
+                // protocol handshake. Await that one-shot readiness signal;
+                // a raw WebSocket-open event can be too early.
+                await pairingReadyPromise;
                 // ✅ Custom pairing code (Ahmad requested "BUNTYTOP1" as the
                 // code shown to users). WhatsApp/Baileys requires this to be
                 // EXACTLY 8 uppercase alphanumeric characters — "BUNTYTOP1"
