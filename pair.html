@@ -2905,35 +2905,17 @@ async function getCode() {
         codeBox.textContent = 'Please enter your phone number';
         return;
     }
-    // 🚨 FIX (Bunty: "koi countries nahi hein, pair nahi ho pata") — the
-    // number field now already contains the country code (auto-detected
-    // live via detectCountry() as the user types), so no more
-    // concatenating a separate dropdown value — this IS the full number.
-    const countryCode = detectCountry();
-    if (!countryCode) {
+    // Country-agnostic input: accept `+`, spaces, dashes, and international
+    // `00` prefixes, but send Baileys digits only with the country code.
+    // Country detection is cosmetic and must never block a valid country.
+    const digitsOnly = num.replace(/\D/g, '').replace(/^00/, '');
+    if (digitsOnly.length < 8 || digitsOnly.length > 15) {
         codeBox.className = 'code-display error';
-        codeBox.textContent = 'Country code not recognized — make sure you included it (e.g. 923044975027)';
+        codeBox.textContent = `Invalid international number length (${digitsOnly.length} digits). Include country code, for example 923044975027.`;
         return;
     }
 
-    // 🛡️ STRICT VALIDATION: Check for valid length (e.g. 92 + 10 digits = 12 total)
-    // Most WhatsApp numbers are between 10-15 digits including country code.
-    const digitsOnly = num.replace(/\D/g, '');
-    if (digitsOnly.length < 10 || digitsOnly.length > 15) {
-        codeBox.className = 'code-display error';
-        codeBox.textContent = `Invalid number length (${digitsOnly.length} digits). Please enter a real WhatsApp number.`;
-        return;
-    }
-
-    // Special check for Pakistan (92)
-    if (countryCode === '92' && digitsOnly.length !== 12) {
-        codeBox.className = 'code-display error';
-        codeBox.textContent = 'Invalid Pakistan number. Format: 923044975027 (12 digits)';
-        return;
-    }
-
-    // Build full number with country code
-    const fullNumber = num;
+    const fullNumber = digitsOnly;
 
     btn.disabled = true;
     btn.classList.add('loading');

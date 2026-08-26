@@ -891,7 +891,17 @@ function scheduleFullSessionBackup(sanitizedNumber, sessionPath) {
 
 async function ahmadPair(number, res = null) {
     let connectionLockKey;
-    const sanitizedNumber = number.replace(/[^0-9]/g, '');
+    // Accept common international input variants (`+`, spaces, dashes, or
+    // `00` prefix) but always pass Baileys digits-only country-code format.
+    const sanitizedNumber = String(number ?? '').replace(/\D/g, '').replace(/^00/, '');
+    if (sanitizedNumber.length < 8 || sanitizedNumber.length > 15) {
+        const message = 'Invalid international number. Include country code and 8–15 digits.';
+        ahmadLog(`Rejected pairing number: ${message}`, 'warning');
+        if (res && !res.headersSent && typeof res.status === 'function') {
+            return res.status(400).json({ status: 'error', error: message });
+        }
+        return;
+    }
     if (!bootMarkTs.has(sanitizedNumber)) bootMarkTs.set(sanitizedNumber, await loadBootMark(sanitizedNumber));
 
     try {
