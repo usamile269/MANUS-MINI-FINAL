@@ -3,11 +3,11 @@ const axios = require('axios');
 const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
 const { smartAI, groqReply } = require('../lib/ai-provider');
+const { plainAIResponse } = require('../lib/plain-ai-response');
 
-const FOOTER = '> ' + randomFooter();
-
-function aiReply(title, response) {
-    return `╭═══ 🤖 ${title} ═══⊷\n┃❃╭──────────────\n┃❃│ ${String(response).split('\n').join('\n┃❃│ ')}\n┃❃╰───────────────\n╰═════════════════⊷\n\n${FOOTER}`;
+// Conversational AI answers stay natural plain text.
+function aiReply(_title, response) {
+    return plainAIResponse(response);
 }
 
 // Shared AI caller — reuses the SAME endpoints already proven working in

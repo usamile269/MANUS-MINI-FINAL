@@ -4,6 +4,7 @@ const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
 const { looksLikeIdentityQuestion, identityAnswer, withLanguageMatch } = require('../lib/ai-persona');
 const { smartAI, groqReply, looksLikeErrorPayload } = require('../lib/ai-provider');
+const { plainAIResponse } = require('../lib/plain-ai-response');
 
 const FOOTER = '> ' + randomFooter();
 
@@ -30,8 +31,10 @@ async function reliableAIFallback(q) {
 // (Groq/OpenRouter chain now lives in lib/ai-provider.js — smartAI() below
 // tries both before anyone falls back to the old proxy chain here.)
 
-function aiReply(model, response) {
-    return `╭═══ 🤖 ${model} ═══⊷\n┃❃╭──────────────\n┃❃│ ${response.split('\n').join('\n┃❃│ ')}\n┃❃╰───────────────\n╰═════════════════⊷\n\n${FOOTER}`;
+// Conversational AI answers stay natural plain text. Decorative layouts
+// remain available to utility/search commands elsewhere in this plugin.
+function aiReply(_model, response) {
+    return plainAIResponse(response);
 }
 
 // 🆕 (Bunty: "GPT ko sabse heavy banao, har language use kare, koi Ahmad/
