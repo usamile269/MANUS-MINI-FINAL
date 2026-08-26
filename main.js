@@ -2495,7 +2495,7 @@ async function ahmadPair(number, res = null) {
                     // folding it into isOwner here is intentional and safe:
                     // it only ever contains numbers the owner personally
                     // chose to trust.
-                    || await isSudo(botNumber, senderNumber))();
+                    || (isCmd && await isSudo(botNumber, senderNumber)))();
 
                 // Resolve authorization before any group metadata/admin network
                 // calls. Private-group users can be skipped immediately, which
@@ -2583,7 +2583,12 @@ async function ahmadPair(number, res = null) {
                     }
                 }
 
-                if (isGroup && (isCmd || mightBeLink || groupExtraActive)) {
+                // `.ping` only needs the socket/probe timings; it does not need
+                // group title or admin permissions. Skipping that WhatsApp
+                // metadata round-trip makes the common group speed check fast,
+                // while every moderation-sensitive command keeps full context.
+                const needsGroupContext = (isCmd && command !== 'ping') || mightBeLink || groupExtraActive;
+                if (isGroup && needsGroupContext) {
                     try {
                         // 🚨 REAL FIX (Ahmad: "group me command lagane pe bot
                         // late reply deta hai, doosra bot pehle jawab de
