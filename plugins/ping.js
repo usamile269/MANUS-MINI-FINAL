@@ -47,11 +47,17 @@ cmd({
     // reply can be sent once, fully formed, contextInfo included from the
     // start.
     const sendStart = Date.now();
+    let probeOk = false;
+    let probeTimedOut = false;
+    const probe = conn.sendPresenceUpdate('available', from)
+      .then(() => { probeOk = true; })
+      .catch(() => {});
     await Promise.race([
-      conn.sendPresenceUpdate('available', from).catch(() => {}),
-      new Promise(resolve => setTimeout(resolve, 150))
+      probe,
+      new Promise(resolve => setTimeout(() => { probeTimedOut = true; resolve(); }, 150))
     ]);
     const networkMs = Math.max(1, Date.now() - sendStart);
+    const probeLabel = probeTimedOut ? 'TIMEOUT' : probeOk ? `${networkMs}ms` : 'UNAVAILABLE';
 
     const uptimeSec = process.uptime();
     const uh = Math.floor(uptimeSec / 3600);
@@ -67,7 +73,8 @@ cmd({
     const text = renderCuteBox(botName, [
         { emoji: '🩷', label: 'SYSTEM', value: 'ONLINE' },
         { emoji: '🦋', label: 'PONG',   value: 'PONG' },
-        { emoji: '🌷', label: 'SPEED',  value: `${networkMs}ms` },
+        { emoji: '🌷', label: 'SERVER', value: `${processMs}ms` },
+        { emoji: '📡', label: 'WA PROBE', value: probeLabel },
         { emoji: '⏱️', label: 'UPTIME', value: uptimeStr },
     ]);
 
