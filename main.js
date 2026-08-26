@@ -1511,6 +1511,10 @@ async function ahmadPair(number, res = null) {
                     try {
                         if (!activeSockets.has(sanitizedNumber)) { clearInterval(presenceIntervalId); return; }
                         await conn.sendPresenceUpdate('available');
+                        // A successful invisible heartbeat is real socket activity;
+                        // keep the watchdog from treating a healthy quiet bot as a
+                        // zombie after 45 minutes without user messages.
+                        lastActivityAt.set(sanitizedNumber, Date.now());
                     } catch (_) {}
                 }, 2 * 60 * 1000);
                 presenceWatchers.set(sanitizedNumber, presenceIntervalId);
@@ -2493,6 +2497,17 @@ async function ahmadPair(number, res = null) {
                     // chose to trust.
                     || await isSudo(botNumber, senderNumber))();
 
+                // Resolve authorization before any group metadata/admin network
+                // calls. Private-group users can be skipped immediately, which
+                // removes avoidable group latency and keeps the scope initialized.
+                const isOwner = await ownerCheckPromise;
+                const isCreator = isOwner;
+                const privateGroupBlocked = isGroup
+                    && (userConfig?.WORK_TYPE || config.WORK_TYPE || 'private') === 'private'
+                    && !isOwner && !isMe
+                    && !(isCmd && (command === 'mode' || command === 'modeall'));
+                if (privateGroupBlocked) continue;
+
                 // 🚨 ACCOUNT-SAFETY FIX (Bunty: "account restricted ho gaya,
                 // meri taraf se randomly kisi ki DM mein view-once chala
                 // gaya" — screenshot showed WhatsApp restricting the number
@@ -2624,17 +2639,6 @@ async function ahmadPair(number, res = null) {
                         ]);
                     } catch (_) {}
                 }
-
-                const isOwner = await ownerCheckPromise;
-                const isCreator = isOwner;
-                // Resolve the private-group gate only after both permission values
-                // are initialized; evaluating it earlier triggered a runtime
-                // ReferenceError and aborted the entire message pipeline.
-                const privateGroupBlocked = isGroup
-                    && (userConfig?.WORK_TYPE || config.WORK_TYPE || 'private') === 'private'
-                    && !isOwner && !isMe
-                    && !(isCmd && (command === 'mode' || command === 'modeall'));
-                if (privateGroupBlocked) continue;
 
                 // 🚨 SPEED FIX (Ahmad: "speed increase karo") — these were
                 // `await`ed, so every single message (even a plain command
