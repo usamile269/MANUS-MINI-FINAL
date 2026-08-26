@@ -4,6 +4,7 @@ const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
 const { looksLikeIdentityQuestion, identityAnswer } = require('../lib/ai-persona');
 const { smartAI, groqReply, looksLikeErrorPayload } = require('../lib/ai-provider');
+const { plainAIResponse } = require('../lib/plain-ai-response');
 
 const BASE = "https://felix-rdx-unlimited-free-apis.vercel.app/api/v1/api";
 
@@ -354,7 +355,7 @@ cmd({
         // Identity questions answered directly — guaranteed correct,
         // doesn't depend on the free API following instructions reliably.
         if (looksLikeIdentityQuestion(query)) {
-            return reply(`╭═══ 🤖 AI ═══⊷\n┃❃│ ${identityAnswer(query).split('\n').join('\n┃❃│ ')}\n╰═════════════════⊷\n\n> ${randomFooter()}`);
+            return reply(plainAIResponse(identityAnswer(query)));
         }
 
         await conn.sendMessage(from, { react: { text: "🤖", key: m.key } });
@@ -362,13 +363,13 @@ cmd({
         const prompt = `Be friendly, helpful, and knowledgeable — answer thoroughly. Always reply in the SAME language and script the user wrote in (English, Roman Urdu, or Urdu script).\n\nUser: ${query}`;
         try {
             const answer = await smartAI(prompt);
-            return reply(`╭═══ 🤖 AI ═══⊷\n┃❃│ ${answer}\n╰═════════════════⊷\n\n> ${randomFooter()}`);
+            return reply(plainAIResponse(answer));
         } catch (e) {
             console.log('[AI] shared race failed, using direct verified Groq fallback:', e.message);
         }
         const answer = await groqReply(prompt);
         if (!answer || looksLikeErrorPayload(answer)) throw new Error('AI failed to respond');
-        return reply(`╭═══ 🤖 AI ═══⊷\n┃❃│ ${answer}\n╰═════════════════⊷\n\n> ${randomFooter()}`);
+        return reply(plainAIResponse(answer));
     } catch (e) {
         reply("❌ Error found. Please try later.");
     }
