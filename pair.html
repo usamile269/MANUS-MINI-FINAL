@@ -2923,7 +2923,12 @@ async function getCode() {
     codeBox.textContent = 'Connecting...';
 
     try {
-        const res = await fetch(`/code?number=${fullNumber}`);
+        const requestUrl = `/code?number=${encodeURIComponent(fullNumber)}&_pairing_request=${Date.now()}`;
+        const res = await fetch(requestUrl, {
+            method: 'GET',
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+        });
         const data = await res.json();
 
             if (data.code) {

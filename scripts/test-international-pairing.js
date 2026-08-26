@@ -9,6 +9,8 @@ assert.match(pairHtml, /replace\(\/\\D\/g, ''\)\.replace\(\/\^00\//);
 assert.match(pairHtml, /digitsOnly\.length < 8 \|\| digitsOnly\.length > 15/);
 assert.doesNotMatch(pairHtml, /Invalid Pakistan number/);
 assert.doesNotMatch(pairHtml, /Country code not recognized/);
+assert.match(pairHtml, /_pairing_request=\$\{Date\.now\(\)\}/);
+assert.match(pairHtml, /cache: 'no-store'/);
 assert.match(pairHtml, /const fullNumber = digitsOnly/);
 
 assert.match(mainJs, /String\(number \?\? ''\)\.replace\(\/\\D\/g, ''\)\.replace\(\/\^00\//);
@@ -18,6 +20,8 @@ assert.match(mainJs, /waitForPairingSocketReady\(conn, sanitizedNumber\)/);
 assert.match(mainJs, /waitForSocketOpen\(\)/);
 assert.match(mainJs, /PAIRING_SOCKET_READY_TIMEOUT_MS = 15000/);
 assert.doesNotMatch(mainJs, /await delay\(1500\)/);
+assert.match(mainJs, /Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'/);
+assert.match(mainJs, /Surrogate-Control': 'no-store'/);
 
 const normalize = value => String(value ?? '').replace(/\D/g, '').replace(/^00/, '');
 assert.equal(normalize('+1 202-555-0100'), '12025550100');

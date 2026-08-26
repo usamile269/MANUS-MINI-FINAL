@@ -3323,7 +3323,19 @@ router.post('/admin/overview', async (req, res) => {
     } catch (e) { res.status(500).json({ status: 'error', message: 'Failed to load overview' }); }
 });
 
-router.get('/code', requireApiKey, async (req, res) => { if (!req.query.number) return res.json({ error: 'Number required' }); await ahmadPair(req.query.number, res); });
+router.get('/code', requireApiKey, async (req, res) => {
+    // Pairing codes are one-time credentials. Never let Vercel, Railway,
+    // browsers, or an intermediary replay a previous response for the same
+    // number; every request must reach this process and Baileys.
+    res.set({
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store'
+    });
+    if (!req.query.number) return res.json({ error: 'Number required' });
+    await ahmadPair(req.query.number, res);
+});
 router.get('/status', async (req, res) => {
     const { number } = req.query;
     if (!number) {
