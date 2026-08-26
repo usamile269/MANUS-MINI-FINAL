@@ -7,10 +7,17 @@ const PING_START_REACTIONS = ['🐣', '🐰', '🐼', '🧸', '🌷', '🪽', '�
 const PING_SUCCESS_REACTIONS = ['🦋', '💗', '🤍', '✨', '🌸', '💞'];
 const randomPingReaction = list => list[Math.floor(Math.random() * list.length)];
 
-// The ping reply is intentionally one normal WhatsApp message: no forwarded
-// channel metadata and no placeholder/edit cycle. The visible SERVER value is
-// local handler processing time; the optional WhatsApp probe runs in the
-// background so it never delays the user-facing reply.
+// `.ping` intentionally uses the bot's attractive channel-post style. The
+// probe remains non-blocking, so this visual metadata does not add latency.
+const channelContext = {
+    forwardingScore: 999,
+    isForwarded: true,
+    forwardedNewsletterMessageInfo: {
+        newsletterJid: config.CHANNEL_JID || '120363427856127926@newsletter',
+        newsletterName: config.BOT_NAME || 'AHMAD MINI',
+        serverMessageId: 2,
+    },
+};
 
 cmd({
   pattern: "ping",
@@ -53,7 +60,8 @@ cmd({
     const resultReaction = randomPingReaction(PING_SUCCESS_REACTIONS);
 
     await conn.sendMessage(from, {
-      text
+      text,
+      contextInfo: channelContext
     }, { quoted: mek });
 
     await conn.sendMessage(from, {

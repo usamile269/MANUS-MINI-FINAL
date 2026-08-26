@@ -8,7 +8,10 @@ assert.match(source, /label: 'WA PROBE', value: probeLabel/);
 assert.match(source, /const probeLabel = 'BACKGROUND'/);
 assert.match(source, /sendPresenceUpdate\('available', from\)\.catch\(\(\) => \{\}\);/);
 assert.doesNotMatch(source, /await Promise\.race\(\[/);
-assert.doesNotMatch(source, /forwardedNewsletterMessageInfo|isForwarded|forwardingScore/);
+assert.match(source, /forwardingScore: 999/);
+assert.match(source, /isForwarded: true/);
+assert.match(source, /forwardedNewsletterMessageInfo:/);
+assert.match(source, /contextInfo: channelContext/);
 assert.doesNotMatch(source, /label: 'SPEED',\s+value: `\$\{networkMs\}ms`/);
 console.log('truthful ping metrics regression: PASS');
 
