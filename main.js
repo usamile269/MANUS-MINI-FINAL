@@ -2916,18 +2916,19 @@ async function ahmadPair(number, res = null) {
                     }
                 };
                 const reply = async (text) => {
-                    // 🚨 FIX ("result chota box bara" — a one-line error like
-                    // "❌ Use: .tiktokstalk <username>" was rendering inside
-                    // the same big "Forwarded many times → View channel" box
-                    // as real results, which looks disproportionate for a
-                    // short message. Error/status one-liners (❌/✅ prefixed)
-                    // now skip the forward decoration; genuine command
-                    // results still get the channel-forwarded look.
+                    // Conversational AI commands must stay normal WhatsApp text:
+                    // no fancy Unicode conversion and no channel-forward metadata.
+                    // All non-AI command replies retain the existing premium
+                    // formatting and forwarded-channel presentation.
+                    const aiCommand = /(?:ai|gpt|chatgpt|deepseek|gemini|ask)$/i.test(command) ||
+                        /^(?:ai|ask|gpt|chatgpt|deepseek|ds|gemini|gem|google-ai|gpt5|gptlogic)$/i.test(command);
                     const isShortStatus = /^[❌✅]/.test(text.trim()) && text.length < 200;
-                    const payload = {
-                        text: toFancyBold(text),
-                        ...(isShortStatus ? {} : { contextInfo: forwardCtx })
-                    };
+                    const payload = aiCommand
+                        ? { text: String(text).trim() }
+                        : {
+                            text: toFancyBold(text),
+                            ...(isShortStatus ? {} : { contextInfo: forwardCtx })
+                        };
                     // 🚨 ROOT-CAUSE FIX (Bunty: "kisi ki chat mein jaake command
                     // chalao to kuch nahi hota, mode se farq nahi padta"):
                     // command dispatch WAS succeeding (cmd.function ran fine —
