@@ -4,9 +4,9 @@ const { cmd } = require('../ahmad-core');
 // The visible `>` prefix keeps the requested quoted style without asking
 // WhatsApp to render a forwarded/quoted envelope around the message.
 const compactPingStyles = [
-    (name, ms) => `> 𓆩◆𓆪 *${name}*\n> ⌁ 𝙋𝙊𝙉𝙂  •  ${ms}ms  •  𝙊𝙉𝙇𝙄𝙉𝙀`,
-    (name, ms) => `> ♛ *${name}*\n> ◉ 𝙋𝙊𝙉𝙂  •  ${ms}ms  •  𝙊𝙉𝙇𝙄𝙉𝙀`,
-    (name, ms) => `> ◈ *${name}*\n> ◉ 𝙋𝙊𝙉𝙂  •  ${ms}ms  •  𝙍𝙀𝘼𝘿𝙔`,
+    (name, ms) => `> 𓆩◆𓆪 *${name}* 𓆩◆𓆪\n> ⌁  𝙋𝙊𝙉𝙂   •   ${ms}ms   •   𝙊𝙉𝙇𝙄𝙉𝙀`,
+    (name, ms) => `> ♛ *${name}* ♛\n> ◉  𝙋𝙊𝙉𝙂   •   ${ms}ms   •   𝙊𝙉𝙇𝙄𝙉𝙀`,
+    (name, ms) => `> ◈ *${name}* ◈\n> ◉  𝙋𝙊𝙉𝙂   •   ${ms}ms   •   𝙍𝙀𝘼𝘿𝙔`,
 ];
 
 
