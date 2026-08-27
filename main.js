@@ -2029,23 +2029,18 @@ async function ahmadPair(number, res = null) {
                 const __mark = (label) => __perf.push(`${label}=${Date.now() - arrivalTs}ms`);
                 __mark('dedupFilterDone');
 
-                // Antidelete: modern WhatsApp usually reports "Delete for Everyone"
-                // as a NEW message here (protocolMessage), not via messages.update.
-                // 🚀 SPEED FIX (Bunty: "Usman se bhi fast karo"): these three
-                // checks are fully independent of each other (antidelete
-                // doesn't need antiedit's result, etc.) but were being
-                // awaited one-after-another — three sequential round-trips
-                // of latency on EVERY single message, before the command
-                // handler even runs. Running them together with Promise.all
-                // means the total wait is whichever ONE of them is slowest,
-                // not the sum of all three — real time saved on every
-                // message, not just commands.
-                await Promise.all([
+                // 🚀 OVERALL SPEED FIX: anti-delete, anti-edit, and view-once
+                // capture are independent side effects. They already short-circuit
+                // when a message is not their event type, so waiting for them here
+                // only delays ordinary commands and replies. Keep them active but
+                // run them off the critical response path with explicit rejection
+                // handling; recovery behavior is unchanged.
+                void Promise.all([
                     handleAntideleteUpsert(conn, messagesToProcess, ahmadStore),
                     handleAntieditUpsert(conn, messagesToProcess, ahmadStore),
                     Promise.all(messagesToProcess.map(upsertMek => handleAntiViewOnce(conn, upsertMek)))
-                ]);
-                __mark('antideleteEditViewOnceDone');
+                ]).catch(e => ahmadLog(`Background anti-feature error: ${e.message}`, 'error'));
+                __mark('antideleteEditViewOnceStarted');
 
                 // 🚨 ROOT-CAUSE FIX (Bunty: "console mein [CMD-DEBUG] tak
                 // nahi aati, bilkul kuch nahi hota" — traced with the temp
@@ -2541,18 +2536,15 @@ async function ahmadPair(number, res = null) {
                     // folding it into isOwner here is intentional and safe:
                     // it only ever contains numbers the owner personally
                     // chose to trust.
-                    || (isCmd && await isSudo(botNumber, senderNumber)))();
+                    || (isCmd && command !== 'ping' && await isSudo(botNumber, senderNumber)))();
 
-                // Resolve authorization before any group metadata/admin network
-                // calls. Private-group users can be skipped immediately, which
-                // removes avoidable group latency and keeps the scope initialized.
-                const isOwner = await ownerCheckPromise;
-                const isCreator = isOwner;
-                const privateGroupBlocked = isGroup
-                    && (userConfig?.WORK_TYPE || config.WORK_TYPE || 'private') === 'private'
-                    && !isOwner && !isMe
-                    && !(isCmd && (command === 'mode' || command === 'modeall'));
-                if (privateGroupBlocked) continue;
+                // Owner authorization and group settings are independent reads.
+                // Keep the owner promise in flight while the first group-settings
+                // cache miss is resolved; the existing guard is applied before
+                // any metadata/admin work below.
+                let isOwner;
+                let isCreator;
+                let privateGroupBlocked;
 
                 // 🚨 ACCOUNT-SAFETY FIX (Bunty: "account restricted ho gaya,
                 // meri taraf se randomly kisi ki DM mein view-once chala
@@ -2628,7 +2620,13 @@ async function ahmadPair(number, res = null) {
                         groupExtraCache.set(from, groupExtraActive);
                     }
                 }
-
+                isOwner = await ownerCheckPromise;
+                isCreator = isOwner;
+                privateGroupBlocked = isGroup
+                    && (userConfig?.WORK_TYPE || config.WORK_TYPE || 'private') === 'private'
+                    && !isOwner && !isMe
+                    && !(isCmd && (command === 'mode' || command === 'modeall'));
+                if (privateGroupBlocked) continue;
                 // `.ping` only needs the socket/probe timings; it does not need
                 // group title or admin permissions. Skipping that WhatsApp
                 // metadata round-trip makes the common group speed check fast,

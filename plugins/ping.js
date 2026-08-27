@@ -64,9 +64,11 @@ cmd({
       contextInfo: channelContext
     }, { quoted: mek });
 
-    await conn.sendMessage(from, {
+    // The text reply is the user-visible result; do not make delivery wait
+    // for the cosmetic success reaction to be acknowledged by WhatsApp.
+    void conn.sendMessage(from, {
       react: { text: resultReaction, key: m.key }
-    });
+    }).catch(() => {});
 
   } catch (e) {
     console.error(e);

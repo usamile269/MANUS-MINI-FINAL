@@ -15,19 +15,32 @@ function keyFor(botNumber) { return botNumber; }
 // whole bot. Cached per botNumber with a short TTL, same pattern as
 // UserConfig/UserBotSettings elsewhere in this bot.
 const sudoCache = new Map(); // botNumber -> { list, ts }
+const sudoRefreshing = new Map(); // botNumber -> Promise<void>
 const SUDO_CACHE_TTL_MS = 30 * 1000;
+
+async function refreshSudoList(botNumber) {
+    const existing = sudoRefreshing.get(botNumber);
+    if (existing) return existing;
+    const refresh = Sudo.findOne({ botNumber: keyFor(botNumber) })
+        .then(doc => {
+            sudoCache.set(botNumber, { list: doc?.numbers || [], ts: Date.now() });
+        })
+        .catch(() => {})
+        .finally(() => {
+            if (sudoRefreshing.get(botNumber) === refresh) sudoRefreshing.delete(botNumber);
+        });
+    sudoRefreshing.set(botNumber, refresh);
+    return refresh;
+}
 
 async function getSudoList(botNumber) {
     const cached = sudoCache.get(botNumber);
-    if (cached && (Date.now() - cached.ts) < SUDO_CACHE_TTL_MS) return cached.list;
-    try {
-        const doc = await Sudo.findOne({ botNumber: keyFor(botNumber) });
-        const list = doc?.numbers || [];
-        sudoCache.set(botNumber, { list, ts: Date.now() });
-        return list;
-    } catch {
-        return cached?.list || [];
+    if (cached) {
+        if ((Date.now() - cached.ts) >= SUDO_CACHE_TTL_MS) void refreshSudoList(botNumber);
+        return cached.list;
     }
+    await refreshSudoList(botNumber);
+    return sudoCache.get(botNumber)?.list || [];
 }
 
 async function isSudo(botNumber, numberOrJid) {

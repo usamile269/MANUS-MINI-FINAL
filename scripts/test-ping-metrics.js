@@ -12,6 +12,8 @@ assert.match(source, /forwardingScore: 999/);
 assert.match(source, /isForwarded: true/);
 assert.match(source, /forwardedNewsletterMessageInfo:/);
 assert.match(source, /contextInfo: channelContext/);
+assert.match(source, /void conn\.sendMessage\(from, \{\n\s+react: \{ text: resultReaction/);
+assert.doesNotMatch(source, /await conn\.sendMessage\(from, \{\n\s+react: \{ text: resultReaction/);
 assert.doesNotMatch(source, /label: 'SPEED',\s+value: `\$\{networkMs\}ms`/);
 console.log('truthful ping metrics regression: PASS');
 

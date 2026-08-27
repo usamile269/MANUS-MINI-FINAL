@@ -29,6 +29,7 @@ const DEFAULTS = { welcomeOn: false, welcomeMsg: DEFAULT_WELCOME_MSG, welcomeVid
 // .antilink/.slowmode/etc.), so cache reads for a short window and refresh
 // instantly on write.
 const groupSettingsCache = new Map(); // chatId -> { settings, ts }
+const groupSettingsRefreshing = new Map(); // chatId -> Promise<object>
 const GROUP_SETTINGS_CACHE_TTL_MS = 30000;
 
 // 🚨 FEATURE RESTORED (Ahmad: "apni chat se sab set karo, sab groups pe
@@ -40,21 +41,34 @@ const GROUP_SETTINGS_CACHE_TTL_MS = 30000;
 // fields overlaid on top (so a group that's explicitly configured
 // something for itself still wins for that field — only fields the group
 // has never touched fall back to the global value).
-async function getGroupSettings(chatId) {
-    try {
-        const cached = groupSettingsCache.get(chatId);
-        if (cached && (Date.now() - cached.ts) < GROUP_SETTINGS_CACHE_TTL_MS) {
-            return cached.settings;
+async function refreshGroupSettings(chatId) {
+    const existing = groupSettingsRefreshing.get(chatId);
+    if (existing) return existing;
+    const refresh = (async () => {
+        try {
+            const chatDoc = await GroupSettings.findOne({ chatId });
+            const groupRaw = chatDoc ? chatDoc.toObject() : {};
+            const base = (chatId === GLOBAL_KEY) ? DEFAULTS : await getGroupSettings(GLOBAL_KEY);
+            const result = { ...base, ...groupRaw, chatId };
+            groupSettingsCache.set(chatId, { settings: result, ts: Date.now() });
+            return result;
+        } catch (e) {
+            return { chatId, ...DEFAULTS };
         }
-        const chatDoc = await GroupSettings.findOne({ chatId });
-        const groupRaw = chatDoc ? chatDoc.toObject() : {};
+    })().finally(() => {
+        if (groupSettingsRefreshing.get(chatId) === refresh) groupSettingsRefreshing.delete(chatId);
+    });
+    groupSettingsRefreshing.set(chatId, refresh);
+    return refresh;
+}
 
-        const base = (chatId === GLOBAL_KEY) ? DEFAULTS : await getGroupSettings(GLOBAL_KEY);
-
-        const result = { ...base, ...groupRaw, chatId };
-        groupSettingsCache.set(chatId, { settings: result, ts: Date.now() });
-        return result;
-    } catch (e) { return { chatId, ...DEFAULTS }; }
+async function getGroupSettings(chatId) {
+    const cached = groupSettingsCache.get(chatId);
+    if (cached) {
+        if ((Date.now() - cached.ts) >= GROUP_SETTINGS_CACHE_TTL_MS) void refreshGroupSettings(chatId);
+        return cached.settings;
+    }
+    return refreshGroupSettings(chatId);
 }
 
 async function setGroupSettings(chatId, update) {
