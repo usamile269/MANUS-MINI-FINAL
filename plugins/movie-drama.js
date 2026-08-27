@@ -11,6 +11,8 @@
 
 const { cmd } = require('../ahmad-core');
 const axios = require('axios');
+const yts = require('yt-search');
+const { pipeline } = require('stream/promises');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const fsp = fs.promises;
@@ -19,6 +21,9 @@ const { renderLuxe, renderError } = require('../lib/menu-styles');
 const YTDlpWrap = require('yt-dlp-wrap').default || require('yt-dlp-wrap');
 const YTDLP_BIN = path.join(__dirname, '..', 'bin', `yt-dlp${process.platform === 'win32' ? '.exe' : ''}`);
 const YTDLP_MARKER = `${YTDLP_BIN}.linux-verified`;
+const DRAMA_MAX_BYTES = 45 * 1024 * 1024;
+const DRAMA_PREFERRED_SECONDS = 300;
+const DRAMA_HARD_SECONDS = 600;
 const { runFallbackChain } = require('../lib/fallback-chain');
 
 const stripHtml = (s) => String(s || '').replace(/<[^>]+>/g, '').trim();
@@ -139,34 +144,99 @@ function dramaProcess(command, args, timeoutMs = 120000) {
     });
 }
 
+async function searchDramaYouTube(query) {
+    const direct = /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)\//i.test(query);
+    if (direct) return [{ url: query, title: query }];
+    const result = await yts(`${query} drama scene short clip`);
+    const videos = (result.videos || []).filter(video => video?.url && Number(video.seconds || 0) > 0);
+    if (!videos.length) throw new Error('no YouTube drama result');
+    // Prefer a clip that can be sent quickly, but keep a wider fallback for
+    // titles whose search results are all longer scene uploads.
+    const preferred = videos.filter(video => Number(video.seconds) <= DRAMA_PREFERRED_SECONDS);
+    const candidates = (preferred.length ? preferred : videos).slice(0, 6);
+    return candidates;
+}
+
+async function dramaProviderMedia(url) {
+    const providers = [
+        async () => {
+            const { data } = await axios.get('https://jawad-tech.vercel.app/download/ytdl', { params: { url }, timeout: 20000 });
+            const mediaUrl = data?.result?.mp4;
+            if (!data?.status || !mediaUrl) throw new Error('JawadTech returned no mp4');
+            return { mediaUrl, title: data.result.title || 'Ahmad Mini Drama' };
+        },
+        async () => {
+            const { data } = await axios.get('https://adeel-xtech-apis.vercel.app/api/ytmp4', { params: { url }, timeout: 20000 });
+            const mediaUrl = data?.result?.video_download;
+            if (!data?.status || !mediaUrl) throw new Error('AdeelXTech returned no mp4');
+            return { mediaUrl, title: data.result.title || 'Ahmad Mini Drama' };
+        }
+    ];
+    let lastError;
+    for (const provider of providers) {
+        try { return await provider(); } catch (error) { lastError = error; }
+    }
+    throw lastError || new Error('all drama media providers failed');
+}
+
+async function downloadDramaUrl(mediaUrl, output) {
+    const response = await axios.get(mediaUrl, {
+        responseType: 'stream',
+        timeout: 60000,
+        maxContentLength: DRAMA_MAX_BYTES,
+        maxBodyLength: DRAMA_MAX_BYTES,
+        maxRedirects: 5,
+        headers: { 'User-Agent': 'Mozilla/5.0', Range: 'bytes=0-' }
+    });
+    const declared = Number(response.headers['content-length'] || 0);
+    if (declared > DRAMA_MAX_BYTES) throw new Error('drama media exceeds safe limit');
+    let bytes = 0;
+    response.data.on('data', chunk => {
+        bytes += chunk.length;
+        if (bytes > DRAMA_MAX_BYTES) response.data.destroy(new Error('drama media exceeds safe limit'));
+    });
+    await pipeline(response.data, fs.createWriteStream(output));
+    const stat = await fsp.stat(output);
+    if (stat.size < 10000 || stat.size > DRAMA_MAX_BYTES) throw new Error('drama file is empty or exceeds safe limit');
+    return output;
+}
+
 async function downloadDramaFromYouTube(query, dir) {
+    const candidates = await searchDramaYouTube(query);
+    const output = path.join(dir, 'drama.mp4');
+    let lastError;
+    for (const candidate of candidates) {
+        try {
+            const media = await dramaProviderMedia(candidate.url);
+            await downloadDramaUrl(media.mediaUrl, output);
+            return { file: output, title: media.title || candidate.title, source: candidate.url };
+        } catch (error) {
+            lastError = error;
+            try { if (fs.existsSync(output)) await fsp.rm(output, { force: true }); } catch (_) {}
+        }
+    }
+    // Direct yt-dlp remains the last fallback for provider outages. It is no
+    // longer the first path, so a normal `.drama` command does not cold-start
+    // by downloading a binary before trying a working media API.
     const bin = await ensureDramaYtDlp();
-    const output = path.join(dir, 'drama.%(ext)s');
+    const outputPattern = path.join(dir, 'drama.%(ext)s');
     const source = /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)\//i.test(query)
         ? query : `ytsearch1:${query} drama scene short clip`;
     await dramaProcess(bin, [
-        source,
-        '--no-playlist',
-        '--no-warnings',
-        '--ignore-config',
-        '--restrict-filenames',
-        '--max-filesize', '45M',
-        '--match-filter', 'duration <= 180',
-        '--socket-timeout', '30',
-        '--retries', '2',
-        '--fragment-retries', '2',
-        '--concurrent-fragments', '2',
-        '--extractor-args', 'youtube:player_client=android,web',
-        '-f', 'bv*[height<=480]+ba/b[height<=480]/b',
-        '--merge-output-format', 'mp4',
-        '-o', output
+        source, '--no-playlist', '--no-warnings', '--ignore-config',
+        '--restrict-filenames', '--max-filesize', '45M',
+        '--match-filter', `duration <= ${DRAMA_HARD_SECONDS}`,
+        '--socket-timeout', '30', '--retries', '2', '--fragment-retries', '2',
+        '--concurrent-fragments', '2', '--extractor-args', 'youtube:player_client=android,web',
+        '-f', 'bv*[height<=480]+ba/b[height<=480]/b', '--merge-output-format', 'mp4',
+        '-o', outputPattern
     ], 120000);
     const files = await fsp.readdir(dir);
     const file = files.map(x => path.join(dir, x)).find(x => /\.(mp4|mkv|webm)$/i.test(x));
-    if (!file) throw new Error('YouTube did not create a video file');
+    if (!file) throw lastError || new Error('YouTube did not create a video file');
     const stat = await fsp.stat(file);
-    if (stat.size < 10000 || stat.size > 45 * 1024 * 1024) throw new Error('drama file exceeded safe limit');
-    return file;
+    if (stat.size < 10000 || stat.size > DRAMA_MAX_BYTES) throw new Error('drama file exceeded safe limit');
+    return { file, title: query, source: candidates[0]?.url || query };
 }
 
 async function resolveDramaClip(query) {
@@ -244,10 +314,10 @@ cmd({
     try {
         await conn.sendMessage(from, { react: { text: '🎭', key: mek.key } });
         await fsp.mkdir(dir, { recursive: true });
-        const localFile = await downloadDramaFromYouTube(query, dir);
-        const title = query.replace(/[\\/:*?"<>|\u0000-\u001F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Ahmad Mini Drama';
+        const media = await downloadDramaFromYouTube(query, dir);
+        const title = String(media.title || query).replace(/[\\/:*?"<>|\u0000-\u001F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Ahmad Mini Drama';
         await conn.sendMessage(from, {
-            document: fs.createReadStream(localFile),
+            document: fs.createReadStream(media.file),
             fileName: `${title}.mp4`,
             mimetype: 'video/mp4',
             caption: `🎬 *${title}*\n\n© AHMAD MINI`
