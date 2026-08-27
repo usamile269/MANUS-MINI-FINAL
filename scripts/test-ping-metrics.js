@@ -3,8 +3,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'plugins', 'ping.js'), 'utf8');
-assert.match(source, /const boldDigits = value =>/);
+assert.doesNotMatch(source, /boldDigits|𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵/);
 assert.match(source, /const compactPingStyles = \[/);
+assert.match(source, /const botName = '𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄';/);
+assert.match(source, /\$\{ms\}ms/);
 assert.match(source, /𓆩◆𓆪/);
 assert.match(source, /♛/);
 assert.match(source, /◈/);

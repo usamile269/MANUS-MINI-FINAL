@@ -3,11 +3,12 @@ const config = require('../config');
 
 // `.ping` is intentionally one lightweight send: no media, database lookup,
 // network probe, presence update, or awaited cosmetic reaction.
-const boldDigits = value => String(value).replace(/[0-9]/g, digit => '𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵'[digit]);
+// Keep the numeric portion ASCII: some WhatsApp clients render mathematical
+// bold digits as the replacement glyph (�). The surrounding font styling stays.
 const compactPingStyles = [
-    (name, ms) => `> 𓆩◆𓆪 *${name}*\n> ⌁ 𝙋𝙊𝙉𝙂  •  ${boldDigits(ms)}𝗺𝘀  •  𝙊𝙉𝙇𝙄𝙉𝙀`,
-    (name, ms) => `> ♛ *${name}*\n> ◉ 𝙋𝙊𝙉𝙂  •  ${boldDigits(ms)}𝗺𝘀  •  𝙊𝙉𝙇𝙄𝙉𝙀`,
-    (name, ms) => `> ◈ *${name}*\n> ◉ 𝙋𝙊𝙉𝙂  •  ${boldDigits(ms)}𝗺𝘀  •  𝙍𝙀𝘼𝘿𝙔`,
+    (name, ms) => `> 𓆩◆𓆪 *${name}*\n> ⌁ 𝙋𝙊𝙉𝙂  •  ${ms}ms  •  𝙊𝙉𝙇𝙄𝙉𝙀`,
+    (name, ms) => `> ♛ *${name}*\n> ◉ 𝙋𝙊𝙉𝙂  •  ${ms}ms  •  𝙊𝙉𝙇𝙄𝙉𝙀`,
+    (name, ms) => `> ◈ *${name}*\n> ◉ 𝙋𝙊𝙉𝙂  •  ${ms}ms  •  𝙍𝙀𝘼𝘿𝙔`,
 ];
 
 const channelContext = {
@@ -33,7 +34,7 @@ cmd({
     const um = Math.floor((uptimeSec % 3600) / 60);
     const us = Math.floor(uptimeSec % 60);
     const uptimeStr = `${uh}h ${um}m ${us}s`;
-    const botName = config.BOT_NAME || 'AHMAD MINI';
+    const botName = '𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄';
 
     const style = compactPingStyles[Math.floor(Math.random() * compactPingStyles.length)];
     const text = style(botName, processMs);
