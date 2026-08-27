@@ -1,21 +1,15 @@
 {
   "version": 2,
   "builds": [
-    { "src": "pair.html", "use": "@vercel/static" },
-    { "src": "admin.html", "use": "@vercel/static" }
+    { "src": "pair.html", "use": "@vercel/static" }
   ],
   "rewrites": [
     { "source": "/", "destination": "/pair.html" },
     { "source": "/pair", "destination": "/pair.html" },
-    { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/admin/", "destination": "/admin.html" },
     { "source": "/code", "destination": "https://web-production-f33e1.up.railway.app/code" },
     { "source": "/active", "destination": "https://web-production-f33e1.up.railway.app/active" },
     { "source": "/status", "destination": "https://web-production-f33e1.up.railway.app/status" },
     { "source": "/site-settings", "destination": "https://web-production-f33e1.up.railway.app/site-settings" },
-    { "source": "/admin/verify-key", "destination": "https://web-production-f33e1.up.railway.app/admin/verify-key" },
-    { "source": "/admin/site-settings", "destination": "https://web-production-f33e1.up.railway.app/admin/site-settings" },
-    { "source": "/admin/overview", "destination": "https://web-production-f33e1.up.railway.app/admin/overview" },
     { "source": "/health", "destination": "https://web-production-f33e1.up.railway.app/health" }
   ],
   "headers": [
