@@ -15,9 +15,11 @@ assert.match(source, /const processMs = Math\.max\(1, Date\.now\(\) - \(arrivalT
 assert.doesNotMatch(source, /WA PROBE/);
 assert.doesNotMatch(source, /sendPresenceUpdate/);
 assert.doesNotMatch(source, /PING_START_REACTIONS|PING_SUCCESS_REACTIONS|renderCuteBox/);
-assert.match(source, /await conn\.sendMessage\(from, \{ text \}\);/);
-assert.doesNotMatch(source, /forwardedNewsletterMessageInfo|contextInfo:/);
-assert.equal((source.match(/await conn\.sendMessage\(from, \{ text \}\);/g) || []).length, 1);
+assert.match(source, /forwardingScore: 999/);
+assert.match(source, /isForwarded: true/);
+assert.match(source, /newsletterName: 'AHMAD MINI'/);
+assert.match(source, /await conn\.sendMessage\(from, \{ text, contextInfo: channelContext \}\);/);
+assert.equal((source.match(/await conn\.sendMessage\(from, \{ text, contextInfo: channelContext \}\);/g) || []).length, 1);
 assert.doesNotMatch(source, /react:/);
 assert.doesNotMatch(source, /label: 'SPEED',\s+value: `\$\{networkMs\}ms`/);
 console.log('random compact truthful ping regression: PASS');
