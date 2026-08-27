@@ -3351,12 +3351,14 @@ document.getElementById('adminKeyInput').addEventListener('keydown', (e) => {
 </script>
 
 <style>
-  html.admin-route, body.admin-route { min-height:100%; height:auto; overflow-x:hidden; overflow-y:auto; touch-action:pan-y; }
-  body.admin-route { background:var(--bg-dark); }
+  html.admin-route, body.admin-route { min-height:100%; height:auto !important; overflow-x:hidden !important; overflow-y:auto !important; touch-action:pan-y !important; -webkit-overflow-scrolling:touch; scroll-behavior:smooth; }
+  body.admin-route { background:var(--bg-dark); position:static !important; }
   body.admin-route .main-wrap, body.admin-route .brand-section, body.admin-route .glass-card, body.admin-route .hero-video-box, body.admin-route .how-to-pair, body.admin-route .status-pill, body.admin-route .footer { display:none !important; }
   body.admin-route #adminOverlay { position:relative; inset:auto; z-index:10; display:flex; min-height:100dvh; width:100%; padding:18px; overflow:visible; align-items:flex-start; justify-content:center; background:transparent; }
   body.admin-route #adminOverlay .admin-panel { width:min(1120px,100%); max-height:none; height:auto; overflow:visible; }
-  body.admin-route #adminOverlay .admin-panel main { overflow:visible; max-height:none; }
+  body.admin-route #adminOverlay .admin-panel main { overflow:visible !important; max-height:none !important; height:auto !important; }
+  body.admin-route #adminPanelView { display:block !important; height:auto !important; min-height:0 !important; overflow:visible !important; }
+  body.admin-route .admin-control-center-main { display:block !important; height:auto !important; min-height:0 !important; max-height:none !important; overflow:visible !important; overscroll-behavior:initial !important; touch-action:pan-y !important; }
   body.admin-route #adminOverlay .admin-panel header { position:sticky; top:0; z-index:2; }
   @media (max-width:640px) {
     body.admin-route #adminOverlay { padding:8px; }

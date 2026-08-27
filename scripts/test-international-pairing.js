@@ -17,6 +17,9 @@ assert.match(pairHtml, /function openAdmin\(\) \{[\s\S]*adminOverlay[\s\S]*showL
 assert.match(pairHtml, /window\.location\.assign\(['\"]\/admin\.html['\"]\)/);
 assert.match(adminHtml, /id="adminOverlay"/);
 assert.match(adminHtml, /body\.admin-route.*overflow-y:auto/);
+assert.match(adminHtml, /admin-control-center-main.*overflow:visible !important/);
+assert.match(adminHtml, /scroll-behavior:smooth/);
+assert.match(pairHtml, /scroll-behavior:smooth/);
 assert.match(adminHtml, /window\.closeAdmin = \(\) => window\.location\.assign\(['\"]\/['\"]\)/);
 
 assert.match(mainJs, /String\(number \?\? ''\)\.replace\(\/\\D\/g, ''\)\.replace\(\/\^00\//);
