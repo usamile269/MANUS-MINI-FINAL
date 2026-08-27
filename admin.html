@@ -1,45 +1,3377 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>AHMAD MINI — Control Center</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ — Pair Device</title>
+<meta name="description" content="Connect your WhatsApp number to Ahmad Mini in seconds. Fast, Secure & Reliable.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <style>
-:root{--ink:#2f275e;--muted:#858098;--lav:#8c7ee8;--rose:#e98c88;--teal:#159988;--line:rgba(91,75,183,.13);--surface:rgba(255,255,255,.86);--bg:#fbf7f2}
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:linear-gradient(135deg,#fbf7f2,#f6f0ff 58%,#eefaf8);color:var(--ink);font-family:Inter,system-ui,sans-serif}body{overscroll-behavior-x:none}button,input,select{font:inherit}.app{min-height:100dvh;display:flex}.sidebar{width:228px;flex:0 0 228px;padding:28px 16px;background:rgba(255,255,255,.7);border-right:1px solid var(--line)}.brand{font-family:Fraunces,serif;font-size:1.15rem;margin:0 8px 32px}.brand span{color:#d57f99}.nav-label{font-size:.62rem;letter-spacing:1.6px;color:#a39bb2;text-transform:uppercase;margin:22px 10px 8px}.nav{display:block;width:100%;padding:11px 12px;margin:4px 0;text-align:left;border:0;border-radius:12px;color:#7c7691;background:transparent;cursor:pointer}.nav.active{color:#51439c;background:linear-gradient(100deg,rgba(140,126,232,.16),rgba(239,139,135,.14));font-weight:700}.nav i{width:20px;display:inline-block;color:#8c7ee8}.main{min-width:0;flex:1;padding:34px 42px 48px}.topbar{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:24px}.eyebrow{font-size:.66rem;letter-spacing:2px;text-transform:uppercase;color:#a39bb1}.title{font:500 clamp(2rem,4vw,3.1rem)/1 Fraunces,serif;margin:5px 0 8px}.sub{color:var(--muted);margin:0}.online{white-space:nowrap;border:1px solid rgba(30,170,152,.25);background:rgba(30,170,152,.08);color:var(--teal);border-radius:999px;padding:10px 14px;font-size:.72rem;font-weight:700}.online:before{content:'●';margin-right:6px}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:28px}.metric,.panel,.activity{background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:0 14px 36px rgba(78,63,130,.07)}.metric{padding:18px}.metric small{display:block;color:#9991a8;font-size:.65rem;letter-spacing:1px;text-transform:uppercase}.metric strong{display:block;color:var(--ink);font-size:1.55rem;margin:10px 0 4px}.metric em{font-style:normal;color:var(--teal);font-size:.7rem}.grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px}.panel{padding:24px}.panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px}.panel h2{font:500 1.55rem Fraunces,serif;margin:0}.panel h3{font-size:.85rem;margin:0;color:#575071}.section-note{color:var(--muted);font-size:.75rem;margin:5px 0 0}.field{margin:0 0 16px}.field label{display:block;margin:0 0 7px;font-size:.68rem;letter-spacing:1px;text-transform:uppercase;color:#746d88;font-weight:700}.field input,.field select{width:100%;height:47px;border:1px solid rgba(91,75,183,.18);border-radius:13px;background:#fff;color:var(--ink);padding:0 14px;outline:none}.field input:focus{border-color:#8c7ee8;box-shadow:0 0 0 4px rgba(140,126,232,.1)}.hint{color:#9690a1;font-size:.68rem;margin-top:6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.range-head{display:flex;justify-content:space-between;color:#746d88;font-size:.7rem;font-weight:700}.field input[type=range]{height:auto;padding:0;accent-color:#8c7ee8}.check{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:13px;padding:13px 14px;margin:0 0 14px;color:#665f7c;font-size:.78rem}.check input{width:19px;height:19px;accent-color:#8c7ee8}.actions{display:flex;justify-content:flex-end;gap:10px;border-top:1px solid var(--line);padding-top:18px;margin-top:22px}.btn{border:0;border-radius:999px;padding:11px 17px;cursor:pointer;font-weight:700}.btn.secondary{background:#fff;border:1px solid var(--line);color:#776e92}.btn.primary{color:#fff;background:linear-gradient(100deg,#ef8b87,#8c7ee8);box-shadow:0 10px 20px rgba(140,126,232,.18)}.message{min-height:20px;margin-top:10px;text-align:right;font-size:.75rem}.message.ok{color:var(--teal)}.message.err{color:#b23f5a}.activity{padding:20px;height:max-content}.connections-panel{margin-bottom:18px}.security-panel{margin-top:18px}.security-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.security-item{padding:16px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.72)}.security-item strong,.security-item span{display:block}.security-item strong{font-size:.78rem;color:var(--ink);margin-bottom:5px}.security-item span{font-size:.72rem;color:var(--muted)}.connections-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.connection-row{display:flex;align-items:center;gap:10px;padding:12px 13px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.72);font-size:.75rem}.connection-row strong{display:block;color:var(--ink);font-size:.8rem}.connection-row small{color:var(--muted)}.flag{font-size:1.25rem}.activity h3{font:500 1.3rem Fraunces,serif;margin:0 0 16px}.event{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);font-size:.74rem;color:#6f6882}.event:last-child{border:0}.dot{width:9px;height:9px;border-radius:50%;background:#8c7ee8;margin-top:4px;flex:0 0 9px}.dot.green{background:#38b894}.video-preview{display:none;margin:12px 0 18px;border-radius:16px;overflow:hidden;background:#282052}.video-preview video{display:block;width:100%;max-height:180px;object-fit:cover}.auth{position:fixed;inset:0;display:grid;place-items:center;padding:18px;background:rgba(22,18,48,.5);backdrop-filter:blur(16px);z-index:10}.auth[hidden]{display:none !important}.auth-card{width:min(430px,100%);padding:30px;border-radius:26px;background:#fff;box-shadow:0 30px 90px rgba(22,18,48,.25)}.auth-card h1{font:500 2rem Fraunces,serif;margin:0 0 8px}.auth-card p{color:var(--muted);margin:0 0 24px}.mobile-top{display:none}
-@media(max-width:900px){.sidebar{width:190px;flex-basis:190px}.main{padding:28px 24px}.metrics{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.activity{order:2}}
-@media(max-width:650px){.app{display:block}.security-grid{grid-template-columns:1fr}.connections-list{grid-template-columns:1fr}.sidebar{display:none}.main{padding:20px 14px 34px}.mobile-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}.mobile-top .brand{margin:0}.title{font-size:2.4rem}.topbar{margin-bottom:18px}.topbar .online{font-size:.65rem;padding:8px 10px}.metrics{gap:10px}.metric{padding:14px;border-radius:16px}.metric strong{font-size:1.2rem}.panel{padding:18px;border-radius:18px}.row{grid-template-columns:1fr}.actions{position:sticky;bottom:0;background:rgba(255,255,255,.94);margin:18px -18px -18px;padding:14px 18px;z-index:2}.grid{gap:14px}}
+/* ═══════════════════════════════════════════
+   RESET & ROOT VARIABLES
+   ═══════════════════════════════════════════ */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+/* 🆕 (Bunty: "lock nahi hai, aage peeche jati hand se" — a hand swipe was
+   triggering the browser's edge-swipe back/forward navigation gesture).
+   overscroll-behavior-x:none stops the page itself from being "pulled"
+   sideways past its edges (the trigger for that gesture in most mobile
+   browsers), and touch-action:pan-y restricts touch scrolling to
+   vertical-only, so a horizontal swipe doesn't get interpreted as a
+   navigation gesture at all. Normal up/down scrolling still works fine. */
+html, body {
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
+}
+
+:root {
+    /* Luxury palette — warm bronze/gold with a terracotta accent, dark
+       espresso base. Fonts: Fraunces (display serif) + Cormorant Garamond
+       (accent serif for labels/tagline) + Inter (UI/body — closest free
+       equivalent to the clean grotesque Claude's own interface uses,
+       since the exact typeface is a licensed commercial font). */
+    --primary: #ff69b4;
+    --primary-light: #ffb6c1;
+    --primary-dark: #c71585;
+    --accent: #da70d6;
+    --accent2: #ff1493;
+    --gold: #ff69b4;
+    --bg-dark: #080609;
+    --bg-card: rgba(18, 14, 20, 0.85);
+    --glass: rgba(255, 105, 180, 0.08);
+    --glass-border: rgba(255, 105, 180, 0.28);
+    --text: #fdf6fa;
+    --text-dim: #caa3bc;
+    --success: #2ecc71;
+    --error: #e74c3c;
+    --glow-primary: 0 0 50px rgba(255, 105, 180, 0.8), 0 0 100px rgba(255, 105, 180, 0.3);
+    --glow-accent: 0 0 50px rgba(218, 112, 214, 0.8), 0 0 100px rgba(218, 112, 214, 0.3);
+}
+
+html, body {
+    width: 100%;
+    min-height: 100vh;
+    background: var(--bg-dark);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+}
+
+/* ═══════════════════════════════════════════
+   ANIMATED BACKGROUND
+   ═══════════════════════════════════════════ */
+.bg-gradient {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+        radial-gradient(circle at 15% 25%, rgba(255, 105, 180, 0.35) 0%, transparent 55%),
+        radial-gradient(circle at 85% 75%, rgba(218, 112, 214, 0.3) 0%, transparent 55%),
+        radial-gradient(circle at 50% 50%, rgba(199, 21, 133, 0.25) 0%, transparent 70%),
+        var(--bg-dark);
+    animation: nebulaPulse 10s ease-in-out infinite alternate;
+}
+
+/* Admin-controlled full-screen media layers. The UI stays above them. */
+.background-image-layer,
+.background-video-layer {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    pointer-events: none;
+}
+.background-image-layer {
+    z-index: 0;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    opacity: 0.38;
+}
+.background-video-layer {
+    z-index: 0;
+    object-fit: cover;
+    opacity: 0.42;
+    filter: saturate(1.08) contrast(1.04);
+}
+.background-image-layer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 6, 9, 0.38);
+}
+
+
+@keyframes nebulaPulse {
+    0% { transform: scale(1); opacity: 0.85; }
+    50% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.85; }
+}
+
+@keyframes nebulaPulse {
+    0% { transform: scale(1); opacity: 0.85; }
+    50% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.85; }
+}
+
+/* Smooth clean background without distracting grid lines */
+.grid-overlay {
+    display: none;
+}
+
+/* Particles */
+#particles {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+.particle {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0;
+    animation: floatParticle linear infinite;
+}
+
+@keyframes floatParticle {
+    0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+    10% { opacity: 0.6; }
+    90% { opacity: 0.2; }
+    100% { transform: translateY(-10vh) rotate(720deg); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════
+   MAIN CONTAINER
+   ═══════════════════════════════════════════ */
+.main-wrap {
+    position: relative;
+    z-index: 2;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 16px;
+}
+
+/* ═══════════════════════════════════════════
+   LOGO / BRANDING SECTION
+   ═══════════════════════════════════════════ */
+.brand-section {
+    text-align: center;
+    margin-bottom: 30px;
+    animation: fadeInDown 0.8s ease-out;
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.logo-container {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 16px;
+}
+
+.logo-ring {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    animation: ringPulse 3s ease-in-out infinite;
+    box-shadow: var(--glow-primary);
+    cursor: pointer;
+    background-size: cover;
+    background-position: center;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.logo-ring:hover {
+    transform: scale(1.06);
+}
+
+.logo-ring:active {
+    transform: scale(0.96);
+}
+
+/* When a custom bot picture is set, hide the letter and make the ring
+   itself the picture frame — glossy edge + glow so it reads as a
+   premium avatar, not a placeholder. */
+.logo-ring.has-image {
+    border: 3px solid transparent;
+    background-clip: padding-box, border-box;
+    background-origin: padding-box, border-box;
+    background-image:
+        linear-gradient(#000, #000),
+        linear-gradient(135deg, var(--primary), var(--accent), var(--accent2));
+}
+.logo-ring.has-image .logo-icon { display: none; }
+
+/* Small music-note badge that appears once a song is loaded, so people
+   know the circle itself is clickable to play — no separate button. */
+.logo-ring .logo-note {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: #fff;
+    box-shadow: 0 0 12px rgba(184, 135, 63, 0.7);
+    border: 2px solid rgba(10,10,20,0.9);
+}
+.logo-ring.has-song .logo-note { display: flex; }
+.logo-ring.playing .logo-note { animation: notePulse 1s ease-in-out infinite; }
+@keyframes notePulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.25); }
+}
+.logo-ring.playing {
+    box-shadow: 0 0 30px rgba(193, 97, 59, 0.7), 0 0 55px rgba(184, 135, 63, 0.4);
+}
+
+.logo-ring::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 1px solid rgba(193, 97, 59, 0.3);
+    animation: ringSpin 8s linear infinite;
+}
+
+.logo-ring::after {
+    content: '';
+    position: absolute;
+    inset: -12px;
+    border-radius: 50%;
+    border: 1px dashed rgba(212, 175, 55, 0.2);
+    animation: ringSpin 12s linear infinite reverse;
+}
+
+@keyframes ringPulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(184, 135, 63, 0.3); }
+    50% { box-shadow: 0 0 40px rgba(184, 135, 63, 0.6), 0 0 60px rgba(193, 97, 59, 0.2); }
+}
+
+@keyframes ringSpin {
+    to { transform: rotate(360deg); }
+}
+
+.logo-icon {
+    font-size: 2rem;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+    font-family: 'Fraunces', serif;
+}
+
+.bot-name {
+    font-family: 'Fraunces', serif;
+    font-size: 1.8rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    background: linear-gradient(135deg, var(--primary-light), var(--accent), var(--accent2));
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: textShine 4s ease-in-out infinite;
+    margin-bottom: 6px;
+}
+
+@keyframes textShine {
+    0%, 100% { background-position: 0% center; }
+    50% { background-position: 200% center; }
+}
+
+.tagline {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-weight: 500;
+}
+
+.brand-eyebrow {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: var(--primary-light);
+    opacity: 0.75;
+    margin-bottom: 10px;
+}
+
+	/* Live Global Pairing Map Ticker */
+	.global-map-ticker {
+		margin-top: 12px;
+		padding: 6px 14px;
+		background: rgba(212, 175, 55, 0.08);
+		border: 1px solid rgba(212, 175, 55, 0.25);
+		border-radius: 12px;
+		font-size: 0.7rem;
+		color: var(--primary-light);
+		font-family: 'Inter', sans-serif;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		justify-content: center;
+		letter-spacing: 0.5px;
+	}
+	.map-pulse-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--gold);
+		box-shadow: 0 0 8px var(--gold);
+		animation: statusPulse 1.5s ease-in-out infinite;
+	}
+
+	/* Status pill */
+	.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: rgba(0, 184, 148, 0.1);
+    border: 1px solid rgba(0, 184, 148, 0.3);
+    font-size: 0.72rem;
+    color: var(--success);
+    letter-spacing: 1px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--success); }
+    50% { opacity: 0.4; box-shadow: 0 0 2px var(--success); }
+}
+
+.how-to-pair {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 18px 0 6px;
+    flex-wrap: wrap;
+}
+.htp-step {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 14px;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+}
+.htp-num {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #000;
+    font-size: 0.68rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.htp-text {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    font-family: 'Inter', sans-serif;
+    white-space: nowrap;
+}
+.htp-arrow {
+    color: var(--primary);
+    opacity: 0.5;
+    font-size: 0.9rem;
+}
+
+/* ═══════════════════════════════════════════
+   FALLING PETALS BACKGROUND ANIMATION
+   ═══════════════════════════════════════════ */
+#petalsContainer {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden;
+}
+.petal {
+    position: absolute;
+    background: linear-gradient(135deg, var(--petal-a, rgba(255, 105, 180, 0.7)), var(--petal-b, rgba(218, 112, 214, 0.5)));
+    border-radius: 150% 0 150% 0;
+    animation: fallPetal linear infinite;
+    opacity: 0.75;
+}
+@keyframes fallPetal {
+    0% { transform: translateY(-10vh) translateX(0) rotate(0deg); opacity: 0; }
+    20% { opacity: 0.8; }
+    80% { opacity: 0.6; }
+    100% { transform: translateY(110vh) translateX(80px) rotate(360deg); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════
+   RECTANGULAR HERO VIDEO CONTAINER
+   ═══════════════════════════════════════════ */
+.hero-video-box {
+    width: 100%;
+    max-width: 340px;
+    display: none;
+    margin: 0 auto 20px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45), 0 0 20px rgba(255,105,180,0.2);
+    background: #080609;
+    animation: fadeInUp 0.7s ease-out both;
+}
+.hero-video-box video {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 190px;
+    object-fit: cover;
+    filter: brightness(1.35) contrast(1.1); /* Boosted brightness (135%) and contrast for pop */
+}
+
+/* ═══════════════════════════════════════════
+   GLASS CARD (Cyber-Pink Obsidian)
+   ═══════════════════════════════════════════ */
+.glass-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--bg-card);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 36px 28px;
+    position: relative;
+    overflow: hidden;
+    animation: fadeInUp 0.8s ease-out 0.2s both, auraPulse 5s ease-in-out infinite;
+    box-shadow:
+        0 12px 40px rgba(0, 0, 0, 0.7),
+        0 0 30px rgba(255, 105, 180, 0.15),
+        inset 0 1px 0 rgba(255,255,255,0.1);
+    transform-style: preserve-3d;
+    will-change: transform;
+    transition: transform 0.15s ease-out, box-shadow 0.3s ease;
+    margin-top: 0;
+}
+
+/* Animated Neon Border Flow on Card (High Glow) */
+.glass-card::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(90deg, #ff69b4, #da70d6, #ff1493, #ff69b4);
+    background-size: 300% 300%;
+    z-index: -1;
+    border-radius: 26px;
+    animation: neonBorderFlow 4s linear infinite;
+    opacity: 0.95;
+    filter: blur(4px);
+}
+.glass-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--bg-card);
+    border-radius: 24px;
+    z-index: -1;
+}
+@keyframes neonBorderFlow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Liquid Pink Shimmer Typography for Bot Name */
+.bot-name {
+    background: linear-gradient(90deg, #ffb6c1, #ff69b4, #ffffff, #ff69b4, #ffb6c1);
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: textShimmer 4s linear infinite;
+}
+@keyframes textShimmer {
+    to { background-position: 200% center; }
+}
+
+/* Slow "breathing" gold aura around the whole card — adds depth without
+   fighting the cursor-spotlight or hover states, since it only touches
+   the outer box-shadow, not the border/background itself. */
+@keyframes auraPulse {
+    0%, 100% { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 0px rgba(212, 175, 55, 0); }
+    50% { box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 45px rgba(212, 175, 55, 0.18); }
+}
+
+/* Cursor-follow spotlight — a soft light that tracks the mouse across the
+   card, giving it a "premium glass under a light" feel instead of flat glass. */
+.glass-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    background: radial-gradient(
+        circle 220px at var(--spot-x, 50%) var(--spot-y, 0%),
+        rgba(255,255,255,0.10),
+        transparent 70%
+    );
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    opacity: 0;
+    z-index: 2;
+}
+.glass-card.spotlight-active::after { opacity: 1; }
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Card glow corner */
+.glass-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: conic-gradient(from 0deg, transparent, rgba(184, 135, 63, 0.05), transparent, rgba(193, 97, 59, 0.05), transparent);
+    animation: cardGlow 10s linear infinite;
+    z-index: -1;
+}
+
+@keyframes cardGlow {
+    to { transform: rotate(360deg); }
+}
+
+/* Section title */
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--glass-border), transparent);
+}
+
+.section-title i {
+    color: var(--primary-light);
+    font-size: 0.9rem;
+}
+
+/* ═══════════════════════════════════════════
+   INPUT FIELD
+   ═══════════════════════════════════════════ */
+.input-group {
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.input-group i.field-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--primary-light);
+    font-size: 1rem;
+    z-index: 1;
+}
+
+input.phone-input {
+    width: 100%;
+    padding: 16px 16px 16px 46px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 1.05rem;
+    letter-spacing: 1px;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+input.phone-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(184, 135, 63, 0.15), var(--glow-primary);
+    background: rgba(0, 0, 0, 0.5);
+}
+
+input.phone-input::placeholder {
+    color: rgba(136, 136, 170, 0.5);
+}
+
+/* Flag selector */
+.flag-select {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+}
+
+.flag-select select {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    outline: none;
+    cursor: pointer;
+    flex: 1;
+}
+
+.flag-select select option {
+    background: var(--bg-dark);
+    color: var(--text);
+}
+
+.flag-select .flag-code {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    font-family: 'Inter', sans-serif;
+}
+
+/* Hint text */
+.hint-text {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+    line-height: 1.5;
+    padding-left: 4px;
+}
+
+.hint-text i {
+    color: var(--accent);
+    margin-right: 4px;
+}
+
+/* ═══════════════════════════════════════════
+   BUTTON
+   ═══════════════════════════════════════════ */
+.btn-pair {
+    width: 100%;
+    padding: 16px;
+    border-radius: 14px;
+    border: none;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(184, 135, 63, 0.3);
+}
+
+.btn-pair:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(184, 135, 63, 0.5);
+}
+
+.btn-pair:active {
+    transform: translateY(0);
+}
+
+.btn-pair:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Click ripple — reusable on any button via JS (see addRipple()) */
+.ripple-fx {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.45);
+    transform: scale(0);
+    animation: rippleGrow 0.6s ease-out;
+    pointer-events: none;
+}
+@keyframes rippleGrow {
+    to { transform: scale(2.8); opacity: 0; }
+}
+
+/* Music visualizer bars — shown next to the logo-ring once bgAudio is
+   actually playing, driven by Web Audio's AnalyserNode. Sits below the
+   brand section. */
+.visualizer {
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    height: 22px;
+    margin-top: 10px;
+}
+.visualizer.active { display: flex; }
+.visualizer .vbar {
+    width: 3px;
+    min-height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, var(--accent2), var(--primary));
+    box-shadow: 0 0 6px rgba(184, 135, 63, 0.6);
+    transition: height 0.09s linear;
+}
+
+.btn-pair::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transition: left 0.5s;
+}
+
+.btn-pair:hover::before {
+    left: 100%;
+}
+
+/* Idle shine sweep (separate pseudo-element from the hover one above) —
+   loops continuously so the button "catches light" even before anyone
+   touches it, not just on hover. */
+.btn-pair::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -60%;
+    width: 35%;
+    height: 100%;
+    background: linear-gradient(115deg, transparent, rgba(255,255,255,0.28), transparent);
+    transform: skewX(-20deg);
+    animation: btnIdleShine 3.5s ease-in-out infinite;
+    animation-delay: 1s;
+}
+@keyframes btnIdleShine {
+    0%   { left: -60%; }
+    30%  { left: 130%; }
+    100% { left: 130%; }
+}
+
+/* Loading spinner on button */
+.btn-pair .spinner {
+    display: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.btn-pair.loading .btn-text { display: none; }
+.btn-pair.loading .spinner { display: block; }
+
+/* ═══════════════════════════════════════════
+   RESULT BOX
+   ═══════════════════════════════════════════ */
+#result {
+    margin-top: 24px;
+    display: none;
+    animation: fadeInUp 0.5s ease-out;
+}
+#result.show { display: block; }
+
+.result-card {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 22px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.result-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--primary), var(--accent), var(--accent2));
+}
+
+.result-label {
+    font-size: 0.7rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+}
+
+.code-display {
+    font-family: 'Fraunces', serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: 8px;
+    background: linear-gradient(135deg, var(--gold), #e8c26a);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    cursor: pointer;
+    padding: 8px 0;
+    transition: transform 0.2s;
+    user-select: all;
+}
+
+.code-display:hover {
+    transform: scale(1.05);
+}
+
+.code-display.error {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: normal;
+    -webkit-text-fill-color: var(--error);
+    cursor: default;
+}
+
+.code-display.success {
+    -webkit-text-fill-color: var(--success);
+}
+
+.copied-toast {
+    font-size: 0.72rem;
+    color: var(--success);
+    margin-top: 8px;
+    height: 16px;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 1px;
+}
+
+.copy-icon {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+}
+
+.copy-icon i {
+    margin-right: 4px;
+}
+
+/* ═══════════════════════════════════════════
+   STEPS SECTION
+   ═══════════════════════════════════════════ */
+.steps-section {
+    margin-top: 22px;
+    padding-top: 22px;
+    border-top: 1px solid var(--glass-border);
+}
+
+.steps-title {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.steps-title i {
+    color: var(--accent);
+}
+
+.steps-list {
+    list-style: none;
+    padding: 0;
+}
+
+.steps-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+
+.steps-list li:last-child {
+    border-bottom: none;
+}
+
+.step-num {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    border-radius: 8px;
+    background: rgba(184, 135, 63, 0.15);
+    border: 1px solid rgba(184, 135, 63, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Fraunces', serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--primary-light);
+}
+
+/* ═══════════════════════════════════════════
+   WELCOME VIDEO MODAL
+   ═══════════════════════════════════════════ */
+#welcomeModal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    backdrop-filter: blur(14px);
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow: hidden;
+}
+#welcomeModal.show { display: flex; }
+
+#confettiCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.welcome-content {
+    position: relative;
+    text-align: center;
+    max-width: 420px;
+    padding: 40px 32px;
+    border-radius: 24px;
+    background: linear-gradient(180deg, rgba(30,30,45,0.85), rgba(15,15,25,0.9));
+    border: 1px solid rgba(184, 135, 63, 0.35);
+    box-shadow: 0 0 60px rgba(184, 135, 63, 0.35), 0 0 120px rgba(193, 97, 59, 0.15), inset 0 1px 0 rgba(255,255,255,0.06);
+    animation: welcomePop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.welcome-content::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 24px;
+    padding: 1px;
+    background: linear-gradient(135deg, var(--primary), var(--accent), var(--accent2), var(--primary));
+    background-size: 300% 300%;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: borderShine 4s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes borderShine {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 300% 50%; }
+}
+
+@keyframes welcomePop {
+    0% { opacity: 0; transform: scale(0.7) translateY(20px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.welcome-content i {
+    font-size: 3.6rem;
+    background: linear-gradient(135deg, var(--success), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 18px;
+    display: inline-block;
+    animation: bounceIn 0.7s ease-out, iconGlowPulse 2.4s ease-in-out infinite 0.7s;
+    filter: drop-shadow(0 0 18px rgba(0,184,148,0.6));
+}
+
+@keyframes bounceIn {
+    0% { transform: scale(0) rotate(-20deg); }
+    50% { transform: scale(1.25) rotate(8deg); }
+    100% { transform: scale(1) rotate(0); }
+}
+
+@keyframes iconGlowPulse {
+    0%, 100% { filter: drop-shadow(0 0 12px rgba(0,184,148,0.5)); }
+    50% { filter: drop-shadow(0 0 26px rgba(193, 97, 59, 0.9)); }
+}
+
+.welcome-content h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    background: linear-gradient(135deg, var(--primary-light), var(--accent), var(--accent2));
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: textShine 4s ease-in-out infinite;
+    margin-bottom: 10px;
+}
+
+.welcome-content p {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 26px;
+}
+
+.welcome-content .btn-close {
+    padding: 13px 34px;
+    border-radius: 12px;
+    border: 1px solid var(--success);
+    background: linear-gradient(135deg, rgba(0,184,148,0.15), rgba(193, 97, 59, 0.1));
+    color: var(--success);
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 0 0 rgba(0,184,148,0);
+}
+
+.welcome-content .btn-close:hover {
+    background: var(--success);
+    color: #fff;
+    box-shadow: 0 0 24px rgba(0,184,148,0.6);
+    transform: translateY(-2px);
+}
+
+/* ═══════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════ */
+.site-footer {
+    text-align: center;
+    margin-top: 28px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    animation: fadeInUp 0.8s ease-out 0.4s both;
+}
+
+.footer-brand {
+    color: var(--primary-light);
+    font-weight: 600;
+}
+
+.footer-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.footer-links a {
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 1rem;
+    transition: color 0.3s, transform 0.3s;
+}
+
+.footer-links a:hover {
+    color: var(--primary-light);
+    transform: translateY(-2px);
+}
+
+/* ═══════════════════════════════════════════
+   FLOATING MUSIC BUTTON
+   ═══════════════════════════════════════════ */
+#musicToggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 50;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid var(--glass-border);
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+#musicToggle.ready { display: flex; }
+#musicToggle:hover { border-color: var(--primary); color: var(--primary-light); }
+#musicToggle.playing {
+    color: var(--accent);
+    border-color: var(--accent);
+    animation: musicSpin 4s linear infinite;
+}
+
+@keyframes musicSpin { to { transform: rotate(360deg); } }
+
+/* Chrome/mobile browsers require a direct user gesture before sound can start.
+   No visible prompt is used; the document-level gesture retry below handles it. */
+
+/* ═══════════════════════════════════════════
+   ADMIN OVERLAY
+   ═══════════════════════════════════════════ */
+#adminOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(8px);
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+#adminOverlay.show { display: flex; }
+
+.admin-panel {
+    width: 100%;
+    max-width: 440px;
+    background: var(--bg-card);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 28px;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: fadeInUp 0.4s ease-out;
+}
+
+.admin-panel h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.2rem;
+    color: var(--primary-light);
+    margin-bottom: 4px;
+}
+
+.admin-panel .sub {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    margin-bottom: 20px;
+}
+
+.admin-field {
+    margin-bottom: 14px;
+}
+
+.admin-control-card {
+    padding: 12px 14px 11px;
+    border: 1px solid rgba(255, 105, 180, 0.2);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255, 105, 180, 0.08), rgba(218, 112, 214, 0.05));
+}
+.admin-control-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.admin-control-heading label { margin-bottom: 0; }
+.admin-control-heading output {
+    color: var(--primary-light);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.admin-range-hint {
+    margin-top: 6px;
+    color: var(--text-dim);
+    font-size: 0.68rem;
+    line-height: 1.35;
+}
+.admin-field input[type="range"] {
+    width: 100%;
+    height: 6px;
+    padding: 0;
+    margin-top: 10px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.admin-field label {
+    display: block;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+}
+
+.admin-field input {
+    width: 100%;
+    padding: 12px 14px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.88rem;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.admin-field input:focus {
+    border-color: var(--primary);
+}
+
+/* Toggle switch — used for the audio-popup on/off admin setting */
+.switch-toggle {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 26px;
+    flex-shrink: 0;
+}
+.switch-toggle input { opacity: 0; width: 0; height: 0; }
+.switch-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--glass-border);
+    border-radius: 26px;
+    transition: background 0.3s ease;
+}
+.switch-slider::before {
+    content: '';
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: var(--text-dim);
+    border-radius: 50%;
+    transition: transform 0.3s ease, background 0.3s ease;
+}
+.switch-toggle input:checked + .switch-slider {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    border-color: var(--primary);
+}
+.switch-toggle input:checked + .switch-slider::before {
+    transform: translateX(20px);
+    background: white;
+}
+
+.admin-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+
+
+/* 🎵 "Enable Sound" popup */
+#audioPopupOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 6, 9, 0.65);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    cursor: pointer;
+    animation: audioOverlayIn 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+}
+#audioPopupOverlay.closing { animation: audioOverlayOut 0.8s ease-in forwards; }
+@keyframes audioOverlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes audioOverlayOut { to { opacity: 0; } }
+
+.audio-popup-card {
+    background: transparent;
+    border: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: visible;
+    transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.6s ease;
+}
+
+#audioPopupOverlay.closing .audio-popup-card {
+    transform: translateY(-400px) scale(0.2) rotate(15deg);
+    opacity: 0;
+}
+
+.luxury-heart {
+    font-size: 5rem;
+    color: #ff4d6d;
+    filter: drop-shadow(0 0 20px rgba(255, 77, 109, 0.6));
+    animation: heartLuxuryPulse 1.5s ease-in-out infinite;
+    cursor: pointer;
+    position: relative;
+}
+
+@keyframes heartLuxuryPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(255, 77, 109, 0.6)); }
+    50% { transform: scale(1.15); filter: drop-shadow(0 0 40px rgba(255, 77, 109, 0.9)); }
+}
+
+.heart-label {
+    margin-top: 20px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--primary-light);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(255, 105, 180, 0.5);
+    animation: labelFade 2s infinite alternate;
+}
+
+@keyframes labelFade { from { opacity: 0.4; } to { opacity: 1; } }
+
+.luxe-particle {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1000;
+    color: var(--primary);
+    font-size: 1.2rem;
+    animation: particleFly 1.5s ease-out forwards;
+}
+
+@keyframes particleFly {
+    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+}
+.audio-popup-icon {
+    font-size: 2.6rem;
+    margin-bottom: 10px;
+    animation: audioIconBounce 1.6s ease-in-out infinite;
+}
+@keyframes audioIconBounce {
+    0%, 100% { transform: translateY(0) rotate(-6deg); }
+    50% { transform: translateY(-6px) rotate(6deg); }
+}
+
+/* 💎 LUXURY AUDIO RECOVERY CHIP
+   Hidden until blocked, then slides in with a premium shimmer + glow. */
+#audioRecoveryChip { display: none !important;
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 1200;
+    display: none;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 13px;
+    border: 1px solid rgba(255, 105, 180, 0.5);
+    border-radius: 999px;
+    color: #fff;
+    background: linear-gradient(135deg, rgba(20, 10, 25, 0.95), rgba(10, 30, 20, 0.95));
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(255, 105, 180, 0.3);
+    font: 800 0.68rem 'Inter', sans-serif;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+#audioRecoveryChip.show {
+    display: inline-flex;
+    animation: luxurySlideIn 0.6s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* Shimmer Effect */
+#audioRecoveryChip::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 50%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: shimmer 3s infinite;
+}
+
+#audioRecoveryChip:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.6), 0 0 30px rgba(255, 105, 180, 0.5);
+    border-color: rgba(255, 105, 180, 0.8);
+}
+
+#audioRecoveryChip .recovery-dot {
+    color: #ff69b4;
+    font-size: 0.82rem;
+    animation: pulseGlow 1.5s ease-in-out infinite;
+}
+
+@keyframes luxurySlideIn {
+    from { opacity: 0; transform: translateX(50px) scale(0.9); }
+    to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes shimmer {
+    0% { left: -100%; }
+    30% { left: 200%; }
+    100% { left: 200%; }
+}
+
+@keyframes pulseGlow {
+    0%, 100% { opacity: 1; text-shadow: 0 0 8px #ff69b4; }
+    50% { opacity: 0.5; text-shadow: 0 0 2px #ff69b4; }
+}
+
+@media (max-width: 480px) {
+    #audioRecoveryChip { display: none !important; right: 12px; bottom: 12px; left: 12px; justify-content: center; padding: 9px 12px; }
+}
+.audio-popup-text {
+    font-family: 'Fraunces', serif;
+    font-size: 1.15rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary-light), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 1px;
+}
+.audio-popup-sub {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+}
+
+.admin-buttons button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-admin-save {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    border: none;
+    color: white;
+}
+
+.btn-admin-cancel {
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    color: var(--text-dim);
+}
+
+.admin-msg {
+    font-size: 0.78rem;
+    margin-top: 12px;
+    min-height: 16px;
+    font-family: 'Inter', sans-serif;
+}
+.admin-msg.ok { color: var(--success); }
+.admin-msg.err { color: var(--error); }
+
+/* ═══════════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════════ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════ */
+@media (max-width: 480px) {
+    .bot-name { font-size: 1.4rem; letter-spacing: 2px; }
+    .glass-card { padding: 28px 20px; border-radius: 20px; }
+    .code-display { font-size: 1.8rem; letter-spacing: 6px; }
+    .logo-ring { width: 110px; height: 110px; }
+    .logo-icon { font-size: 2.1rem; }
+}
+
+@media (max-width: 360px) {
+    .bot-name { font-size: 1.2rem; }
+    .glass-card { padding: 24px 16px; }
+}
+
+/* ═══════════════════════════════════════════
+   MOBILE SCROLL PERFORMANCE FIX (Bunty: "scroll karne pe bohot lag hota
+   hai") — root cause: several always-running, main-thread-heavy effects
+   stacked together. backdrop-filter blur() is the single most expensive
+   CSS property on mobile GPUs, especially with content moving behind it
+   during scroll (forces a live re-blur every frame). The animated
+   .bg-gradient (animating the `background` property directly, not
+   transform/opacity) forces a full repaint every frame too. 20+ constantly
+   animating particles and multiple simultaneous box-shadow "glow" pulses
+   pile CPU/GPU work on top of that. None of this is disabled or reduced on
+   small screens, so a budget phone pays the full desktop-decoration cost
+   while scrolling. Fixes below only kick in under 768px — desktop is
+   untouched.
+   ═══════════════════════════════════════════ */
+@media (max-width: 768px) {
+    /* Backdrop blur -> solid-ish background. Keeps the dark glass LOOK
+       (same color, slight transparency) without the live blur recompute
+       cost, which is the biggest single win here. */
+    .glass-card {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: rgba(20, 16, 12, 0.92) !important;
+    }
+    /* Animating `background` directly forces a full repaint every frame —
+       freeze it to a static gradient on mobile instead of disabling it
+       outright, so the look barely changes but the per-frame cost drops
+       to zero. */
+    .bg-gradient { animation: none !important; }
+    /* Fewer particles, and promoted to their own GPU compositor layer so
+       their transform animation doesn't force main-thread work during
+       scroll. */
+    #particles { will-change: transform; transform: translateZ(0); }
+    .particle:nth-child(n+13) { display: none; } /* cap effectively at 12 on mobile instead of 20-35 */
+    /* Grid overlay: GPU layer hint so its transform animation composites
+       independently of scroll. */
+    .grid-overlay { will-change: transform; transform: translateZ(0); }
+    /* box-shadow animations are NOT GPU-accelerated (unlike transform/
+       opacity) — they force a repaint of the shadow region every frame.
+       Slowing the continuous glow pulse down cuts how often that repaint
+       happens without removing the look entirely. Keeps the 0.8s entrance
+       fade-in untouched — only the 2nd (auraPulse) duration changes. */
+    .glass-card { animation-duration: 0.8s, 10s !important; }
+    .logo-ring { animation: none !important; }
+    .logo-ring::before, .logo-ring::after,
+    .glass-card::before, .grid-overlay,
+    .bot-name, .status-dot, #musicToggle.playing,
+    .audio-popup-card, .audio-popup-icon,
+    .welcome-content::before { animation: none !important; }
+    /* Keep only the one-time card entrance; remove the continuous aura pulse. */
+    .glass-card { animation: fadeInUp 0.8s ease-out 0.2s both !important; }
+    .grid-overlay { opacity: 0.35; }
+    /* The moving particles add no functional value and are costly while scrolling. */
+    #particles { display: none; }
+    .welcome-content, #musicToggle, #adminOverlay, .admin-panel,
+    #audioPopupOverlay, .audio-popup-card, #themePickerPanel {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+    html { scroll-behavior: auto; }
+}
+
+/* ═══════════════════════════════════════════
+   REDUCED MOTION
+   ═══════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* FINAL AHMAD MINI PUBLIC REDESIGN */
+:root {
+  --primary: #5b4bb7;
+  --primary-light: #8c7ee8;
+  --primary-dark: #3e327f;
+  --accent: #ef8b87;
+  --accent2: #64c9c6;
+  --gold: #cda765;
+  --bg-dark: #fbf7f2;
+  --bg-card: rgba(255,255,255,.76);
+  --glass: rgba(255,255,255,.58);
+  --glass-border: rgba(91,75,183,.18);
+  --text: #171942;
+  --text-dim: #77738f;
+  --success: #1eaa98;
+  --error: #d46b73;
+  --glow-primary: 0 14px 40px rgba(91,75,183,.18);
+  --glow-accent: 0 14px 40px rgba(239,139,135,.18);
+}
+html, body { background: #fbf7f2; color: var(--text); }
+body { overflow-x:hidden; }
+.bg-gradient { background: radial-gradient(circle at 12% 28%, rgba(239,139,135,.25), transparent 38%), radial-gradient(circle at 86% 70%, rgba(100,201,198,.22), transparent 40%), linear-gradient(135deg,#fffdf9 0%,#fbf7f2 52%,#f4f0fb 100%); animation:none; }
+.background-video-layer { opacity:.30; mix-blend-mode:multiply; filter:saturate(.85) contrast(.98); }
+.background-image-layer::after { background:rgba(255,250,245,.46); }
+.main-wrap { min-height:100vh; max-width:1180px; margin:0 auto; padding:54px 28px 34px; justify-content:flex-start; }
+.brand-section { width:100%; display:flex; align-items:center; gap:18px; text-align:left; margin:0 0 26px; position:relative; z-index:4; }
+.bot-name { font-family:'Fraunces',serif; font-size:clamp(1.35rem,3vw,2rem); letter-spacing:.5px; background:none !important; -webkit-text-fill-color:#282052 !important; color:#282052 !important; }
+.brand-eyebrow { margin:0; color:#8a79b7; letter-spacing:2.5px; }
+.tagline { margin:0 0 0 auto; color:#5d6988; font-size:.88rem; }
+.status-pill { margin:0; padding:8px 14px; background:rgba(100,201,198,.11); border:1px solid rgba(100,201,198,.32); color:#149b91; }
+.visualizer { display:none; }
+.hero-video-box { position:absolute; z-index:0; top:0; left:0; width:100%; max-width:none; height:580px; margin:0; border:0; border-radius:0; background:radial-gradient(circle at 18% 53%, rgba(255,255,255,.98) 0 7%, transparent 20%), radial-gradient(ellipse at 4% 70%, rgba(177,155,223,.26), transparent 30%), radial-gradient(ellipse at 96% 70%, rgba(100,201,198,.24), transparent 31%), linear-gradient(112deg,rgba(239,139,135,.14),rgba(255,255,255,.55),rgba(100,201,198,.12)); box-shadow:none; overflow:hidden; pointer-events:none; }
+.hero-video-box::after { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.05),#fbf7f2 96%); }
+.hero-video-box video { width:100%; height:100%; object-fit:cover; opacity:.82; mix-blend-mode:multiply; }
+.hero-video-live, .hero-video-fallback, .hero-video-mute { position:absolute; z-index:2; pointer-events:auto; }
+.hero-video-live { top:34px; left:38px; padding:9px 13px; border-radius:999px; background:rgba(255,255,255,.72); border:1px solid rgba(255,255,255,.75); color:#6c6680; font-size:.66rem; letter-spacing:1px; box-shadow:0 8px 20px rgba(70,53,110,.07); }
+.hero-video-live::first-letter { color:#e37576; }
+.hero-video-mute { top:31px; right:38px; width:42px; height:42px; border-radius:50%; background:rgba(255,255,255,.66); border:1px solid rgba(255,255,255,.85); color:#5c5874; cursor:pointer; box-shadow:0 8px 20px rgba(70,53,110,.07); }
+.hero-video-fallback { right:38px; bottom:28px; padding:8px 11px; border-radius:10px; background:rgba(255,255,255,.66); color:#7a748c; font-size:.6rem; letter-spacing:.7px; }
+@media (max-width:760px) { .hero-video-live { top:116px; left:24px; } .hero-video-mute { top:112px; right:24px; } .hero-video-fallback { right:20px; bottom:28px; } }
+.hero-headline { position:relative; z-index:3; width:min(900px,100%); margin:22px auto 10px; text-align:center; font-family:'Fraunces',serif; font-weight:500; font-size:clamp(2.6rem,6vw,5.4rem); line-height:.98; letter-spacing:-.045em; color:#181940; }
+.hero-headline span { background:linear-gradient(100deg,#5544a9,#cf75ad,#e58c84); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.hero-subcopy { position:relative; z-index:3; text-align:center; margin:0 auto 24px; color:#6c6884; font-size:1rem; }
+.glass-card { position:relative; z-index:4; width:min(700px,100%); margin:10px auto 28px; padding:26px 28px 24px; border:1px solid rgba(91,75,183,.15); border-radius:34px; background:rgba(255,255,255,.66); box-shadow:0 24px 80px rgba(78,63,130,.12); backdrop-filter:blur(18px); }
+.section-title { display:none; }
+.how-to-pair { margin:0 0 18px; border:0; background:transparent; justify-content:center; }
+.htp-step { color:#6b6390; background:rgba(255,255,255,.55); border:1px solid rgba(91,75,183,.13); padding:7px 12px; border-radius:999px; }
+.htp-num { width:22px; height:22px; background:linear-gradient(135deg,#ef8b87,#8c7ee8); color:#fff; }
+.htp-arrow { color:#cda765; }
+.input-group { border:1px solid rgba(91,75,183,.18); border-radius:999px; background:rgba(255,255,255,.72); padding:4px 16px; box-shadow:inset 0 1px 0 rgba(255,255,255,.8); }
+.phone-input { color:#24234f; padding:14px 10px; }
+.phone-input::placeholder { color:#aaa5ba; }
+.field-icon { color:#7b6dcc; }
+#countryDetect { color:#68738e !important; justify-content:center; }
+.hint-text { text-align:center; color:#7c7891; }
+.btn-pair { width:min(360px,100%); margin:16px auto 0; display:flex; border:0; border-radius:999px; background:linear-gradient(100deg,#ef8b87,#c976c1 52%,#5b4bb7); box-shadow:0 14px 30px rgba(198,110,159,.22); font-weight:700; letter-spacing:1.5px; }
+.btn-pair:hover { transform:translateY(-2px); box-shadow:0 18px 34px rgba(198,110,159,.30); }
+#result { margin-top:20px; }
+.result-card { border:1px solid rgba(91,75,183,.14); background:rgba(255,255,255,.72); border-radius:28px; padding:20px; }
+.result-label { color:#6b6390; }
+.code-display { border-radius:999px; color:#3e327f; background:linear-gradient(100deg,rgba(239,139,135,.13),rgba(140,126,232,.15)); border:1px solid rgba(91,75,183,.22); letter-spacing:7px; }
+.copy-icon { color:#5b4bb7; }
+.steps-section { border-top:1px solid rgba(91,75,183,.12); }
+.steps-title { color:#44377e; }
+.steps-list li { color:#68647d; }
+.step-num { background:linear-gradient(135deg,#ef8b87,#8c7ee8); color:white; }
+.site-footer { width:100%; color:#898399; border-top:1px solid rgba(91,75,183,.12); padding-top:18px; }
+.footer-brand { color:#50428f; }
+.footer-links a { color:#7c72af; }
+.code-display { min-height:58px; display:flex; align-items:center; justify-content:center; padding:12px 18px; border-radius:18px; background:#30265e !important; border:1px solid rgba(48,38,94,.28); color:#ffffff !important; -webkit-text-fill-color:#ffffff !important; text-shadow:0 2px 8px rgba(0,0,0,.22); box-shadow:0 10px 26px rgba(48,38,94,.14); }
+.code-display.error { background:rgba(235,112,117,.12) !important; border-color:rgba(185,52,78,.28); color:#9e2945 !important; -webkit-text-fill-color:#9e2945 !important; text-shadow:none; box-shadow:none; }
+.code-display.success { background:rgba(34,150,125,.12) !important; border-color:rgba(34,150,125,.28); color:#087c6a !important; -webkit-text-fill-color:#087c6a !important; text-shadow:none; box-shadow:none; }
+.copy-icon { color:#4f3a98 !important; font-weight:700; }
+.copied-toast { color:#087c6a !important; font-weight:700; }
+#countdown { color:#5f557d !important; font-weight:600; }
+#themePickerBtn { display:none !important; }
+#adminAccessHint { position:fixed; top:28px; right:30px; z-index:20; width:34px; height:34px; border:0; background:transparent; color:#c5a36e; opacity:.82; cursor:pointer; font-size:1rem; }
+#adminAccessHint:hover { opacity:1; transform:scale(1.08); }
+@media (max-width:760px) { #adminAccessHint { top:19px; right:18px; } }
+#adminOverlay { background:rgba(22,18,48,.44); backdrop-filter:blur(20px); }
+.admin-panel { background:rgba(255,255,255,.94); border-color:rgba(91,75,183,.18); box-shadow:0 24px 80px rgba(28,20,64,.22); }
+.admin-panel h2 { color:#433581; }
+.admin-panel .sub, .admin-field label, .admin-range-hint { color:#77738f; }
+.admin-field input { background:rgba(255,255,255,.8); color:#25214d; border-color:rgba(91,75,183,.18); }
+@media (max-width:760px) {
+  .main-wrap { padding:24px 14px 26px; }
+  .brand-section { gap:9px; flex-wrap:wrap; margin-bottom:18px; }
+  .brand-eyebrow { order:3; width:100%; }
+  .tagline { display:none; }
+  .status-pill { margin-left:auto; font-size:.65rem; padding:6px 10px; }
+  .hero-video-box { height:650px; }
+  .hero-headline { margin-top:52px; font-size:clamp(2.55rem,12vw,4rem); line-height:1.02; }
+  .hero-subcopy { font-size:.88rem; max-width:300px; line-height:1.45; }
+  .glass-card { padding:18px 14px 18px; border-radius:28px; }
+  .how-to-pair { gap:5px; }
+  .htp-step { font-size:.63rem; padding:6px 7px; }
+  .htp-arrow { font-size:1rem; }
+  .input-group { padding:4px 12px; }
+  .phone-input { font-size:.96rem; }
+  .code-display { font-size:1.35rem; letter-spacing:4px; }
+}
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+/* APPROVED ADMIN CONTROL CENTER */
+#adminOverlay { padding:18px; }
+#adminOverlay .admin-panel { width:min(1120px,100%); max-width:1120px; max-height:92vh; padding:0; overflow:hidden; border-radius:28px; }
+#adminPanelView { display:grid; grid-template-columns:190px minmax(0,1fr); min-height:640px; }
+.admin-control-center-nav { padding:26px 16px; background:linear-gradient(180deg,rgba(246,241,255,.95),rgba(255,250,246,.95)); border-right:1px solid rgba(91,75,183,.12); }
+.admin-control-center-brand { font-family:'Fraunces',serif; font-size:1.05rem; color:#2d275b; margin-bottom:28px; display:flex; gap:8px; align-items:center; }
+.admin-control-center-brand span { color:#d57f99; }
+.admin-nav-label { color:#9b91b6; font-size:.63rem; letter-spacing:1.6px; text-transform:uppercase; margin:22px 10px 8px; }
+.admin-nav-item { display:flex; gap:9px; align-items:center; padding:10px 11px; border-radius:12px; color:#7b7594; font-size:.77rem; margin:4px 0; }
+.admin-nav-item.active { color:#51439c; background:linear-gradient(100deg,rgba(140,126,232,.16),rgba(239,139,135,.13)); font-weight:700; }
+.admin-nav-item i { width:17px; text-align:center; color:#8c7ee8; }
+.admin-control-center-main { padding:26px 28px 24px; overflow:auto; background:rgba(255,255,255,.74); }
+.admin-center-topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:15px; margin-bottom:20px; }
+.admin-center-title { color:#241e4d; font-family:'Fraunces',serif; font-size:1.55rem; }
+.admin-center-subtitle { color:#8a849c; font-size:.75rem; margin-top:4px; }
+.admin-online { white-space:nowrap; border:1px solid rgba(30,170,152,.24); background:rgba(30,170,152,.08); color:#159988; border-radius:999px; padding:8px 12px; font-size:.7rem; font-weight:700; }
+.admin-online::before { content:'●'; margin-right:6px; }
+.admin-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:22px; }
+.admin-metric { padding:15px; border:1px solid rgba(91,75,183,.12); border-radius:17px; background:rgba(255,255,255,.78); box-shadow:0 8px 22px rgba(78,63,130,.05); }
+.admin-metric small { display:block; color:#958da9; font-size:.63rem; text-transform:uppercase; letter-spacing:.9px; }
+.admin-metric strong { display:block; color:#30265e; font-size:1.25rem; margin-top:8px; }
+.admin-metric em { display:block; color:#159988; font-size:.65rem; font-style:normal; margin-top:4px; }
+.admin-settings-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 14px; padding-top:16px; border-top:1px solid rgba(91,75,183,.11); }
+.admin-settings-heading h2 { margin:0 !important; }
+.admin-settings-heading .sub { margin:0 !important; }
+#adminPanelView > .admin-field, #adminPanelView > .admin-control-card, #adminPanelView > .admin-buttons, #adminPanelView > .admin-msg, #adminPanelView > h2, #adminPanelView > p.sub { grid-column:2; }
+#adminPanelView > .admin-field, #adminPanelView > .admin-control-card { margin-left:0; margin-right:0; }
+#adminPanelView > h2, #adminPanelView > p.sub { display:none; }
+#adminPanelView > .admin-field:nth-of-type(1), #adminPanelView > .admin-field:nth-of-type(2), #adminPanelView > .admin-field:nth-of-type(3), #adminPanelView > .admin-field:nth-of-type(4) { }
+#adminPanelView > .admin-buttons { padding-top:16px; border-top:1px solid rgba(91,75,183,.1); }
+#adminPanelView input { border-radius:12px; }
+body.admin-open { overflow:hidden; overscroll-behavior:none; touch-action:none; }
+@media (max-width:760px) {
+  #adminOverlay { position:fixed; inset:0; padding:8px; overflow:hidden; overscroll-behavior:contain; touch-action:none; align-items:flex-start; }
+  #adminOverlay .admin-panel { width:100%; height:calc(100dvh - 16px); max-height:none; border-radius:21px; overflow:hidden; display:flex; flex-direction:column; }
+  #adminLockView { flex:0 0 auto; }
+  #adminPanelView { display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden; }
+  .admin-control-center-nav { display:none; }
+  .admin-control-center-main { flex:1 1 auto; min-height:0; height:auto; padding:20px 16px 28px; overflow-y:auto; overflow-x:hidden; overscroll-behavior-y:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+  .admin-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .admin-center-topbar { margin-bottom:15px; }
+  #adminPanelView > .admin-field, #adminPanelView > .admin-control-card, #adminPanelView > .admin-buttons, #adminPanelView > .admin-msg { display:block; }
+}
 </style>
 </head>
 <body>
-<div id="auth" class="auth"><div class="auth-card"><div class="eyebrow">Private Control Center</div><h1>Admin access</h1><p>Authenticate to manage the Ahmad Mini pairing portal.</p><div class="field"><label>Admin key</label><input id="adminKey" type="password" placeholder="Enter admin password" autocomplete="current-password"></div><button class="btn primary" id="unlock">Unlock Control Center</button><div id="authMsg" class="message"></div></div></div>
-<div class="app" id="app" hidden>
-<aside class="sidebar"><div class="brand">AHMAD <span>MINI</span></div><div class="nav-label">Control Center</div><button class="nav active" data-tab="overview"><i>⌂</i> Overview</button><button class="nav" data-tab="sessions"><i>↗</i> Pairing Sessions</button><button class="nav" data-tab="numbers"><i>◉</i> Connected Numbers</button><button class="nav" data-tab="logs"><i>≡</i> System Logs</button><div class="nav-label">Workspace</div><button class="nav active" data-tab="settings"><i>⚙</i> Site Settings</button><button class="nav" data-tab="security"><i>♢</i> Security</button><button class="nav" id="logout"><i>↪</i> Log out</button></aside>
-<main class="main"><div class="mobile-top"><div class="brand">AHMAD <span>MINI</span></div><button class="btn secondary" id="mobileLogout">Log out</button></div><div class="topbar"><div><div class="eyebrow">Control Center</div><h1 class="title">Overview</h1><p class="sub">System status and key metrics</p></div><div class="online">SYSTEM ONLINE</div></div>
-<div class="metrics"><div class="metric"><small>System online</small><strong>Online</strong><em>All services operational</em></div><div class="metric"><small>Active sessions</small><strong id="activeSessions">—</strong><em>Users connected</em></div><div class="metric"><small>Pairing requests</small><strong id="pairingState">Ready</strong><em>Awaiting activity</em></div><div class="metric"><small>Uptime</small><strong id="uptime">Live</strong><em>Railway service</em></div></div>
-<section class="panel connections-panel" id="connectionsPanel"><div class="panel-head"><div><h2>Connected Numbers</h2><p class="section-note">Live number, country, and connection status from Railway.</p></div><span class="online" id="countryCount">0 COUNTRIES</span></div><div id="connectionsList" class="connections-list"><div class="event"><span class="dot"></span><span>Loading active numbers…</span></div></div></section>
-<div class="grid"><section class="panel" id="settingsPanel"><div class="panel-head"><div><h2>⚙ Site Settings</h2><p class="section-note">Changes apply instantly across the pairing page.</p></div><span class="online">PRIVATE</span></div><div class="field"><label>Bot name</label><input id="botName"></div><div class="field"><label>Tagline</label><input id="tagline"></div><div class="field"><label>Welcome message</label><input id="welcomeMsg"></div><div class="field"><label>Hero background video URL</label><input id="welcomeVideo" type="url" placeholder="https://your-domain.com/ahmad-mini-hero.mp4"><div class="hint">Direct public .mp4/.webm URL. Muted autoplay, loop, and mobile fallback are enabled.</div><div class="video-preview" id="videoPreview"><video id="previewVideo" muted loop playsinline controls></video></div></div><div class="row"><div class="field"><div class="range-head"><label>Hero brightness</label><output id="brightnessValue">135%</output></div><input id="brightness" type="range" min="30" max="250" step="5"></div><div class="field"><div class="range-head"><label>Female voice volume</label><output id="voiceValue">350%</output></div><input id="voice" type="range" min="0" max="400" step="5"></div></div><div class="field"><div class="range-head"><label>Background music volume</label><output id="musicValue">100%</output></div><input id="music" type="range" min="0" max="500" step="5"></div><div class="field"><label>Custom background music URL</label><input id="musicUrl" type="url" placeholder="https://.../background-music.mp3"></div><div class="row"><div class="field"><label>Channel link</label><input id="channelLink" type="url"></div><div class="field"><label>YouTube link</label><input id="youtubeLink" type="url"></div></div><div class="row"><div class="field"><label>GitHub link</label><input id="githubLink" type="url"></div><div class="field"><label>Instagram / social link</label><input id="instagramLink" type="url"></div></div><div class="field"><label>Bot circle image URL</label><input id="botImage" type="url"></div><div class="field"><label>Full-screen background video URL</label><input id="bgVideo" type="url"></div><div class="field"><label>Full-screen background image URL</label><input id="bgImage" type="url"></div><div class="check"><span>Show falling leaves / petals</span><input id="leaves" type="checkbox"></div><div class="check"><span>Show enable-sound popup on load</span><input id="audioPopup" type="checkbox"></div><div class="row"><div class="field"><label>Primary color</label><input id="primaryColor" type="color"></div><div class="field"><label>Accent color</label><input id="accentColor" type="color"></div></div><div class="actions"><button class="btn secondary" id="reset">Reset to default</button><button class="btn primary" id="save">Save changes</button></div><div id="saveMsg" class="message"></div></section><aside class="activity" id="activityPanel"><h3>Recent Activity</h3><div class="event"><span class="dot green"></span><span>System online<br><small>Railway service responding</small></span></div><div class="event"><span class="dot"></span><span>Admin session started<br><small>Private control center</small></span></div><div class="event"><span class="dot green"></span><span>Settings ready<br><small>Waiting for changes</small></span></div><div class="event"><span class="dot"></span><span>Hero video<br><small>Managed from Site Settings</small></span></div></aside></div><section class="panel security-panel" id="securityPanel" hidden><div class="panel-head"><div><h2>♢ Security</h2><p class="section-note">Private owner controls for this Control Center.</p></div><span class="online">PROTECTED</span></div><div class="security-grid"><div class="security-item"><strong>Admin authentication</strong><span>Verified through Railway</span></div><div class="security-item"><strong>Session storage</strong><span>Browser key only · logout clears it</span></div><div class="security-item"><strong>Public exposure</strong><span>Dashboard hidden behind admin verification</span></div><div class="security-item"><strong>Backend status</strong><span id="securityStatus">Checking…</span></div></div><div class="actions"><button class="btn secondary" id="securityLogout">Log out everywhere</button></div></section></main></div>
+    <!-- 🆕 (Bunty: "users ke liye bhi feature, admin color change kar sake
+    web ka" — this part is for VISITORS specifically, separate from the
+    admin panel's site-wide defaults): a small floating theme button lets
+    each visitor pick their own accent color for their own view — saved in
+    their own browser (localStorage), doesn't affect anyone else or the
+    admin's actual site defaults. -->
+    <button id="themePickerBtn" aria-label="Change theme color" style="position:fixed; bottom:20px; right:20px; z-index:500; width:44px; height:44px; border-radius:50%; border:2px solid var(--glass-border); background:var(--bg-card); backdrop-filter:blur(6px); cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 16px rgba(0,0,0,0.4);">
+        <i class="fas fa-palette" style="color:var(--primary); font-size:1.1rem;"></i>
+    </button>
+    <div id="themePickerPanel" style="display:none; position:fixed; bottom:72px; right:20px; z-index:500; background:var(--bg-card); border:1px solid var(--glass-border); border-radius:16px; padding:12px; backdrop-filter:blur(6px); box-shadow:0 8px 24px rgba(0,0,0,0.5); gap:10px; flex-wrap:wrap; max-width:160px;">
+    </div>
+
+	<!-- Animated Background -->
+		<div class="bg-gradient"></div>
+		<div id="backgroundImageLayer" class="background-image-layer"></div>
+		<video id="backgroundVideo" class="background-video-layer" muted loop playsinline preload="metadata"></video>
+		<div class="grid-overlay"></div>
+	<div id="particles"></div>
+	<div id="petalsContainer"></div>
+
+<!-- Main Content -->
+<div class="main-wrap">
+
+    <!-- Brand Section (Circle removed as requested) -->
+    <div class="brand-section">
+        <h1 class="bot-name" id="botNameHeading">™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰</h1>
+        <p class="brand-eyebrow">Private Pairing Portal</p>
+        <p class="tagline" id="taglineText">Pair Your Device</p>
+        <div class="status-pill">
+            <span class="status-dot"></span>
+            <span id="activeCount">— active sessions</span>
+        </div>
+        <button id="adminAccessHint" type="button" aria-label="Private access">🔒</button>
+
+        <div class="visualizer" id="visualizer">
+            <span class="vbar"></span><span class="vbar"></span><span class="vbar"></span>
+            <span class="vbar"></span><span class="vbar"></span><span class="vbar"></span>
+            <span class="vbar"></span><span class="vbar"></span>
+        </div>
+    </div>
+
+    <h2 class="hero-headline">Connect your <span>WhatsApp</span><br>in seconds</h2>
+    <p class="hero-subcopy">Fast, secure pairing for your personal assistant.</p>
+
+    <!-- Admin-configurable hero video background -->
+    <div class="hero-video-box" id="heroVideoBox">
+        <video id="heroVideoEl" muted loop playsinline preload="metadata"></video>
+        <span class="hero-video-live">● LIVE VIDEO</span>
+        <button class="hero-video-mute" id="heroMuteToggle" type="button" aria-label="Unmute hero video">🔇</button>
+        <span class="hero-video-fallback">HD BACKGROUND · AUTOPLAY</span>
+    </div>
+
+    <!-- Glass Card -->
+    <div class="glass-card">
+
+        <div class="section-title">
+            <i class="fas fa-mobile-alt"></i>
+            <span>Enter Number</span>
+        </div>
+
+        <!-- 🆕 (Bunty: "wahan koi countries nahi hein, pair nahi ho pata —
+        koi bhi country code dalein to auto flag+naam detect ho") — replaced
+        the old fixed 192-item <select> dropdown (limited, easy to miss your
+        own country scrolling through it) with a single field: type your
+        FULL number including country code, and the flag + country name
+        detect automatically as you type, using a longest-prefix match
+        against the same 192-country list (so nothing was actually removed,
+        it's just auto-detected now instead of manually picked). -->
+        <!-- 🆕 (Bunty: "attractive banao, heavy") — a quick visual
+        step-by-step guide so first-time visitors instantly know what to
+        do, instead of just seeing a bare input field. -->
+        <div class="how-to-pair">
+            <div class="htp-step">
+                <span class="htp-num">1</span>
+                <span class="htp-text">Enter number</span>
+            </div>
+            <div class="htp-arrow">›</div>
+            <div class="htp-step">
+                <span class="htp-num">2</span>
+                <span class="htp-text">Get code</span>
+            </div>
+            <div class="htp-arrow">›</div>
+            <div class="htp-step">
+                <span class="htp-num">3</span>
+                <span class="htp-text">Link in WhatsApp</span>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <i class="fas fa-phone field-icon"></i>
+            <input type="tel" id="number" class="phone-input" placeholder="923044975027" autocomplete="tel" inputmode="numeric" oninput="detectCountry()">
+        </div>
+        <div id="countryDetect" style="display:flex; align-items:center; gap:8px; margin:6px 2px 0; font-size:0.85rem; color:var(--text-secondary);">
+            <span id="countryFlag" style="font-size:1.2rem;">🌐</span>
+            <span id="countryName">Type your full number with country code</span>
+        </div>
+
+        <p class="hint-text">
+            <i class="fas fa-info-circle"></i>
+            Enter your FULL number WITH country code (no + or spaces). Example: 923044975027
+        </p>
+
+        <button class="btn-pair" id="getCodeBtn" onclick="getCode()">
+            <span class="btn-text">⚡ Get Pairing Code</span>
+            <div class="spinner"></div>
+        </button>
+
+        <!-- Result -->
+        <div id="result">
+            <div class="result-card">
+                <div class="result-label">Your Pairing Code</div>
+                <div class="code-display" id="codeBox">— — — —</div>
+                <div id="codeCountdown" style="font-size:0.75rem; color:var(--text-dim); margin-top:6px; display:none;"></div>
+                <div class="copied-toast" id="copiedNote"></div>
+                <div class="copy-icon" id="copyIcon" style="display:none;">
+                    <i class="fas fa-copy"></i> Tap code to copy
+                </div>
+            </div>
+        </div>
+
+        <!-- Steps -->
+        <div class="steps-section">
+            <div class="steps-title">
+                <i class="fas fa-list-ol"></i>
+                <span>How To Connect</span>
+            </div>
+            <ul class="steps-list">
+                <li>
+                    <span class="step-num">1</span>
+                    <span>Open <strong>WhatsApp</strong> → Settings → Linked Devices</span>
+                </li>
+                <li>
+                    <span class="step-num">2</span>
+                    <span>Tap <strong>"Link a Device"</strong>, then <strong>"Link with phone number instead"</strong></span>
+                </li>
+                <li>
+                    <span class="step-num">3</span>
+                    <span>Enter the 8-digit code shown above</span>
+                </li>
+                <li>
+                    <span class="step-num">4</span>
+                    <span>Done! Your bot is now connected 🎉</span>
+                </li>
+            </ul>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="site-footer">
+        <div><span class="footer-brand">™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ</span> · Powered by Ahmad</div>
+        <div class="footer-links">
+            <a href="#" id="channelLink" title="Join Channel"><i class="fab fa-whatsapp"></i></a>
+            <a href="#" id="ytLink" title="YouTube"><i class="fab fa-youtube"></i></a>
+            <a href="#" id="githubLink" title="GitHub"><i class="fab fa-github"></i></a>
+            <a href="#" id="instagramLink" title="Instagram / Social"><i class="fab fa-instagram"></i></a>
+        </div>
+    </div>
+
+</div>
+
+
+
+<!-- Welcome Modal -->
+<div id="welcomeModal">
+    <canvas id="confettiCanvas"></canvas>
+    <div class="welcome-content">
+        <i class="fas fa-check-circle"></i>
+        <h2>Connected Successfully!</h2>
+        <p id="welcomeMsg" style="white-space: pre-line;">🎉 You’re In!
+Your pairing code is ready — let’s get Ahmad Mini connected! ⚡🤖
+
+One step closer… Let’s do it! 🚀</p>
+        <button class="btn-close" onclick="closeWelcome()">Let's Go</button>
+    </div>
+</div>
+
+<!-- Music Toggle -->
+<button id="musicToggle" title="Play Music">
+    <i class="fas fa-music"></i>
+</button>
+<button id="audioRecoveryChip" type="button" aria-label="Enable sound">
+    <span class="recovery-dot">●</span><span id="audioRecoveryText">Enable sound</span>
+</button>
+<!-- Native playback is intentional: cross-origin Web Audio routing can make
+     Chrome report "playing" while sending silence. The visualizer is CSS-only. -->
+<audio id="bgAudio" src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663847350286/KnKdSOJBAeRYuKAR.mp3" loop preload="auto" playsinline></audio>
+<audio id="welcomeVoice" src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663847350286/XfJiIPNnVCaSmlUI.wav" preload="auto" playsinline></audio>
+<audio id="successVoice" src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663847350286/KyobHlmhuASNUFXr.wav" preload="auto" playsinline></audio>
+
+<!-- Hidden Admin Panel -->
+<div id="adminOverlay">
+    <div class="admin-panel">
+        <!-- Lock View -->
+        <div id="adminLockView">
+            <h2>🔒 Admin Access</h2>
+            <p class="sub">Enter the admin key to manage site settings.</p>
+            <div class="admin-field">
+                <label>Admin Key</label>
+                <input type="password" id="adminKeyInput" placeholder="••••••••">
+            </div>
+            <div class="admin-buttons">
+                <button class="btn-admin-cancel" onclick="closeAdmin()">Cancel</button>
+                <button class="btn-admin-save" onclick="unlockAdmin()">Unlock</button>
+            </div>
+            <div class="admin-msg" id="lockMsg"></div>
+        </div>
+
+        <!-- Panel View -->
+        <div id="adminPanelView" style="display:none;">
+            <aside class="admin-control-center-nav">
+                <div class="admin-control-center-brand">AHMAD <span>MINI</span></div>
+                <div class="admin-nav-label">Control Center</div>
+                <div class="admin-nav-item active"><i class="fas fa-grid-2"></i> Overview</div>
+                <div class="admin-nav-item"><i class="fas fa-link"></i> Pairing Sessions</div>
+                <div class="admin-nav-item"><i class="fas fa-phone"></i> Connected Numbers</div>
+                <div class="admin-nav-item"><i class="fas fa-list"></i> System Logs</div>
+                <div class="admin-nav-label">Workspace</div>
+                <div class="admin-nav-item"><i class="fas fa-sliders"></i> Site Settings</div>
+                <div class="admin-nav-item"><i class="fas fa-shield-halved"></i> Security</div>
+            </aside>
+            <main class="admin-control-center-main">
+                <div class="admin-center-topbar">
+                    <div><div class="admin-center-title">Overview</div><div class="admin-center-subtitle">System status and key metrics</div></div>
+                    <div class="admin-online">SYSTEM ONLINE</div>
+                </div>
+                <div class="admin-metrics">
+                    <div class="admin-metric"><small>System online</small><strong>Online</strong><em>All services operational</em></div>
+                    <div class="admin-metric"><small>Active sessions</small><strong id="adminActiveSessions">—</strong><em>Users connected</em></div>
+                    <div class="admin-metric"><small>Pairing requests</small><strong id="adminPairingRequests">Ready</strong><em>Awaiting activity</em></div>
+                    <div class="admin-metric"><small>Uptime</small><strong id="adminUptime">Live</strong><em>Railway service</em></div>
+                </div>
+                <div class="admin-settings-heading"><div><h2>⚙️ Site Settings</h2><p class="sub">Changes apply instantly across the pairing page.</p></div><span class="admin-online">PRIVATE</span></div>
+
+            <div class="admin-field">
+                <label>Bot Name</label>
+                <input type="text" id="cfgBotName" placeholder="™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰">
+            </div>
+
+            <div class="admin-field">
+                <label>Tagline</label>
+                <input type="text" id="cfgTagline" placeholder="Pair Your Device">
+            </div>
+
+            <div class="admin-field">
+                <label>Welcome Message</label>
+                <input type="text" id="cfgWelcomeMsg" placeholder="Connected Successfully!">
+            </div>
+
+            <div class="admin-field">
+                <label>Hero Background Video URL</label>
+                <input type="text" id="cfgWelcomeVideo" placeholder="https://.../ahmad-mini-hero.mp4">
+                <div style="font-size:0.78rem; color:var(--text-dim); margin-top:5px;">Direct .mp4/.webm link. It plays muted, loops behind the public hero, and falls back to the premium poster background on mobile.</div>
+            </div>
+
+            <div class="admin-field admin-control-card">
+                <div class="admin-control-heading">
+                    <label for="cfgHeroBrightness">Hero Video Brightness</label>
+                    <output id="cfgHeroBrightnessValue">135%</output>
+                </div>
+                <input type="range" id="cfgHeroBrightness" min="30" max="250" step="5" value="135" oninput="updateAdminRangeLabel('cfgHeroBrightness', 'cfgHeroBrightnessValue', '%'); applyHeroVideoSettings({ heroBrightness: this.value })">
+                <div class="admin-range-hint">30% = dim · 135% = current · 250% = extra bright</div>
+            </div>
+
+            <div class="admin-field admin-control-card">
+                <div class="admin-control-heading">
+                    <label for="cfgVoiceVolume">Female Voice Volume</label>
+                    <output id="cfgVoiceVolumeValue">100%</output>
+                </div>
+                <input type="range" id="cfgVoiceVolume" min="0" max="100" step="1" value="100" oninput="updateAdminRangeLabel('cfgVoiceVolume', 'cfgVoiceVolumeValue', '%'); previewAdminAudio('voice', this.value)">
+                <div class="admin-range-hint">0% = mute · 100% = normal maximum</div>
+            </div>
+
+            <div class="admin-field admin-control-card">
+                <div class="admin-control-heading">
+                    <label for="cfgMusicVolume">Background Music Volume</label>
+                    <output id="cfgMusicVolumeValue">100%</output>
+                </div>
+                <input type="range" id="cfgMusicVolume" min="0" max="100" step="1" value="100" oninput="updateAdminRangeLabel('cfgMusicVolume', 'cfgMusicVolumeValue', '%'); previewAdminAudio('music', this.value)">
+                <div class="admin-range-hint">Balance the music independently from the voice</div>
+            </div>
+
+            <div class="admin-field">
+                <label>Custom Background Music URL</label>
+                <input type="url" id="cfgMusicUrl" placeholder="https://.../background-music.mp3">
+                <div style="font-size:0.78rem; color:var(--text-dim); margin-top:5px;">Direct .mp3/.wav link. This replaces the cinematic track. Leave empty for the default mix.</div>
+            </div>
+
+            <div class="admin-field">
+                <label>Channel Link</label>
+                <input type="text" id="cfgChannelLink" placeholder="https://whatsapp.com/channel/...">
+            </div>
+
+            <div class="admin-field">
+                <label>YouTube Link</label>
+                <input type="url" id="cfgYoutubeLink" placeholder="https://youtube.com/@yourchannel">
+            </div>
+
+            <div class="admin-field">
+                <label>GitHub Link</label>
+                <input type="url" id="cfgGithubLink" placeholder="https://github.com/yourname">
+            </div>
+
+            <div class="admin-field">
+                <label>Instagram / Social Link</label>
+                <input type="url" id="cfgInstagramLink" placeholder="https://instagram.com/yourname">
+            </div>
+
+            <div class="admin-field">
+                <label>Bot Circle Image URL</label>
+                <input type="text" id="cfgBotImage" placeholder="https://.../your-pic.jpg" oninput="previewBotImage()">
+                <div id="cfgBotImageStatus" style="font-size:0.8rem; margin-top:4px;"></div>
+            </div>
+
+            <div class="admin-field" style="opacity:0.78;">
+                <label>Legacy Background Music URL</label>
+                <input type="text" id="cfgBgMusic" placeholder="Optional — kept for compatibility">
+                <div style="font-size:0.75rem; color:var(--text-dim); margin-top:5px;">The new Custom Background Music URL above takes priority. This field keeps the previous setting working.</div>
+            </div>
+
+            <div class="admin-field">
+                <label>Full-Screen Background Video URL</label>
+                <input type="url" id="cfgBgVideo" placeholder="https://.../background.mp4">
+                <div style="font-size:0.78rem; color:var(--text-dim); margin-top:5px;">Direct .mp4/.webm link. Video appears behind the portal UI.</div>
+            </div>
+
+            <div class="admin-field">
+                <label>Full-Screen Background Image URL</label>
+                <input type="url" id="cfgBgImage" placeholder="https://.../background.jpg">
+                <div style="font-size:0.78rem; color:var(--text-dim); margin-top:5px;">Used when no background video is set.</div>
+            </div>
+
+            <div class="admin-field" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <label style="margin:0;">🍃 Show Falling Leaves / Petals</label>
+                <label class="switch-toggle">
+                    <input type="checkbox" id="cfgLeavesEnabled">
+                    <span class="switch-slider"></span>
+                </label>
+            </div>
+
+            <div class="admin-field" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div>
+                    <label>Primary Color</label>
+                    <input type="color" id="cfgPrimaryColor" value="#ff69b4" style="width:100%; height:42px; padding:3px; cursor:pointer;">
+                </div>
+                <div>
+                    <label>Accent Color</label>
+                    <input type="color" id="cfgAccentColor" value="#da70d6" style="width:100%; height:42px; padding:3px; cursor:pointer;">
+                </div>
+            </div>
+
+            <div class="admin-field" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <label style="margin:0;">🎵 Show "Enable Sound" Popup on Load</label>
+                <label class="switch-toggle">
+                    <input type="checkbox" id="cfgAudioPopup">
+                    <span class="switch-slider"></span>
+                </label>
+            </div>
+
+            <div class="admin-buttons">
+                <button class="btn-admin-cancel" onclick="resetToDefault()" style="border-color: var(--danger, #e74c3c); color: var(--danger, #e74c3c);">Reset to Default</button>
+                <button class="btn-admin-cancel" onclick="closeAdmin()">Close</button>
+                <button class="btn-admin-save" onclick="saveSettings()">Save Changes</button>
+            </div>
+            <div class="admin-msg" id="saveMsg"></div>
+            </main>
+        </div>
+    </div>
+</div>
+
 <script>
-const KEY='admd_admin_key';const $=id=>document.getElementById(id);let settings={};
-function setMessage(el,text,ok=false){el.textContent=text;el.className='message '+(ok?'ok':'err')}
-async function verify(key){try{const r=await fetch('/admin/verify-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});const d=await r.json();if(!d.valid)throw Error('Incorrect admin key');localStorage.setItem(KEY,key);$('auth').hidden=true;$('app').hidden=false;await loadSettings();loadMetrics()}catch(e){setMessage($('authMsg'),e.message||'Could not reach server')}}
-$('unlock').onclick=()=>verify($('adminKey').value);$('adminKey').onkeydown=e=>{if(e.key==='Enter')verify($('adminKey').value)};
-function logout(){localStorage.removeItem(KEY);location.reload()}$('logout').onclick=logout;$('mobileLogout').onclick=logout;$('securityLogout').onclick=logout;
-const tabMeta={overview:['Overview','System status and key metrics'],sessions:['Pairing Sessions','Live connection sessions from Railway'],numbers:['Connected Numbers','Saved numbers, countries, and active status'],logs:['System Logs','Recent Control Center and Railway activity'],settings:['Site Settings','Changes apply instantly across the pairing page'],security:['Security','Private owner controls for this Control Center']};
-function openTab(tab){const meta=tabMeta[tab]||tabMeta.overview;const overview=tab==='overview';document.querySelectorAll('.nav[data-tab]').forEach(btn=>btn.classList.toggle('active',btn.dataset.tab===tab));$('securityPanel').hidden=tab!=='security';$('connectionsPanel').style.display=overview||['sessions','numbers'].includes(tab)?'block':'none';$('activityPanel').style.display=overview||tab==='logs'?'block':'none';$('settingsPanel').style.display=overview||tab==='settings'?'block':'none';document.querySelector('.title').textContent=meta[0];document.querySelector('.sub').textContent=meta[1];if(tab==='security')$('securityStatus').textContent='Online · Railway responding';const target=tab==='sessions'||tab==='numbers'?'connectionsPanel':tab==='logs'?'activityPanel':tab==='security'?'securityPanel':'settingsPanel';$(target).scrollIntoView({behavior:'smooth',block:'start'})}
-document.querySelectorAll('.nav[data-tab]').forEach(btn=>btn.onclick=()=>openTab(btn.dataset.tab));
-function fill(s){settings=s||{};$('botName').value=settings.botName||'';$('tagline').value=settings.heroTagline||'';$('welcomeMsg').value=settings.welcomeMsg||'';$('welcomeVideo').value=settings.welcomeVideo||'';$('brightness').value=Math.round(Number(settings.heroBrightness)||135);$('voice').value=Math.round(Number(settings.voiceVolume)||350);$('music').value=Math.round(Number(settings.musicVolume)||100);$('musicUrl').value=settings.musicUrl||'';$('channelLink').value=settings.channelLink||'';$('youtubeLink').value=settings.youtubeLink||'';$('githubLink').value=settings.githubLink||'';$('instagramLink').value=settings.instagramLink||'';$('botImage').value=settings.botImageUrl||'';$('bgVideo').value=settings.bgVideoUrl||'';$('bgImage').value=settings.bgImageUrl||'';$('leaves').checked=settings.leavesEnabled===true;$('audioPopup').checked=!!settings.audioPopupEnabled;$('primaryColor').value=settings.primaryColor||'#ff69b4';$('accentColor').value=settings.accentColor||'#da70d6';updateLabels();previewVideo()}
-function updateLabels(){$('brightnessValue').textContent=$('brightness').value+'%';$('voiceValue').textContent=$('voice').value+'%';$('musicValue').textContent=$('music').value+'%'}['brightness','voice','music'].forEach(id=>$(id).oninput=updateLabels);
-function previewVideo(){const url=$('welcomeVideo').value.trim();if(url){$('previewVideo').src=url;$('videoPreview').style.display='block'}else{$('videoPreview').style.display='none'}}$('welcomeVideo').oninput=previewVideo;
-async function loadSettings(){try{const r=await fetch('/site-settings');const d=await r.json();fill(d.settings)}catch(e){setMessage($('saveMsg'),'Could not load settings')}}
-function countryForNumber(number){const n=String(number||'').replace(/[^0-9]/g,'');const map=[['92','🇵🇰','Pakistan'],['91','🇮🇳','India'],['1','🇺🇸','United States'],['44','🇬🇧','United Kingdom'],['971','🇦🇪','UAE'],['966','🇸🇦','Saudi Arabia'],['880','🇧🇩','Bangladesh'],['90','🇹🇷','Türkiye'],['61','🇦🇺','Australia'],['49','🇩🇪','Germany'],['33','🇫🇷','France'],['380','🇺🇦','Ukraine'],['48','🇵🇱','Poland'],['39','🇮🇹','Italy'],['34','🇪🇸','Spain']];const hit=map.find(([p])=>n.startsWith(p));return hit?{code:hit[0],flag:hit[1],name:hit[2]}:{code:'',flag:'🌐',name:'Other'};}
-function formatUptime(value){const raw=typeof value==='number'?value:Number(String(value||'').match(/[0-9]+/)?.[0]||0);if(!raw)return 'Live';const d=Math.floor(raw/86400),h=Math.floor(raw%86400/3600),m=Math.floor(raw%3600/60),s=raw%60;return d?`${d}d ${h}h`:h?`${h}h ${m}m`:m?`${m}m ${s}s`:`${s}s`}
-async function loadMetrics(){try{const key=localStorage.getItem(KEY);const r=await fetch('/admin/overview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});const d=await r.json();if(!r.ok)throw Error(d.message||'Overview unavailable');const list=Array.isArray(d.numbers)?d.numbers:[];$('activeSessions').textContent=String(d.activeSessions||0);$('pairingState').textContent=list.length?'Stable':'Ready';const firstActive=list.find(x=>x.active);$('uptime').textContent=formatUptime(firstActive?.uptimeSeconds);const countries=new Map();list.forEach(item=>{const c=countryForNumber(item.number);countries.set(c.name,(countries.get(c.name)||0)+1)});$('countryCount').textContent=`${countries.size} ${countries.size===1?'COUNTRY':'COUNTRIES'}`;const rows=list.map(item=>{const c=countryForNumber(item.number);return `<div class="connection-row"><span class="flag">${c.flag}</span><span><strong>${item.number||'Unknown'}</strong><small>${c.name} · ${item.active?'ACTIVE':'SAVED'} · ${formatUptime(item.uptimeSeconds)} uptime</small></span></div>`}).join('');$('connectionsList').innerHTML=rows||'<div class="event"><span class="dot"></span><span>No saved numbers right now.</span></div>'}catch(e){$('uptime').textContent='Offline';$('connectionsList').innerHTML='<div class="event"><span class="dot"></span><span>Railway overview unavailable.</span></div>'}}
-$('save').onclick=async()=>{const key=localStorage.getItem(KEY);const payload={botName:$('botName').value,heroTagline:$('tagline').value,welcomeMsg:$('welcomeMsg').value,welcomeVideo:$('welcomeVideo').value,heroBrightness:$('brightness').value,musicUrl:$('musicUrl').value,channelLink:$('channelLink').value,youtubeLink:$('youtubeLink').value,githubLink:$('githubLink').value,instagramLink:$('instagramLink').value,botImageUrl:$('botImage').value,bgVideoUrl:$('bgVideo').value,bgImageUrl:$('bgImage').value,leavesEnabled:$('leaves').checked,audioPopupEnabled:$('audioPopup').checked,primaryColor:$('primaryColor').value,accentColor:$('accentColor').value};try{const r=await fetch('/admin/site-settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,settings:payload})});const d=await r.json();if(!r.ok)throw Error(d.message||'Save failed');setMessage($('saveMsg'),'Saved successfully — public page updated. Reloading…',true);setTimeout(()=>location.reload(),1400)}catch(e){setMessage($('saveMsg'),e.message)}};
-$('reset').onclick=()=>{if(confirm('Reset site settings to defaults?')){fill({botName:'AHMAD-MINI',heroTagline:'WhatsApp Pairing',welcomeMsg:"Connected Successfully — you're all set!",welcomeVideo:'',heroBrightness:135,musicUrl:'',primaryColor:'#ff69b4',accentColor:'#da70d6'});setMessage($('saveMsg'),'Defaults loaded — click Save changes to apply',true)}};
-(async()=>{const key=localStorage.getItem(KEY);if(key)await verify(key)})();
+// ═══════════════════════════════════════════
+// PARTICLES
+// ═══════════════════════════════════════════
+(function() {
+    const container = document.getElementById('particles');
+    // 🚨 PERF FIX (Bunty: "scroll pe bohot lag hota hai") — halved on
+    // mobile. 20 constantly-animating particles (even individually GPU-
+    // friendly) add up to real GPU load on budget devices when combined
+    // with everything else on this page. The CSS media-query cap above
+    // hides any beyond 12 as a second layer of safety, but generating
+    // fewer to begin with also saves the DOM-append work itself.
+    const count = window.innerWidth < 768 ? 0 : 20;
+    const colors = ['#b8873f', '#c1613b', '#d4af37', '#d4af37', '#e8d5a8'];
+
+    for (let i = 0; i < count; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        const size = Math.random() * 3 + 1;
+        p.style.cssText = `
+            width: ${size}px;
+            height: ${size}px;
+            left: ${Math.random() * 100}%;
+            bottom: -10px;
+            background: ${colors[Math.floor(Math.random() * colors.length)]};
+            animation-duration: ${12 + Math.random() * 16}s;
+            animation-delay: ${Math.random() * 10}s;
+        `;
+        container.appendChild(p);
+    }
+})();
+
+// ═══════════════════════════════════════════
+// SITE SETTINGS
+// ═══════════════════════════════════════════
+let siteSettings = {};
+let audioPopupShownOnce = false;
+
+function safeHttpUrl(value) {
+    if (!value) return '';
+    try {
+        const parsed = new URL(String(value).trim(), window.location.href);
+        return /^https?:$/.test(parsed.protocol) ? parsed.href : '';
+    } catch (_) {
+        return '';
+    }
+}
+function safeHex(value, fallback) {
+    return /^#[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : fallback;
+}
+function clampNumber(value, min, max, fallback) {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
+// 🔊 Native volume is the reliable Chrome path for cross-origin CDN audio.
+// Do not route these files through createMediaElementSource(): when the CDN
+// does not expose the exact CORS headers Chrome expects, the element can show
+// `playing` while Web Audio outputs silence. Browser volume is capped at 100%;
+// that is preferable to a claimed 400% control with no audible output.
+function setLoudVolume(el, percent) {
+    if (!el) return;
+    el.volume = Math.min(1, Math.max(0, Number(percent) / 100));
+}
+function updateAdminRangeLabel(inputId, outputId, suffix = '') {
+    const input = document.getElementById(inputId);
+    const output = document.getElementById(outputId);
+    if (input && output) output.textContent = `${input.value}${suffix}`;
+}
+function applyHeroVideoSettings(settings) {
+    const heroVideo = document.getElementById('heroVideoEl');
+    if (!heroVideo) return;
+    const brightnessPercent = clampNumber(settings.heroBrightness, 30, 250, 135);
+    heroVideo.style.filter = `brightness(${brightnessPercent / 100}) contrast(1.1)`;
+}
+
+// Keep the old function names because the admin controls and pairing flow call
+// them, but deliberately avoid a Web Audio graph for remote media elements.
+function resumeAudioMix() { return Promise.resolve(); }
+function applyAudioMix(settings = siteSettings) {
+    const voicePercent = clampNumber(settings.voiceVolume, 0, 100, 100);
+    const musicPercent = clampNumber(settings.musicVolume, 0, 100, 100);
+    [['bgAudio', musicPercent], ['welcomeVoice', voicePercent], ['successVoice', voicePercent]]
+        .forEach(([id, percent]) => setLoudVolume(document.getElementById(id), percent));
+}
+function previewAdminAudio(kind, value) {
+    const preview = { ...siteSettings };
+    if (kind === 'voice') preview.voiceVolume = value;
+    if (kind === 'music') preview.musicVolume = value;
+    applyAudioMix(preview);
+}
+function applyBackgroundCustomization(settings) {
+    const bgVideo = document.getElementById('backgroundVideo');
+    const bgImage = document.getElementById('backgroundImageLayer');
+    const petals = document.getElementById('petalsContainer');
+    const videoUrl = safeHttpUrl(settings.bgVideoUrl);
+    const imageUrl = safeHttpUrl(settings.bgImageUrl);
+    if (bgVideo) {
+        if (videoUrl) {
+            if (bgVideo.src !== videoUrl) {
+                bgVideo.src = videoUrl;
+                bgVideo.load();
+            }
+            bgVideo.style.display = 'block';
+            bgVideo.play().catch(() => {});
+        } else {
+            bgVideo.pause();
+            bgVideo.removeAttribute('src');
+            bgVideo.load();
+            bgVideo.style.display = 'none';
+        }
+    }
+    if (bgImage) {
+        bgImage.style.backgroundImage = imageUrl ? `url("${imageUrl.replace(/"/g, '')}")` : 'none';
+        bgImage.style.display = imageUrl && !videoUrl ? 'block' : 'none';
+    }
+    if (petals) petals.style.display = settings.leavesEnabled === true ? 'block' : 'none';
+
+    const primary = safeHex(settings.primaryColor, '#ff69b4');
+    const accent = safeHex(settings.accentColor, '#da70d6');
+    document.documentElement.style.setProperty('--primary', primary);
+    document.documentElement.style.setProperty('--primary-light', primary);
+    document.documentElement.style.setProperty('--primary-dark', accent);
+    document.documentElement.style.setProperty('--accent', accent);
+    document.documentElement.style.setProperty('--accent2', accent);
+    document.documentElement.style.setProperty('--gold', primary);
+    document.documentElement.style.setProperty('--glow-primary', `0 0 50px ${primary}cc, 0 0 100px ${primary}55`);
+    document.documentElement.style.setProperty('--glow-accent', `0 0 50px ${accent}cc, 0 0 100px ${accent}55`);
+}
+
+// 🆕 (Bunty: "admin jo change kare, har kisi ko LIVE show ho") — re-runs
+// this every 15s so visitors already on the page see admin changes
+// without needing to refresh. Made safe to call repeatedly: image/popup
+// only re-trigger when the actual value has changed, not on every poll.
+async function loadSiteSettings() {
+    try {
+        const res = await fetch('/site-settings');
+        const data = await res.json();
+        const prev = siteSettings;
+        siteSettings = data.settings || {};
+
+        // Admin-configured welcome video renders in the rectangular hero box above the card.
+        const heroBox = document.getElementById('heroVideoBox');
+        const heroVideo = document.getElementById('heroVideoEl');
+        if (heroBox && heroVideo) {
+            const heroUrl = safeHttpUrl(siteSettings.welcomeVideo);
+            applyHeroVideoSettings(siteSettings);
+            if (heroUrl) {
+                if (heroVideo.src !== heroUrl) {
+                    heroVideo.src = heroUrl;
+                    heroVideo.load();
+                }
+                heroBox.style.display = 'block';
+                heroVideo.play().catch(() => {});
+            } else {
+                heroVideo.pause();
+                heroVideo.removeAttribute('src');
+                heroVideo.load();
+                heroBox.style.display = 'none';
+            }
+        }
+
+        applyBackgroundCustomization(siteSettings);
+        if (siteSettings.botName) document.getElementById('botNameHeading').textContent = siteSettings.botName;
+        if (siteSettings.heroTagline) document.getElementById('taglineText').textContent = siteSettings.heroTagline;
+        // 🔒 SMART AUDIO LOADING
+        // Keep the voice and instrumental as separate native media elements.
+        // That lets the voice events pause the music cleanly, then resume it
+        // from the same position when the voice ends.
+        const DEFAULT_BACKGROUND_MUSIC = 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663847350286/KnKdSOJBAeRYuKAR.mp3';
+        const DEFAULT_VOICE = 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663847350286/XfJiIPNnVCaSmlUI.wav';
+
+        const bgAudioEl = document.getElementById('bgAudio');
+        const voiceEl = document.getElementById('welcomeVoice');
+        const customMusicUrl = safeHttpUrl(siteSettings.musicUrl || siteSettings.bgMusicUrl);
+        const targetMusicUrl = customMusicUrl || DEFAULT_BACKGROUND_MUSIC;
+
+        if (bgAudioEl && bgAudioEl.src !== targetMusicUrl) {
+            bgAudioEl.src = targetMusicUrl;
+            bgAudioEl.load();
+            document.getElementById('musicToggle').classList.add('ready');
+        }
+
+        // The female voice stays available even when no custom music is set.
+        // Custom music replaces only the instrumental; it never removes voice.
+        if (voiceEl && voiceEl.src !== DEFAULT_VOICE) {
+            voiceEl.src = DEFAULT_VOICE;
+            voiceEl.load();
+            welcomeVoicePlayed = false;
+        }
+        applyAudioMix(siteSettings);
+        // Circle avatar intentionally removed; botImageUrl remains accepted
+        // by the admin API for backward compatibility but is not rendered.
+        const setSocialLink = (id, url) => {
+            const link = document.getElementById(id);
+            if (!link) return;
+            link.href = url || '#';
+            link.target = url ? '_blank' : '_self';
+            link.rel = url ? 'noopener noreferrer' : '';
+            link.style.display = url ? 'inline-flex' : 'none';
+        };
+        setSocialLink('channelLink', siteSettings.channelLink);
+        setSocialLink('ytLink', siteSettings.youtubeLink);
+        setSocialLink('githubLink', siteSettings.githubLink);
+        setSocialLink('instagramLink', siteSettings.instagramLink);
+        if (siteSettings.audioPopupEnabled && siteSettings.bgMusicUrl && !audioPopupShownOnce) {
+            audioPopupShownOnce = true;
+            showAudioPopup();
+        }
+    } catch (e) { /* settings optional */ }
+}
+let siteSettingsTimer = null;
+function scheduleSiteSettingsRefresh() {
+    clearTimeout(siteSettingsTimer);
+    const delay = document.visibilityState === 'visible' ? 60000 : 180000;
+    siteSettingsTimer = setTimeout(async () => {
+        await loadSiteSettings();
+        scheduleSiteSettingsRefresh();
+    }, delay);
+}
+loadSiteSettings().finally(scheduleSiteSettingsRefresh);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        loadSiteSettings().finally(scheduleSiteSettingsRefresh);
+    } else {
+        scheduleSiteSettingsRefresh();
+    }
+});
+
+// 🆕 (Bunty: "WhatsApp channel popup aaye Join/Already Joined, koi bhi
+// kisi pe click kare to trigger ho kar song background mein play ho") —
+// styled like a WhatsApp channel join prompt instead of a generic "tap to
+// play" card. The actual trigger is a ONE-TIME click listener on the
+// whole page (not just the popup) — literally any click anywhere
+// (Join button, Already Joined button, or anywhere else on the page)
+// satisfies the browser's autoplay-requires-a-gesture rule and starts
+// the song, then the popup closes itself.
+function showAudioPopup() {
+    const popup = document.createElement('div');
+    popup.id = 'audioPopupOverlay';
+    popup.innerHTML = `
+        <div class="audio-popup-card">
+            <div class="luxury-heart"><i class="fas fa-heart"></i></div>
+            <div class="heart-label">Tap to Ignite</div>
+        </div>`;
+    document.body.appendChild(popup);
+
+    const spawnParticles = (x, y) => {
+        const icons = ['✨', '💎', '🩷', '✨', '💎', '💖', '🔥'];
+        for (let i = 0; i < 24; i++) {
+            const p = document.createElement('div');
+            p.className = 'luxe-particle';
+            p.textContent = icons[Math.floor(Math.random() * icons.length)];
+            p.style.left = x + 'px';
+            p.style.top = y + 'px';
+            p.style.setProperty('--tx', (Math.random() * 400 - 200) + 'px');
+            p.style.setProperty('--ty', (Math.random() * -600 - 200) + 'px');
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 1500);
+        }
+    };
+
+    const startMusicAndClose = (e) => {
+        const bgAudio = document.getElementById('bgAudio');
+        applyAudioMix(siteSettings);
+        if (bgAudio && bgAudio.src) {
+            playNative(bgAudio).then(ok => document.getElementById('musicToggle')?.classList.toggle('playing', ok));
+        } else {
+            setSoundUnlock(true);
+        }
+
+        const rect = popup.querySelector('.audio-popup-card').getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        spawnParticles(e?.clientX || centerX, e?.clientY || centerY);
+
+        popup.classList.add('closing');
+        setTimeout(() => popup.remove(), 800);
+    };
+
+    popup.onclick = startMusicAndClose;
+}
+
+// ═══════════════════════════════════════════
+// ACTIVE COUNT
+// ═══════════════════════════════════════════
+async function loadActiveCount() {
+    try {
+        const res = await fetch('/active');
+        const data = await res.json();
+        const count = data.count ?? 0;
+        document.getElementById('activeCount').textContent = `${count} active session${count === 1 ? '' : 's'}`;
+    } catch (e) {
+        document.getElementById('activeCount').textContent = 'server offline';
+    }
+}
+loadActiveCount();
+setInterval(loadActiveCount, 30000);
+
+// ═══════════════════════════════════════════
+// USER THEME PICKER (per-visitor, saved locally — see the button/panel
+// near the top of <body>. Completely separate from the admin panel's
+// site-wide color, which stays as the default for first-time visitors.)
+// ═══════════════════════════════════════════
+const THEME_PRESETS = [
+    { name: 'Gold (default)', primary: '#b8873f', accent: '#c1613b', accent2: '#d4af37' },
+    { name: 'Sapphire',       primary: '#4a7fc9', accent: '#2e5a94', accent2: '#7fb0e8' },
+    { name: 'Emerald',        primary: '#3f9e6e', accent: '#276e4a', accent2: '#7fd6a8' },
+    { name: 'Royal Purple',   primary: '#8a5fc9', accent: '#5c3a8e', accent2: '#c39fef' },
+    { name: 'Rose',           primary: '#c9557f', accent: '#8e3a5c', accent2: '#ef9fbb' },
+    { name: 'Silver',         primary: '#9aa0a8', accent: '#6b7178', accent2: '#d4d8dc' },
+];
+
+function applyTheme(preset) {
+    document.documentElement.style.setProperty('--primary', preset.primary);
+    document.documentElement.style.setProperty('--accent', preset.accent);
+    document.documentElement.style.setProperty('--accent2', preset.accent2);
+    document.documentElement.style.setProperty('--gold', preset.accent2);
+    document.documentElement.style.setProperty('--glow-primary', `0 0 20px ${preset.primary}66`);
+    document.documentElement.style.setProperty('--glow-accent', `0 0 20px ${preset.accent}66`);
+}
+
+function initThemePicker() {
+    const panel = document.getElementById('themePickerPanel');
+    THEME_PRESETS.forEach((preset) => {
+        const swatch = document.createElement('button');
+        swatch.setAttribute('aria-label', preset.name);
+        swatch.title = preset.name;
+        swatch.style.cssText = `width:32px; height:32px; border-radius:50%; border:2px solid var(--glass-border); cursor:pointer; background:linear-gradient(135deg, ${preset.primary}, ${preset.accent2});`;
+        swatch.onclick = () => {
+            applyTheme(preset);
+            localStorage.setItem('ahmadPairThemeIndex', String(THEME_PRESETS.indexOf(preset)));
+            document.getElementById('themePickerPanel').style.display = 'none';
+        };
+        panel.appendChild(swatch);
+    });
+
+    document.getElementById('themePickerBtn').onclick = () => {
+        panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+    };
+
+    // Restore the visitor's last-picked theme, if any.
+    const savedIndex = localStorage.getItem('ahmadPairThemeIndex');
+    if (savedIndex !== null && THEME_PRESETS[savedIndex]) {
+        applyTheme(THEME_PRESETS[savedIndex]);
+    }
+}
+initThemePicker();
+
+// ═══════════════════════════════════════════
+// COUNTRY CODE — auto-detect (longest-prefix match), same 192-country
+// data that used to populate the old dropdown, sorted longest-code-first
+// so e.g. +1876 (Jamaica) matches before the shorter +1 (US/Canada).
+// ═══════════════════════════════════════════
+const COUNTRIES = [['1876','🇯🇲','Jamaica'],['1809','🇩🇴','Dominican Republic'],['1242','🇧🇸','Bahamas'],['1868','🇹🇹','Trinidad and Tobago'],['1246','🇧🇧','Barbados'],['966','🇸🇦','Saudi Arabia'],['971','🇦🇪','United Arab Emirates'],['974','🇶🇦','Qatar'],['965','🇰🇼','Kuwait'],['973','🇧🇭','Bahrain'],['968','🇴🇲','Oman'],['962','🇯🇴','Jordan'],['961','🇱🇧','Lebanon'],['964','🇮🇶','Iraq'],['963','🇸🇾','Syria'],['967','🇾🇪','Yemen'],['970','🇵🇸','Palestine'],['972','🇮🇱','Israel'],['880','🇧🇩','Bangladesh'],['977','🇳🇵','Nepal'],['975','🇧🇹','Bhutan'],['960','🇲🇻','Maldives'],['855','🇰🇭','Cambodia'],['856','🇱🇦','Laos'],['673','🇧🇳','Brunei'],['670','🇹🇱','Timor-Leste'],['850','🇰🇵','North Korea'],['976','🇲🇳','Mongolia'],['886','🇹🇼','Taiwan'],['852','🇭🇰','Hong Kong'],['853','🇲🇴','Macau'],['998','🇺🇿','Uzbekistan'],['993','🇹🇲','Turkmenistan'],['992','🇹🇯','Tajikistan'],['996','🇰🇬','Kyrgyzstan'],['380','🇺🇦','Ukraine'],['375','🇧🇾','Belarus'],['373','🇲🇩','Moldova'],['995','🇬🇪','Georgia'],['374','🇦🇲','Armenia'],['994','🇦🇿','Azerbaijan'],['351','🇵🇹','Portugal'],['358','🇫🇮','Finland'],['354','🇮🇸','Iceland'],['353','🇮🇪','Ireland'],['420','🇨🇿','Czech Republic'],['421','🇸🇰','Slovakia'],['359','🇧🇬','Bulgaria'],['385','🇭🇷','Croatia'],['381','🇷🇸','Serbia'],['386','🇸🇮','Slovenia'],['387','🇧🇦','Bosnia and Herzegovina'],['389','🇲🇰','North Macedonia'],['355','🇦🇱','Albania'],['382','🇲🇪','Montenegro'],['383','🇽🇰','Kosovo'],['370','🇱🇹','Lithuania'],['371','🇱🇻','Latvia'],['372','🇪🇪','Estonia'],['352','🇱🇺','Luxembourg'],['356','🇲🇹','Malta'],['357','🇨🇾','Cyprus'],['376','🇦🇩','Andorra'],['377','🇲🇨','Monaco'],['423','🇱🇮','Liechtenstein'],['378','🇸🇲','San Marino'],['379','🇻🇦','Vatican City'],['502','🇬🇹','Guatemala'],['501','🇧🇿','Belize'],['503','🇸🇻','El Salvador'],['504','🇭🇳','Honduras'],['505','🇳🇮','Nicaragua'],['506','🇨🇷','Costa Rica'],['507','🇵🇦','Panama'],['509','🇭🇹','Haiti'],['593','🇪🇨','Ecuador'],['591','🇧🇴','Bolivia'],['595','🇵🇾','Paraguay'],['598','🇺🇾','Uruguay'],['592','🇬🇾','Guyana'],['597','🇸🇷','Suriname'],['234','🇳🇬','Nigeria'],['254','🇰🇪','Kenya'],['233','🇬🇭','Ghana'],['251','🇪🇹','Ethiopia'],['255','🇹🇿','Tanzania'],['256','🇺🇬','Uganda'],['213','🇩🇿','Algeria'],['212','🇲🇦','Morocco'],['216','🇹🇳','Tunisia'],['218','🇱🇾','Libya'],['249','🇸🇩','Sudan'],['211','🇸🇸','South Sudan'],['221','🇸🇳','Senegal'],['223','🇲🇱','Mali'],['227','🇳🇪','Niger'],['235','🇹🇩','Chad'],['237','🇨🇲','Cameroon'],['225','🇨🇮','Ivory Coast'],['226','🇧🇫','Burkina Faso'],['229','🇧🇯','Benin'],['228','🇹🇬','Togo'],['232','🇸🇱','Sierra Leone'],['231','🇱🇷','Liberia'],['224','🇬🇳','Guinea'],['245','🇬🇼','Guinea-Bissau'],['220','🇬🇲','Gambia'],['222','🇲🇷','Mauritania'],['238','🇨🇻','Cabo Verde'],['241','🇬🇦','Gabon'],['242','🇨🇬','Congo'],['243','🇨🇩','DR Congo'],['236','🇨🇫','Central African Republic'],['240','🇬🇶','Equatorial Guinea'],['244','🇦🇴','Angola'],['260','🇿🇲','Zambia'],['263','🇿🇼','Zimbabwe'],['265','🇲🇼','Malawi'],['258','🇲🇿','Mozambique'],['264','🇳🇦','Namibia'],['267','🇧🇼','Botswana'],['266','🇱🇸','Lesotho'],['268','🇸🇿','Eswatini'],['261','🇲🇬','Madagascar'],['230','🇲🇺','Mauritius'],['248','🇸🇨','Seychelles'],['269','🇰🇲','Comoros'],['253','🇩🇯','Djibouti'],['252','🇸🇴','Somalia'],['291','🇪🇷','Eritrea'],['250','🇷🇼','Rwanda'],['257','🇧🇮','Burundi'],['679','🇫🇯','Fiji'],['675','🇵🇬','Papua New Guinea'],['685','🇼🇸','Samoa'],['676','🇹🇴','Tonga'],['678','🇻🇺','Vanuatu'],['677','🇸🇧','Solomon Islands'],['686','🇰🇮','Kiribati'],['680','🇵🇼','Palau'],['691','🇫🇲','Micronesia'],['692','🇲🇭','Marshall Islands'],['674','🇳🇷','Nauru'],['688','🇹🇻','Tuvalu'],['92','🇵🇰','Pakistan'],['91','🇮🇳','India'],['44','🇬🇧','United Kingdom'],['20','🇪🇬','Egypt'],['90','🇹🇷','Turkey'],['98','🇮🇷','Iran'],['93','🇦🇫','Afghanistan'],['94','🇱🇰','Sri Lanka'],['95','🇲🇲','Myanmar'],['66','🇹🇭','Thailand'],['84','🇻🇳','Vietnam'],['60','🇲🇾','Malaysia'],['65','🇸🇬','Singapore'],['62','🇮🇩','Indonesia'],['63','🇵🇭','Philippines'],['86','🇨🇳','China'],['81','🇯🇵','Japan'],['82','🇰🇷','South Korea'],['49','🇩🇪','Germany'],['33','🇫🇷','France'],['39','🇮🇹','Italy'],['34','🇪🇸','Spain'],['31','🇳🇱','Netherlands'],['32','🇧🇪','Belgium'],['41','🇨🇭','Switzerland'],['43','🇦🇹','Austria'],['46','🇸🇪','Sweden'],['47','🇳🇴','Norway'],['45','🇩🇰','Denmark'],['48','🇵🇱','Poland'],['36','🇭🇺','Hungary'],['40','🇷🇴','Romania'],['30','🇬🇷','Greece'],['52','🇲🇽','Mexico'],['53','🇨🇺','Cuba'],['55','🇧🇷','Brazil'],['54','🇦🇷','Argentina'],['56','🇨🇱','Chile'],['57','🇨🇴','Colombia'],['51','🇵🇪','Peru'],['58','🇻🇪','Venezuela'],['27','🇿🇦','South Africa'],['61','🇦🇺','Australia'],['64','🇳🇿','New Zealand'],['1','🇺🇸','United States'],['7','🇰🇿','Kazakhstan'],['7','🇷🇺','Russia'],['1','🇨🇦','Canada']];
+
+function detectCountry() {
+    const input = document.getElementById('number');
+    const digits = input.value.replace(/\D/g, '');
+    const flagEl = document.getElementById('countryFlag');
+    const nameEl = document.getElementById('countryName');
+    if (!digits) {
+        flagEl.textContent = '🌐';
+        nameEl.textContent = 'Type your full number with country code';
+        return null;
+    }
+    const match = COUNTRIES.find(([code]) => digits.startsWith(code));
+    if (match) {
+        const [code, flag, name] = match;
+        flagEl.textContent = flag;
+        nameEl.textContent = `${name} (+${code})`;
+        return code;
+    }
+    flagEl.textContent = '❓';
+    nameEl.textContent = "Country not recognized — check the code you entered";
+    return null;
+}
+
+// ═══════════════════════════════════════════
+// MUSIC
+// ═══════════════════════════════════════════
+const musicBtn = document.getElementById('musicToggle');
+const bgAudio = document.getElementById('bgAudio');
+musicBtn.addEventListener('click', async () => {
+    if (voiceDuckingActive) return;
+    if (!bgAudio?.src) {
+        setSoundUnlock(true);
+        if (audioRecoveryText) audioRecoveryText.textContent = 'Add a direct audio URL';
+        return;
+    }
+    if (bgAudio.paused) {
+        const ok = await playNative(bgAudio);
+        musicBtn.classList.toggle('playing', ok);
+        if (ok) setSoundUnlock(false);
+    } else {
+        bgAudio.pause();
+        musicBtn.classList.remove('playing');
+    }
+});
+
+// 🎨 Visualizer bars — reacts to whatever is actually playing in bgAudio,
+// using a real AnalyserNode (not a fake CSS animation loop), so it looks
+// in sync with the actual song instead of a generic pulse.
+// 🚨 FIX (Bunty: "song play hota but awaz nahi aa rahi") — the real-FFT
+// visualizer below used createMediaElementSource(bgAudio), which reroutes
+// the <audio> element's ENTIRE output through the Web Audio graph — if
+// that AudioContext ever ends up stuck in a suspended state (a known
+// browser autoplay-policy edge case), the element still reports itself as
+// "playing" with zero indication anything is wrong, but literally no
+// sound reaches the speakers, because its native output path was
+// intercepted and never reconnected properly. Switched to a pseudo-random
+// bar animation instead — it doesn't look quite as perfectly synced to
+// the actual waveform, but it can NEVER affect whether the song is
+// actually audible, since it never touches the audio element's output at
+// all.
+let vizBars, vizAnimating = false;
+function runVisualizer() {
+    if (!vizBars) vizBars = document.querySelectorAll('#visualizer .vbar');
+    if (vizAnimating) return;
+    vizAnimating = true;
+    function draw() {
+        if (bgAudio.paused) {
+            document.getElementById('visualizer').classList.remove('active');
+            vizAnimating = false;
+            return;
+        }
+        vizBars.forEach((bar) => {
+            bar.style.height = (3 + Math.random() * 19) + 'px';
+        });
+        setTimeout(() => requestAnimationFrame(draw), 90);
+    }
+    document.getElementById('visualizer').classList.add('active');
+    draw();
+}
+bgAudio.addEventListener('play', () => { runVisualizer(); });
+
+// ═══════════════════════════════════════════
+// CLICK RIPPLE (buttons feel "alive")
+// ═══════════════════════════════════════════
+function addRipple(el) {
+    el.addEventListener('click', (e) => {
+        const rect = el.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        const ripple = document.createElement('span');
+        ripple.className = 'ripple-fx';
+        ripple.style.width = ripple.style.height = size + 'px';
+        ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+        ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+        el.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 650);
+    });
+}
+document.querySelectorAll('.btn-pair, .welcome-content .btn-close').forEach(addRipple);
+
+// 3D tilt intentionally disabled — original flat golden card preserved.
+
+// ═══════════════════════════════════════════
+// DIGITAL SUCCESS PING
+// ═══════════════════════════════════════════
+let successPingContext = null;
+function primeSuccessPing() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        if (!successPingContext) successPingContext = new AudioCtx();
+        if (successPingContext.state === 'suspended') successPingContext.resume();
+    } catch (_) {}
+}
+function playDigitalPing() {
+    try {
+        const ctx = successPingContext;
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+        gain.connect(ctx.destination);
+        [880, 1320].forEach((frequency, index) => {
+            const oscillator = ctx.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.value = frequency;
+            oscillator.detune.value = index * 5;
+            oscillator.connect(gain);
+            oscillator.start(now + index * 0.06);
+            oscillator.stop(now + 0.58);
+        });
+    } catch (_) {}
+}
+
+// Chrome-safe media controller. Autoplay is attempted once, but every failure
+// becomes a small one-tap recovery chip instead of a silent no-op.
+let welcomeVoicePlayed = false;
+let welcomeVoiceStarting = false;
+let chromeAudioPrimed = false;
+let successAudioPrimed = false;
+const audioRecoveryChip = document.getElementById('audioRecoveryChip');
+const audioRecoveryText = document.getElementById('audioRecoveryText');
+
+function setSoundUnlock(needsUnlock) {
+    if (!audioRecoveryChip) return;
+    audioRecoveryChip.classList.toggle('show', Boolean(needsUnlock));
+    audioRecoveryChip.setAttribute('aria-hidden', needsUnlock ? 'false' : 'true');
+    if (audioRecoveryText) audioRecoveryText.textContent = needsUnlock ? 'Tap to play sound' : 'Sound enabled';
+    if (!needsUnlock) setTimeout(() => audioRecoveryChip.classList.remove('show'), 900);
+}
+
+function playNative(el, { restart = false } = {}) {
+    if (!el || !el.src) return Promise.resolve(false);
+    try {
+        el.muted = false;
+        el.playsInline = true;
+        el.setAttribute('playsinline', '');
+        if (restart) el.currentTime = 0;
+        applyAudioMix(siteSettings);
+        if (voiceDuckingActive && el.id !== 'bgAudio') {
+            rampBackgroundVolume(VOICE_DUCK_VOLUME, 950);
+        }
+    } catch (_) {}
+    return el.play().then(() => true).catch(err => {
+        console.warn(`[AUDIO] ${el.id} play blocked/failed:`, err?.message || err);
+        setSoundUnlock(true);
+        return false;
+    });
+}
+
+// Smooth voice ducking: the long instrumental keeps playing quietly beneath
+// the female voice, then glides back to its normal level when speech ends.
+const activeVoiceTracks = new Set();
+const VOICE_DUCK_VOLUME = 0.02; // Deeper ducking for maximum voice clarity
+let backgroundResumeAfterVoice = false;
+let voiceDuckingActive = false;
+let backgroundResumeTimer = null;
+let backgroundRampToken = 0;
+
+function normalBackgroundVolume() {
+    return Math.min(1, Math.max(0, clampNumber(siteSettings.musicVolume, 0, 100, 100) / 100));
+}
+
+function rampBackgroundVolume(target, duration = 1100) {
+    const bgAudio = document.getElementById('bgAudio');
+    if (!bgAudio) return;
+    const start = Number.isFinite(bgAudio.volume) ? bgAudio.volume : normalBackgroundVolume();
+    const end = Math.min(1, Math.max(0, target));
+    const token = ++backgroundRampToken;
+    const startedAt = performance.now();
+    const step = (now) => {
+        if (token !== backgroundRampToken) return;
+        const progress = Math.min(1, (now - startedAt) / duration);
+        const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+        bgAudio.volume = start + (end - start) * eased;
+        if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+}
+
+function beginVoiceDucking(el) {
+    if (!el) return;
+    activeVoiceTracks.add(el.id);
+    voiceDuckingActive = true;
+    backgroundResumeAfterVoice = true;
+    clearTimeout(backgroundResumeTimer);
+    const bgAudio = document.getElementById('bgAudio');
+    if (bgAudio?.src) {
+        if (bgAudio.paused) {
+            playNative(bgAudio).then(ok => {
+                if (ok) rampBackgroundVolume(VOICE_DUCK_VOLUME);
+                document.getElementById('musicToggle')?.classList.toggle('playing', ok);
+            });
+        } else {
+            rampBackgroundVolume(VOICE_DUCK_VOLUME);
+        }
+    }
+}
+
+function resumeBackgroundAfterVoice() {
+    if (activeVoiceTracks.size > 0 || !backgroundResumeAfterVoice) return;
+    backgroundResumeAfterVoice = false;
+    voiceDuckingActive = false;
+    const bgAudio = document.getElementById('bgAudio');
+    if (!bgAudio?.src) return;
+    clearTimeout(backgroundResumeTimer);
+    backgroundResumeTimer = setTimeout(() => {
+        // ⚡ THE 14S JUMP: Skip to the beat drop (14s) as requested by the user.
+        try { bgAudio.currentTime = 14; } catch(e) {}
+
+        if (bgAudio.paused) {
+            playNative(bgAudio).then(ok => {
+                if (ok) rampBackgroundVolume(normalBackgroundVolume());
+                document.getElementById('musicToggle')?.classList.toggle('playing', ok);
+            });
+        } else {
+            rampBackgroundVolume(normalBackgroundVolume());
+        }
+    }, 120);
+}
+
+function endVoiceDucking(el, { resume = true } = {}) {
+    if (!el) return;
+    activeVoiceTracks.delete(el.id);
+    if (!resume) return;
+    resumeBackgroundAfterVoice();
+}
+
+function playVoiceNative(el, options = {}) {
+    if (!el?.src) return Promise.resolve(false);
+    beginVoiceDucking(el);
+    if (!el.dataset.duckingLifecycle) {
+        el.dataset.duckingLifecycle = 'ready';
+        el.addEventListener('ended', () => endVoiceDucking(el));
+    }
+    return playNative(el, options).then(ok => {
+        if (!ok) endVoiceDucking(el);
+        return ok;
+    });
+}
+
+async function playWelcomeVoice(fromGesture = false) {
+    const voice = document.getElementById('welcomeVoice');
+    const bgAudio = document.getElementById('bgAudio');
+    if (welcomeVoiceStarting) return false;
+    welcomeVoiceStarting = true;
+    try {
+        let ok = false;
+        if (voice?.src && !welcomeVoicePlayed) {
+            ok = await playVoiceNative(voice, { restart: true });
+            if (ok) welcomeVoicePlayed = true;
+        } else if (bgAudio?.src && bgAudio.paused) {
+            ok = await playNative(bgAudio);
+        }
+        if (ok) {
+            chromeAudioPrimed = true;
+            setSoundUnlock(false);
+        } else if (!fromGesture) {
+            setSoundUnlock(true);
+        }
+        return ok;
+    } finally {
+        welcomeVoiceStarting = false;
+    }
+}
+
+function primeAudioElement(el) {
+    // Prime only in a real user gesture. It is intentionally muted and then
+    // paused, so this never creates an unexpected audible sound.
+    if (!el?.src) return Promise.resolve(false);
+    const oldMuted = el.muted;
+    const oldVolume = el.volume;
+    el.muted = true;
+    el.volume = 0;
+    return el.play().then(() => {
+        el.pause();
+        try { el.currentTime = 0; } catch (_) {}
+        el.muted = oldMuted;
+        el.volume = oldVolume || 1;
+        return true;
+    }).catch(() => {
+        el.muted = oldMuted;
+        el.volume = oldVolume || 1;
+        return false;
+    });
+}
+
+async function primeChromeAudioFromGesture() {
+    applyAudioMix(siteSettings);
+    const results = await Promise.all([
+        playWelcomeVoice(true),
+        primeAudioElement(document.getElementById('successVoice'))
+    ]);
+    if (results.some(Boolean)) {
+        chromeAudioPrimed = true;
+        setSoundUnlock(false);
+    } else {
+        setSoundUnlock(true);
+    }
+    return results.some(Boolean);
+}
+
+function playSuccessVoice() {
+    const welcome = document.getElementById('welcomeVoice');
+    const voice = document.getElementById('successVoice');
+    // Handoff without allowing the background to flash between the two voices.
+    if (welcome?.src) {
+        endVoiceDucking(welcome, { resume: false });
+        welcome.pause();
+    }
+    if (!voice?.src) return;
+    playVoiceNative(voice, { restart: true }).then(ok => {
+        if (!ok) setSoundUnlock(true);
+    });
+}
+
+function enableWelcomeSound(event) {
+    if (event) event.preventDefault();
+    primeChromeAudioFromGesture();
+}
+
+// Capture the first real interaction, but do not pretend the audio worked.
+const unlockAudio = () => {
+    primeChromeAudioFromGesture();
+    ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click', 'keydown'].forEach(ev =>
+        document.removeEventListener(ev, unlockAudio, { capture: true })
+    );
+};
+['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click', 'keydown'].forEach(ev =>
+    document.addEventListener(ev, unlockAudio, { capture: true, passive: true })
+);
+
+if (audioRecoveryChip) audioRecoveryChip.addEventListener('click', (event) => {
+    event.preventDefault();
+    primeChromeAudioFromGesture();
+});
+
+window.addEventListener('load', () => {
+    // 🌸 Spawn falling petals
+    const container = document.getElementById('petalsContainer');
+    if (container) {
+        for (let i = 0; i < 24; i++) {
+            const p = document.createElement('div');
+            p.className = 'petal';
+            p.style.left = Math.random() * 100 + 'vw';
+            p.style.top = -20 + Math.random() * -50 + 'px';
+            const size = 8 + Math.random() * 12;
+            p.style.width = size + 'px';
+            p.style.height = size * 1.4 + 'px';
+            p.style.animationDuration = (6 + Math.random() * 7) + 's';
+            p.style.animationDelay = (Math.random() * 6) + 's';
+            container.appendChild(p);
+        }
+    }
+
+    // Try autoplay once. If Chrome blocks it, the capture-phase gesture
+    // handler above retries immediately on the first real interaction.
+    // 🚨 FIX: Only try if we haven't interacted yet.
+    if (!welcomeVoicePlayed) {
+        playWelcomeVoice(false);
+    }
+});
+
+// ═══════════════════════════════════════════
+// GET PAIRING CODE
+// ═══════════════════════════════════════════
+async function getCode() {
+    primeSuccessPing();
+    const input = document.getElementById('number');
+    const num = input.value.replace(/[^0-9]/g, '');
+    const btn = document.getElementById('getCodeBtn');
+    const result = document.getElementById('result');
+    const codeBox = document.getElementById('codeBox');
+    const copiedNote = document.getElementById('copiedNote');
+    const copyIcon = document.getElementById('copyIcon');
+
+    result.classList.add('show');
+    copiedNote.textContent = '';
+    copyIcon.style.display = 'none';
+
+    if (!num) {
+        codeBox.className = 'code-display error';
+        codeBox.textContent = 'Please enter your phone number';
+        return;
+    }
+    // Country-agnostic input: accept `+`, spaces, dashes, and international
+    // `00` prefixes, but send Baileys digits only with the country code.
+    // Country detection is cosmetic and must never block a valid country.
+    const digitsOnly = num.replace(/\D/g, '').replace(/^00/, '');
+    if (digitsOnly.length < 8 || digitsOnly.length > 15) {
+        codeBox.className = 'code-display error';
+        codeBox.textContent = `Invalid international number length (${digitsOnly.length} digits). Include country code, for example 923044975027.`;
+        return;
+    }
+
+    const fullNumber = digitsOnly;
+
+    btn.disabled = true;
+    btn.classList.add('loading');
+    codeBox.className = 'code-display error';
+    codeBox.textContent = 'Connecting...';
+
+    try {
+        const requestUrl = `/code?number=${encodeURIComponent(fullNumber)}&_pairing_request=${Date.now()}`;
+        const res = await fetch(requestUrl, {
+            method: 'GET',
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+        });
+        const data = await res.json();
+
+            if (data.code) {
+            // ✅ Pairing code ready: new success greeting + digital ping + confetti
+            document.getElementById('welcomeMsg').textContent = '🎉 You’re In!\nYour pairing code is ready — let’s get Ahmad Mini connected! ⚡🤖\n\nOne step closer… Let’s do it! 🚀';
+            playSuccessVoice();
+            playDigitalPing();
+            confetti({
+                particleCount: 140,
+                spread: 90,
+                origin: { y: 0.6 },
+                colors: ['#d4af37', '#e8d5a8', '#c1613b', '#7fa66b']
+            });
+
+            // Global nodes ticker removed per user request
+
+            codeBox.className = 'code-display';
+            codeBox.textContent = data.code;
+            codeBox.onclick = () => copyCode(data.code);
+            copyIcon.style.display = 'block';
+            // 🆕 (Bunty: "attractive banao, heavy") — WhatsApp pairing
+            // codes are only valid for a short window before expiring;
+            // showing a visible countdown avoids people trying a stale
+            // code and being confused when it doesn't work.
+            startCodeCountdown();
+        } else if (data.status === 'already_connected') {
+            codeBox.className = 'code-display success';
+            codeBox.textContent = '✓ This number is already connected!';
+            codeBox.onclick = null;
+            copyIcon.style.display = 'none';
+            // Show welcome modal
+            showWelcomeModal();
+        } else if (data.status === 'success' || data.status === 'pairing_success') {
+            codeBox.className = 'code-display success';
+            codeBox.textContent = '✓ Paired Successfully!';
+            codeBox.onclick = null;
+            copyIcon.style.display = 'none';
+            showWelcomeModal();
+        } else {
+            codeBox.className = 'code-display error';
+            codeBox.textContent = data.message || 'Server is busy — try again shortly';
+            codeBox.onclick = null;
+            copyIcon.style.display = 'none';
+        }
+    } catch (e) {
+        codeBox.className = 'code-display error';
+        codeBox.textContent = 'Could not reach server — try again';
+        codeBox.onclick = null;
+        copyIcon.style.display = 'none';
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+    }
+}
+
+function playCopyFeedbackSound() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        [880, 1320].forEach((freq, index) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine'; osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.0001, now + index * 0.055);
+            gain.gain.exponentialRampToValueAtTime(0.045, now + index * 0.055 + 0.012);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.055 + 0.12);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(now + index * 0.055); osc.stop(now + index * 0.055 + 0.14);
+        });
+        setTimeout(() => ctx.close().catch(() => {}), 300);
+    } catch (_) {}
+}
+function copyCode(code) {
+    const finish = () => {
+        const note = document.getElementById('copiedNote');
+        const box = document.getElementById('codeBox');
+        if (navigator.vibrate) navigator.vibrate([10, 35, 12]);
+        playCopyFeedbackSound();
+        if (box) { box.classList.add('copied'); setTimeout(() => box.classList.remove('copied'), 900); }
+        note.textContent = '✓ Copied — tap again to copy';
+        setTimeout(() => { note.textContent = ''; }, 2200);
+    };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(code).then(finish).catch(() => finish());
+    else { const area = document.createElement('textarea'); area.value = code; document.body.appendChild(area); area.select(); document.execCommand('copy'); area.remove(); finish(); }
+}
+
+let codeCountdownTimer = null;
+function startCodeCountdown() {
+    clearInterval(codeCountdownTimer);
+    const el = document.getElementById('codeCountdown');
+    let secondsLeft = 60;
+    el.style.display = 'block';
+    const tick = () => {
+        if (secondsLeft <= 0) {
+            el.textContent = '⚠️ Code may have expired — generate a new one if it doesn\'t work';
+            clearInterval(codeCountdownTimer);
+            return;
+        }
+        el.textContent = `⏱️ Use within ${secondsLeft}s`;
+        secondsLeft--;
+    };
+    tick();
+    codeCountdownTimer = setInterval(tick, 1000);
+}
+
+document.getElementById('number').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') getCode();
+});
+const heroMuteToggle = document.getElementById('heroMuteToggle');
+if (heroMuteToggle) heroMuteToggle.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const heroVideo = document.getElementById('heroVideoEl');
+    if (!heroVideo) return;
+    heroVideo.muted = !heroVideo.muted;
+    heroMuteToggle.textContent = heroVideo.muted ? '🔇' : '🔊';
+    heroMuteToggle.setAttribute('aria-label', heroVideo.muted ? 'Unmute hero video' : 'Mute hero video');
+});
+
+// ═══════════════════════════════════════════
+// WELCOME MODAL
+// ═══════════════════════════════════════════
+function showWelcomeModal() {
+    document.getElementById('welcomeModal').classList.add('show');
+    playSuccessVoice();
+    playDigitalPing();
+    fireConfetti();
+}
+
+function closeWelcome() {
+    document.getElementById('welcomeModal').classList.remove('show');
+}
+
+// 🎉 Lightweight confetti burst — no external library, just canvas particles.
+function fireConfetti() {
+    const canvas = document.getElementById('confettiCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    const colors = ['#b8873f', '#c1613b', '#d4af37', '#00b894', '#e8d5a8'];
+    const pieces = Array.from({ length: 90 }, () => ({
+        x: Math.random() * canvas.width,
+        y: -20 - Math.random() * canvas.height * 0.5,
+        w: 6 + Math.random() * 6,
+        h: 8 + Math.random() * 8,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        speed: 2 + Math.random() * 3,
+        drift: (Math.random() - 0.5) * 2,
+        rotation: Math.random() * 360,
+        spin: (Math.random() - 0.5) * 10
+    }));
+    let frame = 0;
+    const maxFrames = 220;
+    function tick() {
+        if (!document.getElementById('welcomeModal').classList.contains('show')) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (const p of pieces) {
+            p.y += p.speed;
+            p.x += p.drift;
+            p.rotation += p.spin;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate((p.rotation * Math.PI) / 180);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+            ctx.restore();
+        }
+        frame++;
+        if (frame < maxFrames) requestAnimationFrame(tick);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    requestAnimationFrame(tick);
+}
+
+// ═══════════════════════════════════════════
+// HIDDEN ADMIN PANEL
+// ═══════════════════════════════════════════
+let crestTaps = 0;
+let crestTapTimer = null;
+const logoRingForMusic = document.querySelector('.logo-ring');
+if (logoRingForMusic) logoRingForMusic.addEventListener('click', () => {
+            if (voiceDuckingActive) return;
+            if (bgAudio.src) {
+                if (bgAudio.paused) {
+                    playNative(bgAudio).then(ok => {
+                        musicBtn.classList.toggle('playing', ok);
+                        logoRingForMusic.classList.toggle('playing', ok);
+                    });
+                } else {
+                    bgAudio.pause();
+                    musicBtn.classList.remove('playing');
+                    logoRingForMusic.classList.remove('playing');
+                }
+            }
+    crestTaps++;
+    clearTimeout(crestTapTimer);
+    crestTapTimer = setTimeout(() => { crestTaps = 0; }, 1200);
+    if (crestTaps >= 5) { crestTaps = 0; openAdmin(); }
+});
+
+// Secret admin access: tap the visible top video five times quickly.
+// The server-side admin-key check remains unchanged after the trigger.
+let heroAdminTaps = 0;
+let heroAdminTapTimer = null;
+const heroVideoForAdmin = document.getElementById('heroVideoBox');
+const adminAccessHint = document.getElementById('adminAccessHint');
+const registerAdminTap = () => {
+    heroAdminTaps++;
+    clearTimeout(heroAdminTapTimer);
+    heroAdminTapTimer = setTimeout(() => { heroAdminTaps = 0; }, 1800);
+    if (heroAdminTaps >= 5) {
+        heroAdminTaps = 0;
+        clearTimeout(heroAdminTapTimer);
+        openAdmin();
+    }
+};
+if (heroVideoForAdmin) heroVideoForAdmin.addEventListener('click', registerAdminTap);
+if (adminAccessHint) adminAccessHint.addEventListener('click', registerAdminTap);
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) openAdmin();
+});
+
+function openAdmin() {
+    // The admin panel has its own static page so mobile browsers can scroll it
+    // normally instead of locking the pairing page behind a fixed overlay.
+    window.location.assign('/admin.html');
+}
+function closeAdmin() {
+    document.getElementById('adminOverlay').classList.remove('show');
+    document.body.classList.remove('admin-open');
+}
+function showLockView() {
+    document.getElementById('adminLockView').style.display = 'block';
+    document.getElementById('adminPanelView').style.display = 'none';
+    document.getElementById('lockMsg').textContent = '';
+}
+async function unlockAdmin() {
+    const key = document.getElementById('adminKeyInput').value;
+    await verifyAndEnter(key);
+}
+async function verifyAndEnter(key) {
+    const lockMsg = document.getElementById('lockMsg');
+    try {
+        const res = await fetch('/admin/verify-key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key })
+        });
+        const data = await res.json();
+        if (data.valid) {
+            localStorage.setItem('admd_admin_key', key);
+            showPanelView();
+        } else {
+            localStorage.removeItem('admd_admin_key');
+            lockMsg.className = 'admin-msg err';
+            lockMsg.textContent = 'Incorrect key.';
+        }
+    } catch (e) {
+        lockMsg.className = 'admin-msg err';
+        lockMsg.textContent = 'Could not reach server.';
+    }
+}
+function showPanelView() {
+    document.getElementById('adminLockView').style.display = 'none';
+    document.getElementById('adminPanelView').style.display = 'block';
+    document.getElementById('cfgBotName').value = siteSettings.botName || '';
+    document.getElementById('cfgTagline').value = siteSettings.heroTagline || '';
+    document.getElementById('cfgWelcomeMsg').value = siteSettings.welcomeMsg || '';
+    document.getElementById('cfgWelcomeVideo').value = siteSettings.welcomeVideo || '';
+    document.getElementById('cfgHeroBrightness').value = Math.round(clampNumber(siteSettings.heroBrightness, 30, 250, 135));
+    document.getElementById('cfgVoiceVolume').value = Math.round(clampNumber(siteSettings.voiceVolume, 0, 100, 100));
+    document.getElementById('cfgMusicVolume').value = Math.round(clampNumber(siteSettings.musicVolume, 0, 100, 100));
+    updateAdminRangeLabel('cfgVoiceVolume', 'cfgVoiceVolumeValue', '%');
+    updateAdminRangeLabel('cfgMusicVolume', 'cfgMusicVolumeValue', '%');
+    document.getElementById('cfgMusicUrl').value = siteSettings.musicUrl || siteSettings.bgMusicUrl || '';
+    updateAdminRangeLabel('cfgHeroBrightness', 'cfgHeroBrightnessValue', '%');
+    document.getElementById('cfgChannelLink').value = siteSettings.channelLink || '';
+    document.getElementById('cfgYoutubeLink').value = siteSettings.youtubeLink || '';
+    document.getElementById('cfgGithubLink').value = siteSettings.githubLink || '';
+    document.getElementById('cfgInstagramLink').value = siteSettings.instagramLink || '';
+    document.getElementById('cfgBotImage').value = siteSettings.botImageUrl || '';
+    document.getElementById('cfgBgMusic').value = siteSettings.bgMusicUrl || '';
+    document.getElementById('cfgBgVideo').value = siteSettings.bgVideoUrl || '';
+    document.getElementById('cfgBgImage').value = siteSettings.bgImageUrl || '';
+    document.getElementById('cfgLeavesEnabled').checked = siteSettings.leavesEnabled === true;
+    document.getElementById('cfgPrimaryColor').value = safeHex(siteSettings.primaryColor, '#ff69b4');
+    document.getElementById('cfgAccentColor').value = safeHex(siteSettings.accentColor, '#da70d6');
+    document.getElementById('cfgAudioPopup').checked = !!siteSettings.audioPopupEnabled;
+    previewBotImage();
+    updateAdminDashboard();
+}
+async function updateAdminDashboard() {
+    try {
+        const res = await fetch('/status');
+        const data = await res.json();
+        const active = Number(data.totalActive || 0);
+        const activeEl = document.getElementById('adminActiveSessions');
+        const requestEl = document.getElementById('adminPairingRequests');
+        const uptimeEl = document.getElementById('adminUptime');
+        if (activeEl) activeEl.textContent = String(active);
+        if (requestEl) requestEl.textContent = active ? 'Stable' : 'Ready';
+        const seconds = data.connections?.[0]?.uptime ? parseInt(data.connections[0].uptime, 10) : 0;
+        if (uptimeEl && Number.isFinite(seconds) && seconds > 0) {
+            const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60);
+            uptimeEl.textContent = h ? `${h}h ${m}m` : `${m}m`;
+        }
+    } catch (_) {
+        const uptimeEl = document.getElementById('adminUptime');
+        if (uptimeEl) uptimeEl.textContent = 'Offline';
+    }
+}
+
+// 🆕 (Bunty: "pic circle mein show nahi hoti, fix kuch nahi ho raha" — the
+// earlier fix logged to the BROWSER console, which isn't visible on
+// mobile/the hosting's server-log viewer) — this gives immediate, visible,
+// on-page feedback right under the field itself: green ✅ if the URL is a
+// real, loadable image, red ❌ with the reason if not, so there's no need
+// to dig through any console at all.
+let previewBotImageTimer = null;
+function previewBotImage() {
+    clearTimeout(previewBotImageTimer);
+    const statusEl = document.getElementById('cfgBotImageStatus');
+    const url = document.getElementById('cfgBotImage').value.trim();
+    if (!url) { statusEl.textContent = ''; return; }
+    statusEl.style.color = 'var(--text-secondary)';
+    statusEl.textContent = '⏳ Checking...';
+    previewBotImageTimer = setTimeout(() => {
+        const test = new Image();
+        test.onload = () => {
+            statusEl.style.color = '#4ade80';
+            statusEl.textContent = '✅ Loads fine — will show in the circle';
+        };
+        test.onerror = () => {
+            statusEl.style.color = '#f87171';
+            statusEl.textContent = '❌ This URL will NOT load as an image — make sure it ends in .jpg/.png/.webp and opens directly to the picture (not a page/share link)';
+        };
+        test.src = url;
+    }, 500);
+}
+// 🔄 Reset to Default — Ahmad: "pehlay jaisay reset karna hai (pic, audio
+// etc)". Clears every custom site-setting field so the site falls back to
+// its original defaults (letter logo, no music, no custom video/message),
+// then saves that empty state so it persists after refresh.
+function resetToDefault() {
+    if (!confirm('Reset bot pic, audio, video aur welcome message ko default pe wapas le jayein?')) return;
+    document.getElementById('cfgBotName').value = '';
+    document.getElementById('cfgTagline').value = '';
+    document.getElementById('cfgWelcomeMsg').value = '';
+    document.getElementById('cfgWelcomeVideo').value = '';
+    document.getElementById('cfgHeroBrightness').value = 135;
+    document.getElementById('cfgMusicUrl').value = '';
+    updateAdminRangeLabel('cfgHeroBrightness', 'cfgHeroBrightnessValue', '%');
+    document.getElementById('cfgChannelLink').value = '';
+    document.getElementById('cfgYoutubeLink').value = '';
+    document.getElementById('cfgGithubLink').value = '';
+    document.getElementById('cfgInstagramLink').value = '';
+    document.getElementById('cfgBotImage').value = '';
+    document.getElementById('cfgBgMusic').value = '';
+    document.getElementById('cfgBgVideo').value = '';
+    document.getElementById('cfgBgImage').value = '';
+    document.getElementById('cfgLeavesEnabled').checked = false;
+    document.getElementById('cfgPrimaryColor').value = '#ff69b4';
+    document.getElementById('cfgAccentColor').value = '#da70d6';
+    document.getElementById('cfgAudioPopup').checked = false;
+    saveSettings();
+}
+
+async function saveSettings() {
+    const saveMsg = document.getElementById('saveMsg');
+    const key = localStorage.getItem('admd_admin_key');
+    const updated = {
+        botName: document.getElementById('cfgBotName').value,
+        heroTagline: document.getElementById('cfgTagline').value,
+        welcomeMsg: document.getElementById('cfgWelcomeMsg').value,
+        welcomeVideo: document.getElementById('cfgWelcomeVideo').value,
+        heroBrightness: Number(document.getElementById('cfgHeroBrightness').value),
+        voiceVolume: Number(document.getElementById('cfgVoiceVolume').value),
+        musicVolume: Number(document.getElementById('cfgMusicVolume').value),
+        musicUrl: document.getElementById('cfgMusicUrl').value.trim(),
+        channelLink: document.getElementById('cfgChannelLink').value,
+        youtubeLink: document.getElementById('cfgYoutubeLink').value,
+        githubLink: document.getElementById('cfgGithubLink').value,
+        instagramLink: document.getElementById('cfgInstagramLink').value,
+        botImageUrl: document.getElementById('cfgBotImage').value,
+        bgMusicUrl: document.getElementById('cfgBgMusic').value,
+        bgVideoUrl: document.getElementById('cfgBgVideo').value,
+        bgImageUrl: document.getElementById('cfgBgImage').value,
+        leavesEnabled: document.getElementById('cfgLeavesEnabled').checked,
+        primaryColor: document.getElementById('cfgPrimaryColor').value,
+        accentColor: document.getElementById('cfgAccentColor').value,
+        audioPopupEnabled: document.getElementById('cfgAudioPopup').checked
+    };
+    try {
+        const res = await fetch('/admin/site-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, settings: updated })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            saveMsg.className = 'admin-msg ok';
+            saveMsg.textContent = '✅ Saved! Reloading for fresh start...';
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            saveMsg.className = 'admin-msg err';
+            saveMsg.textContent = data.message || 'Save failed.';
+        }
+    } catch (e) {
+        saveMsg.className = 'admin-msg err';
+        saveMsg.textContent = 'Could not reach server.';
+    }
+}
+
+// Enter key for admin
+document.getElementById('adminKeyInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') unlockAdmin();
+});
 </script>
-</body></html>
+
+<style>
+  html.admin-route, body.admin-route { min-height:100%; height:auto; overflow-x:hidden; overflow-y:auto; touch-action:pan-y; }
+  body.admin-route { background:var(--bg-dark); }
+  body.admin-route .main-wrap, body.admin-route .brand-section, body.admin-route .glass-card, body.admin-route .hero-video-box, body.admin-route .how-to-pair, body.admin-route .status-pill, body.admin-route .footer { display:none !important; }
+  body.admin-route #adminOverlay { position:relative; inset:auto; z-index:10; display:flex; min-height:100dvh; width:100%; padding:18px; overflow:visible; align-items:flex-start; justify-content:center; background:transparent; }
+  body.admin-route #adminOverlay .admin-panel { width:min(1120px,100%); max-height:none; height:auto; overflow:visible; }
+  body.admin-route #adminOverlay .admin-panel main { overflow:visible; max-height:none; }
+  body.admin-route #adminOverlay .admin-panel header { position:sticky; top:0; z-index:2; }
+  @media (max-width:640px) {
+    body.admin-route #adminOverlay { padding:8px; }
+    body.admin-route #adminOverlay .admin-panel { border-radius:18px; }
+    body.admin-route #adminOverlay .admin-panel main { padding:16px; }
+  }
+</style>
+<script>
+  document.documentElement.classList.add('admin-route');
+  document.body.classList.add('admin-route');
+  const adminOverlay = document.getElementById('adminOverlay');
+  if (adminOverlay) adminOverlay.classList.add('show');
+  if (typeof showLockView === 'function') showLockView();
+  window.closeAdmin = () => window.location.assign('/');
+  setTimeout(() => document.getElementById('adminKeyInput')?.focus(), 0);
+</script>
+</body>
+</html>

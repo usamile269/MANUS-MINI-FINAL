@@ -4,6 +4,7 @@ const path = require('node:path');
 
 const pairHtml = fs.readFileSync(path.join(__dirname, '..', 'pair.html'), 'utf8');
 const mainJs = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+const adminHtml = fs.readFileSync(path.join(__dirname, '..', 'admin.html'), 'utf8');
 
 assert.match(pairHtml, /replace\(\/\\D\/g, ''\)\.replace\(\/\^00\//);
 assert.match(pairHtml, /digitsOnly\.length < 8 \|\| digitsOnly\.length > 15/);
@@ -13,7 +14,10 @@ assert.match(pairHtml, /_pairing_request=\$\{Date\.now\(\)\}/);
 assert.match(pairHtml, /cache: 'no-store'/);
 assert.match(pairHtml, /const fullNumber = digitsOnly/);
 assert.match(pairHtml, /function openAdmin\(\) \{[\s\S]*adminOverlay[\s\S]*showLockView\(\)/);
-assert.doesNotMatch(pairHtml, /window\.location\.href = ['\"]\/admin\.html['\"]/);
+assert.match(pairHtml, /window\.location\.assign\(['\"]\/admin\.html['\"]\)/);
+assert.match(adminHtml, /id="adminOverlay"/);
+assert.match(adminHtml, /body\.admin-route.*overflow-y:auto/);
+assert.match(adminHtml, /window\.closeAdmin = \(\) => window\.location\.assign\(['\"]\/['\"]\)/);
 
 assert.match(mainJs, /String\(number \?\? ''\)\.replace\(\/\\D\/g, ''\)\.replace\(\/\^00\//);
 assert.match(mainJs, /sanitizedNumber\.length < 8 \|\| sanitizedNumber\.length > 15/);
