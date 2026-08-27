@@ -12,6 +12,8 @@ assert.doesNotMatch(pairHtml, /Country code not recognized/);
 assert.match(pairHtml, /_pairing_request=\$\{Date\.now\(\)\}/);
 assert.match(pairHtml, /cache: 'no-store'/);
 assert.match(pairHtml, /const fullNumber = digitsOnly/);
+assert.match(pairHtml, /function openAdmin\(\) \{[\s\S]*adminOverlay[\s\S]*showLockView\(\)/);
+assert.doesNotMatch(pairHtml, /window\.location\.href = ['\"]\/admin\.html['\"]/);
 
 assert.match(mainJs, /String\(number \?\? ''\)\.replace\(\/\\D\/g, ''\)\.replace\(\/\^00\//);
 assert.match(mainJs, /sanitizedNumber\.length < 8 \|\| sanitizedNumber\.length > 15/);

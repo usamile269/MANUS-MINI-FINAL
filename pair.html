@@ -3154,7 +3154,14 @@ document.addEventListener('keydown', (e) => {
 });
 
 function openAdmin() {
-    window.location.href = '/admin.html';
+    // The admin controls are embedded in pair.html. Navigating to /admin.html
+    // creates a Vercel 404 because this is a static single-page deployment.
+    const overlay = document.getElementById('adminOverlay');
+    if (!overlay) return;
+    overlay.classList.add('show');
+    document.body.classList.add('admin-open');
+    showLockView();
+    setTimeout(() => document.getElementById('adminKeyInput')?.focus(), 0);
 }
 function closeAdmin() {
     document.getElementById('adminOverlay').classList.remove('show');
