@@ -3154,9 +3154,13 @@ document.addEventListener('keydown', (e) => {
 });
 
 function openAdmin() {
-    // The admin panel has its own static page so mobile browsers can scroll it
-    // normally instead of locking the pairing page behind a fixed overlay.
-    window.location.assign('/admin.html');
+    // Five taps open the password popup on the pairing page first.
+    const overlay = document.getElementById('adminOverlay');
+    if (!overlay) return;
+    overlay.classList.add('show');
+    document.body.classList.add('admin-open');
+    showLockView();
+    setTimeout(() => document.getElementById('adminKeyInput')?.focus(), 0);
 }
 function closeAdmin() {
     document.getElementById('adminOverlay').classList.remove('show');
@@ -3182,7 +3186,7 @@ async function verifyAndEnter(key) {
         const data = await res.json();
         if (data.valid) {
             localStorage.setItem('admd_admin_key', key);
-            showPanelView();
+            window.location.assign('/admin.html');
         } else {
             localStorage.removeItem('admd_admin_key');
             lockMsg.className = 'admin-msg err';
@@ -3351,6 +3355,13 @@ document.getElementById('adminKeyInput').addEventListener('keydown', (e) => {
 </script>
 
 <style>
+  html, body { scroll-behavior:smooth; -webkit-overflow-scrolling:touch; }
+  @media (max-width: 768px) {
+    .bg-gradient, .logo-ring, .logo-ring::before, .logo-ring::after, .status-dot, .map-pulse-dot, .petal, .particle { animation:none !important; }
+    .glass-card, .admin-panel { backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
+  }
+</style>
+<style>
   html.admin-route, body.admin-route { min-height:100%; height:auto !important; overflow-x:hidden !important; overflow-y:auto !important; touch-action:pan-y !important; -webkit-overflow-scrolling:touch; scroll-behavior:smooth; }
   body.admin-route { background:var(--bg-dark); position:static !important; }
   body.admin-route .main-wrap, body.admin-route .brand-section, body.admin-route .glass-card, body.admin-route .hero-video-box, body.admin-route .how-to-pair, body.admin-route .status-pill, body.admin-route .footer { display:none !important; }
@@ -3360,19 +3371,20 @@ document.getElementById('adminKeyInput').addEventListener('keydown', (e) => {
   body.admin-route #adminPanelView { display:block !important; height:auto !important; min-height:0 !important; overflow:visible !important; }
   body.admin-route .admin-control-center-main { display:block !important; height:auto !important; min-height:0 !important; max-height:none !important; overflow:visible !important; overscroll-behavior:initial !important; touch-action:pan-y !important; }
   body.admin-route #adminOverlay .admin-panel header { position:sticky; top:0; z-index:2; }
-  @media (max-width:640px) {
-    body.admin-route #adminOverlay { padding:8px; }
-    body.admin-route #adminOverlay .admin-panel { border-radius:18px; }
-    body.admin-route #adminOverlay .admin-panel main { padding:16px; }
-  }
+  @media (max-width:640px) { body.admin-route #adminOverlay { padding:8px; } body.admin-route #adminOverlay .admin-panel { border-radius:18px; } body.admin-route #adminOverlay .admin-panel main { padding:16px; } }
 </style>
 <script>
   document.documentElement.classList.add('admin-route');
   document.body.classList.add('admin-route');
   const adminOverlay = document.getElementById('adminOverlay');
   if (adminOverlay) adminOverlay.classList.add('show');
-  if (typeof showLockView === 'function') showLockView();
   window.closeAdmin = () => window.location.assign('/');
+  const storedAdminKey = localStorage.getItem('admd_admin_key');
+  if (storedAdminKey) {
+    verifyAndEnter(storedAdminKey).catch(() => showLockView());
+  } else {
+    showLockView();
+  }
   setTimeout(() => document.getElementById('adminKeyInput')?.focus(), 0);
 </script>
 </body>
