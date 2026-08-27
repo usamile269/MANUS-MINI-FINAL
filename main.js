@@ -369,11 +369,14 @@ async function flushAllBootMarks() {
 }
 
 
-function wasAlreadyProcessed(number, id) {
+function hasBeenProcessed(number, id) {
     if (!id) return false;
+    return processedMessageIds.get(number)?.has(id) || false;
+}
+function markProcessed(number, id) {
+    if (!id) return;
     let seen = processedMessageIds.get(number);
     if (!seen) { seen = new Set(); processedMessageIds.set(number, seen); }
-    if (seen.has(id)) return true;
     seen.add(id);
     if (seen.size > 500) {
         // drop the oldest half once it gets too big
@@ -381,7 +384,6 @@ function wasAlreadyProcessed(number, id) {
         seen.clear();
         for (const v of arr.slice(arr.length - 250)) seen.add(v);
     }
-    return false;
 }
 
 // 🚨 STORAGE FIX: multiple plugins write temp files to /tmp and the OS tmpdir
@@ -2014,11 +2016,26 @@ async function ahmadPair(number, res = null) {
                 // batch here means every downstream consumer gets the same
                 // protection, not just the single command-dispatch path.
                 const preFilterLen = messagesToProcess.length;
+                const batchSeenIds = new Set();
                 messagesToProcess = messagesToProcess.filter(mm => {
                     if (mm.key && mm.key.remoteJid && mm.key.remoteJid.endsWith('@newsletter')) return true; // newsletters use their own dedup (newsletterServerId), not this
-                    return !wasAlreadyProcessed(sanitizedNumber, mm.key && mm.key.id);
+                    const id = mm.key && mm.key.id;
+                    if (id && (batchSeenIds.has(id) || hasBeenProcessed(sanitizedNumber, id))) return false;
+                    // Do not consume an ID for an empty encrypted delivery;
+                    // a later usable retry in the same batch may contain the
+                    // actual command. Real duplicate deliveries with content
+                    // remain blocked both within this batch and across events.
+                    if (id && mm.message) batchSeenIds.add(id);
+                    return true;
                 });
                 if (messagesToProcess.length === 0) return;
+                // Mark only messages with decrypted content. WhatsApp can emit
+                // an empty encrypted delivery first and a usable retry later;
+                // consuming the ID before decryption would make that later
+                // command look like a duplicate and silently drop it.
+                for (const mm of messagesToProcess) {
+                    if (mm.message) markProcessed(sanitizedNumber, mm.key && mm.key.id);
+                }
 
                 // 🔍 PERF DEBUG (Ahmad: ".ping shows 1700ms processing, network
                 // is only 6ms" — everything upstream of dispatch is fast on
