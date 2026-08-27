@@ -1807,7 +1807,10 @@ body.admin-open { overflow:hidden; overscroll-behavior:none; touch-action:none; 
             <span class="status-dot"></span>
             <span id="activeCount">— active sessions</span>
         </div>
-        <button id="adminAccessHint" type="button" aria-label="Private access">🔒</button>
+        <button id="adminAccessHint" type="button" aria-label="Open menu" aria-expanded="false">☰</button>
+        <div id="siteMenu" class="site-menu" hidden>
+            <button type="button" id="adminMenuItem">🔐 Admin Panel</button>
+        </div>
 
         <div class="visualizer" id="visualizer">
             <span class="vbar"></span><span class="vbar"></span><span class="vbar"></span>
@@ -3125,32 +3128,31 @@ if (logoRingForMusic) logoRingForMusic.addEventListener('click', () => {
                     logoRingForMusic.classList.remove('playing');
                 }
             }
-    crestTaps++;
-    clearTimeout(crestTapTimer);
-    crestTapTimer = setTimeout(() => { crestTaps = 0; }, 1200);
-    if (crestTaps >= 5) { crestTaps = 0; openAdmin(); }
 });
 
-// Secret admin access: tap the visible top video five times quickly.
-// The server-side admin-key check remains unchanged after the trigger.
-let heroAdminTaps = 0;
-let heroAdminTapTimer = null;
-const heroVideoForAdmin = document.getElementById('heroVideoBox');
+// Visible menu access: no hidden tap counter or accidental admin trigger.
 const adminAccessHint = document.getElementById('adminAccessHint');
-const registerAdminTap = () => {
-    heroAdminTaps++;
-    clearTimeout(heroAdminTapTimer);
-    heroAdminTapTimer = setTimeout(() => { heroAdminTaps = 0; }, 1800);
-    if (heroAdminTaps >= 5) {
-        heroAdminTaps = 0;
-        clearTimeout(heroAdminTapTimer);
-        openAdmin();
-    }
-};
-if (heroVideoForAdmin) heroVideoForAdmin.addEventListener('click', registerAdminTap);
-if (adminAccessHint) adminAccessHint.addEventListener('click', registerAdminTap);
+const siteMenu = document.getElementById('siteMenu');
+const adminMenuItem = document.getElementById('adminMenuItem');
+function toggleSiteMenu(force) {
+    if (!siteMenu || !adminAccessHint) return;
+    const shouldOpen = typeof force === 'boolean' ? force : siteMenu.hasAttribute('hidden');
+    siteMenu.toggleAttribute('hidden', !shouldOpen);
+    adminAccessHint.setAttribute('aria-expanded', String(shouldOpen));
+}
+if (adminAccessHint) adminAccessHint.addEventListener('click', (event) => {
+    event.stopPropagation();
+    toggleSiteMenu();
+});
+if (adminMenuItem) adminMenuItem.addEventListener('click', () => {
+    toggleSiteMenu(false);
+    openAdmin();
+});
+document.addEventListener('click', (event) => {
+    if (siteMenu && !siteMenu.hasAttribute('hidden') && !siteMenu.contains(event.target) && event.target !== adminAccessHint) toggleSiteMenu(false);
+});
 document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) openAdmin();
+    if (e.key === 'Escape') toggleSiteMenu(false);
 });
 
 function openAdmin() {
@@ -3356,6 +3358,11 @@ document.getElementById('adminKeyInput').addEventListener('keydown', (e) => {
 
 <style>
   html, body { scroll-behavior:smooth; -webkit-overflow-scrolling:touch; }
+  #adminAccessHint { display:flex; align-items:center; justify-content:center; width:42px; height:42px; margin-left:8px; border:1px solid rgba(91,75,183,.18); border-radius:12px; background:rgba(255,255,255,.78); color:#433581; font-size:1.35rem; line-height:1; cursor:pointer; box-shadow:0 8px 20px rgba(70,53,110,.08); }
+  #adminAccessHint:active { transform:scale(.96); }
+  .site-menu { position:absolute; top:58px; right:0; z-index:80; min-width:178px; padding:7px; border:1px solid rgba(91,75,183,.16); border-radius:14px; background:rgba(255,255,255,.97); box-shadow:0 18px 40px rgba(53,43,103,.18); }
+  .site-menu button { width:100%; padding:10px 12px; border:0; border-radius:10px; background:transparent; color:#282052; text-align:left; font:600 .78rem/1.2 inherit; cursor:pointer; }
+  .site-menu button:hover, .site-menu button:focus-visible { background:rgba(91,75,183,.09); outline:none; }
   @media (max-width: 768px) {
     .bg-gradient, .logo-ring, .logo-ring::before, .logo-ring::after, .status-dot, .map-pulse-dot, .petal, .particle { animation:none !important; }
     .glass-card, .admin-panel { backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
@@ -3380,11 +3387,8 @@ document.getElementById('adminKeyInput').addEventListener('keydown', (e) => {
   if (adminOverlay) adminOverlay.classList.add('show');
   window.closeAdmin = () => window.location.assign('/');
   const storedAdminKey = localStorage.getItem('admd_admin_key');
-  if (storedAdminKey) {
-    verifyAndEnter(storedAdminKey).catch(() => showLockView());
-  } else {
-    showLockView();
-  }
+  if (storedAdminKey) verifyAndEnter(storedAdminKey).catch(() => showLockView());
+  else showLockView();
   setTimeout(() => document.getElementById('adminKeyInput')?.focus(), 0);
 </script>
 </body>
