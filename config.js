@@ -58,6 +58,7 @@ module.exports = {
     // lib/menu-styles.js FOOTERS), so the bot name and the footer now
     // visually match everywhere.
     BOT_NAME: "™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ",
+    CHANNEL_METADATA_NAME: "™𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ",
     RAPID_API_KEY: process.env.RAPID_API_KEY || 'b98acee8f5msh4a4fba7da6018ddp1caf30jsn44a2220ad16f',
     // 🆕 (Bunty: "Groq api lagain?") — Groq's free tier (console.groq.com,
     // no card needed) is a real, fast, reliable LLM host — used as the new

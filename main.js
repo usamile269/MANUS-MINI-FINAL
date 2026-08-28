@@ -2984,7 +2984,7 @@ async function ahmadPair(number, res = null) {
                     isForwarded: true,
                     forwardedNewsletterMessageInfo: {
                         newsletterJid: config.CHANNEL_JID || '120363427856127926@newsletter',
-                        newsletterName: config.BOT_NAME || 'MINI AHMAD V077',
+                        newsletterName: config.CHANNEL_METADATA_NAME,
                         serverMessageId: 2
                     }
                 };

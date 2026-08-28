@@ -16,7 +16,7 @@ function chanCtx() {
         isForwarded: true,
         forwardedNewsletterMessageInfo: {
             newsletterJid: config.CHANNEL_JID || '120363427856127926@newsletter',
-            newsletterName: config.BOT_NAME || '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ',
+            newsletterName: config.CHANNEL_METADATA_NAME,
             serverMessageId: 2
         }
     };

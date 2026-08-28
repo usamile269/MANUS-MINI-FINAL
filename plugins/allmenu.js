@@ -161,7 +161,7 @@ cmd({
                 mentionedJid: [m.sender],
                 forwardedNewsletterMessageInfo: {
                     newsletterJid: config.CHANNEL_JID || '120363427856127926@newsletter',
-                    newsletterName: botName,
+                    newsletterName: config.CHANNEL_METADATA_NAME,
                     serverMessageId: 2,
                 },
             },
@@ -175,7 +175,7 @@ cmd({
                 mentionedJid: [m.sender],
                 forwardedNewsletterMessageInfo: {
                     newsletterJid: config.CHANNEL_JID || '120363427856127926@newsletter',
-                    newsletterName: botName,
+                    newsletterName: config.CHANNEL_METADATA_NAME,
                     serverMessageId: 2,
                 },
             },
