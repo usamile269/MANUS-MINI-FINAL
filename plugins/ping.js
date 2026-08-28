@@ -9,7 +9,7 @@ const channelContext = {
     isForwarded: true,
     forwardedNewsletterMessageInfo: {
         newsletterJid: config.CHANNEL_JID || '120363427856127926@newsletter',
-        newsletterName: 'AHMAD MINI',
+        newsletterName: '™𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ',
         serverMessageId: 2,
     },
 };

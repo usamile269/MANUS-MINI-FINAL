@@ -20,7 +20,7 @@ assert.match(source, /const uptimeSec = Math\.floor\(process\.uptime\(\)\);/);
 assert.doesNotMatch(source, /WA PROBE|sendPresenceUpdate|PING_START_REACTIONS|PING_SUCCESS_REACTIONS|renderCuteBox/);
 assert.match(source, /forwardingScore: 999/);
 assert.match(source, /isForwarded: true/);
-assert.match(source, /newsletterName: 'AHMAD MINI'/);
+assert.ok(source.includes("newsletterName: '™𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ'"));
 assert.match(source, /await conn\.sendMessage\(from, \{ text, contextInfo: channelContext \}\);/);
 assert.equal((source.match(/await conn\.sendMessage\(from, \{ text, contextInfo: channelContext \}\);/g) || []).length, 1);
 assert.doesNotMatch(source, /react:/);
