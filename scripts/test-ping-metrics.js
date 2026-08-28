@@ -4,13 +4,13 @@ const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'plugins', 'ping.js'), 'utf8');
 assert.doesNotMatch(source, /𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵|�/);
-assert.doesNotMatch(source, /\*𝘼𝙃𝙈𝘼𝘿|\*\$\{/);
+assert.doesNotMatch(source, /\*𝘼𝙃𝙈𝘼𝘿|\*\$\{|quoteLines/);
 assert.match(source, /const pingHeaders = \[/);
 assert.match(source, /⚡ 𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄/);
 assert.match(source, /♛ 𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄/);
 assert.match(source, /◈ 𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄/);
-assert.match(source, /const quoteLines = lines =>/);
-assert.match(source, /`> \$\{line\}`/);
+assert.match(source, /const body = `\$\{header\}\\n/);
+assert.match(source, /const text = body;/);
 assert.match(source, /𝙊𝙉𝙇𝙄𝙉𝙀 & 𝙍𝙀𝘼𝘿𝙔/);
 assert.match(source, /𝙎𝙋𝙀𝙀𝘿 : \$\{processMs\}ms/);
 assert.match(source, /𝙐𝙋𝙏𝙄𝙈𝙀 : \$\{uh\}h \$\{um\}m \$\{us\}s/);
