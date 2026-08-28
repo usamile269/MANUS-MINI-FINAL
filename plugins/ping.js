@@ -15,9 +15,7 @@ const channelContext = {
 };
 
 const pingHeaders = [
-    '╭━━〔 ⚡ 𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄 〕━━╮',
-    '╭━━〔 ♛ 𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄 〕━━╮',
-    '╭━━〔 ◈ 𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄 〕━━╮',
+    '╭━━〔 ⚡ 𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄 〕━━━━━━━━╮',
 ];
 
 cmd({
@@ -33,7 +31,7 @@ cmd({
     const um = Math.floor((uptimeSec % 3600) / 60);
     const us = uptimeSec % 60;
     const header = pingHeaders[Math.floor(Math.random() * pingHeaders.length)];
-    const body = `${header}\n┃ 🟢 𝙊𝙉𝙇𝙄𝙉𝙀 & 𝙍𝙀𝘼𝘿𝙔\n┃ ⚡ 𝙎𝙋𝙀𝙀𝘿 : ${processMs}ms\n┃ ⏱️ 𝙐𝙋𝙏𝙄𝙈𝙀 : ${uh}h ${um}m ${us}s\n┃ 🚀 𝙋𝙄𝙉𝙂 : 𝙎𝙐𝘾𝘾𝙀𝙎𝙎 ✓\n╰━━━━━━━━━━━━━━╯`;
+    const body = `${header}\n┃ 🟢 𝙊𝙉𝙇𝙄𝙉𝙀  •  ⚡ 𝙎𝙋𝙀𝙀𝘿 : ${processMs}ms\n┃ ⏱️ 𝙐𝙋𝙏𝙄𝙈𝙀  •  ${uh}h ${um}m ${us}s\n┃ 🚀 𝙋𝙄𝙉𝙂  •  𝙎𝙐𝘾𝘾𝙀𝙎𝙎 ✓\n╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
     const text = body;
 
     // Exactly one user-visible operation keeps group ping responsive.
