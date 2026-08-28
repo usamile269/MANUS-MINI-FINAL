@@ -1,6 +1,11 @@
 const { cmd } = require('../ahmad-core');
 const config = require('../config');
 
+const BOLD_DIGITS = Array.from('𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵');
+function boldDigits(value) {
+    return String(value ?? '').replace(/[0-9]/g, digit => BOLD_DIGITS[Number(digit)]);
+}
+
 // One user-visible send with the requested WhatsApp channel/forward envelope.
 // No media, database lookup, network probe, presence update, or reaction is
 // performed on the ping path.
@@ -31,7 +36,7 @@ cmd({
     const um = Math.floor((uptimeSec % 3600) / 60);
     const us = uptimeSec % 60;
     const header = pingHeaders[Math.floor(Math.random() * pingHeaders.length)];
-    const body = `${header}\n┃ 🟢 𝙊𝙉𝙇𝙄𝙉𝙀  •  ⚡ 𝙎𝙋𝙀𝙀𝘿 : ${processMs}ms\n┃ ⏱️ 𝙐𝙋𝙏𝙄𝙈𝙀  •  ${uh}h ${um}m ${us}s\n┃ 🚀 𝙋𝙄𝙉𝙂  •  𝙎𝙐𝘾𝘾𝙀𝙎𝙎 ✓\n╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+    const body = `${header}\n┃ 🟢 𝙊𝙉𝙇𝙄𝙉𝙀  •  ⚡ 𝙎𝙋𝙀𝙀𝘿 : ${boldDigits(processMs)}𝗺𝘀\n┃ ⏱️ 𝙐𝙋𝙏𝙄𝙈𝙀  •  ${boldDigits(uh)}𝗵 ${boldDigits(um)}𝗺 ${boldDigits(us)}𝘀\n┃ 🚀 𝙋𝙄𝙉𝙂  •  𝙎𝙐𝘾𝘾𝙀𝙎𝙎 ✓\n╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
     const text = body;
 
     // Exactly one user-visible operation keeps group ping responsive.
