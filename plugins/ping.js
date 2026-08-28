@@ -13,30 +13,29 @@ const channelContext = {
         serverMessageId: 2,
     },
 };
-const compactPingStyles = [
-    (name, ms) => `> 𓆩◆𓆪 *${name}* 𓆩◆𓆪\n> ⌁  𝙋𝙊𝙉𝙂   •   ${ms}ms   •   𝙊𝙉𝙇𝙄𝙉𝙀`,
-    (name, ms) => `> ♛ *${name}* ♛\n> ◉  𝙋𝙊𝙉𝙂   •   ${ms}ms   •   𝙊𝙉𝙇𝙄𝙉𝙀`,
-    (name, ms) => `> ◈ *${name}* ◈\n> ◉  𝙋𝙊𝙉𝙂   •   ${ms}ms   •   𝙍𝙀𝘼𝘿𝙔`,
+
+const pingHeaders = [
+    '╭━━〔 ⚡ 𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄 〕━━╮',
+    '╭━━〔 ♛ 𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄 〕━━╮',
+    '╭━━〔 ◈ 𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄 〕━━╮',
 ];
 
+const bold = value => `*${String(value)}*`;
 
 cmd({
-  pattern: "ping",
-  desc: "⚡ Check bot speed",
-  category: "main",
-  filename: __filename
+  pattern: 'ping',
+  desc: '⚡ Check bot speed',
+  category: 'main',
+  filename: __filename,
 }, async (conn, mek, m, { from, arrivalTs }) => {
   try {
     const processMs = Math.max(1, Date.now() - (arrivalTs || Date.now()));
-    const uptimeSec = process.uptime();
+    const uptimeSec = Math.floor(process.uptime());
     const uh = Math.floor(uptimeSec / 3600);
     const um = Math.floor((uptimeSec % 3600) / 60);
-    const us = Math.floor(uptimeSec % 60);
-    const uptimeStr = `${uh}h ${um}m ${us}s`;
-    const botName = '𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄';
-
-    const style = compactPingStyles[Math.floor(Math.random() * compactPingStyles.length)];
-    const text = style(botName, processMs);
+    const us = uptimeSec % 60;
+    const header = pingHeaders[Math.floor(Math.random() * pingHeaders.length)];
+    const text = `${header}\n┃ 🟢 𝙊𝙉𝙇𝙄𝙉𝙀 & 𝙍𝙀𝘼𝘿𝙔\n┃ ⚡ 𝙎𝙋𝙀𝙀𝘿 : ${bold(processMs)}ms\n┃ ⏱️ 𝙐𝙋𝙏𝙄𝙈𝙀 : ${bold(uh)}h ${bold(um)}m ${bold(us)}s\n┃ 🚀 𝙋𝙄𝙉𝙂 : 𝙎𝙐𝘾𝘾𝙀𝙎𝙎 ✓\n╰━━━━━━━━━━━━━━╯`;
 
     // Exactly one user-visible operation keeps group ping responsive.
     await conn.sendMessage(from, { text, contextInfo: channelContext });
@@ -45,3 +44,5 @@ cmd({
     await conn.sendMessage(from, { text: '❌ Ping failed' }, { quoted: mek }).catch(() => {});
   }
 });
+
+module.exports = { pingHeaders, bold };
