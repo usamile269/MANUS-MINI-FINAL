@@ -146,7 +146,8 @@ cmd({
     desc: "Enable/Disable auto react to every message",
     category: "settings",
     react: "👑"
-}, async (conn, mek, m, { args, isOwner, reply, botNumber, config }) => {
+}, async (conn, mek, m, { args, isOwner, isMe, reply, botNumber, config }) => {
+    if (!isOwner && !isMe) return reply(ownerOnlyDenied());
     const userConfig = await getUserConfigFromMongoDB(botNumber);
     const value = args[0]?.toLowerCase();
 
