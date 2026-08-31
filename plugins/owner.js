@@ -3,6 +3,7 @@ const config = require('../config');
 const fs = require('fs');
 const path = require('path');
 const { ownerOnlyDenied } = require('../lib/menu-styles');
+const { whitelist, normalizeAllowedJid } = require('../lib/owner-lists');
 
 // ====================================================
 // AHMAD MINI — OWNER COMMANDS (54 total)
@@ -26,7 +27,8 @@ const FOOTER = config.BOT_FOOTER || randomFooter();
 
 // In-memory stores (persist across commands in same session)
 const banList    = new Set();
-const whitelist  = new Set();
+// Shared whitelist is consumed by the main dispatcher for private-mode bypasses.
+
 const blacklist  = new Set();
 const premiumList= new Set();
 const ownerList  = new Set([config.OWNER_NUMBER?.replace(/[^0-9]/g,'')]);
@@ -185,10 +187,10 @@ cmd({
     react: '⭐'
 }, async (conn, mek, m, { isOwner, reply, args }) => {
     if (!isOwner) return reply(ownerOnlyDenied());
-    const num = args[0]?.replace(/[^0-9]/g,'');
-    if (!num) return reply(`⭐ ${toFancy('Usage')}: .whitelist <number>`);
-    whitelist.add(num);
-    reply(`⭐ ${toFancy('Whitelisted')}: +${num}`);
+    const jid = normalizeAllowedJid(args[0]);
+    if (!jid) return reply(`⭐ ${toFancy('Usage')}: .whitelist <number>`);
+    whitelist.add(jid);
+    reply(`⭐ ${toFancy('Whitelisted')}: ${jid}`);
 });
 
 // 9. blacklist
@@ -984,7 +986,7 @@ cmd({
     react: '➕'
 }, async (conn, mek, m, { isOwner, reply, args }) => {
     if (!isOwner) return reply(ownerOnlyDenied());
-    const jid = args[0];
+    const jid = normalizeAllowedJid(args[0]);
     if (!jid) return reply(`➕ ${toFancy('Usage')}: .addjid <jid>`);
     whitelist.add(jid);
     reply(`✅ ${toFancy('JID Added')}: ${jid}`);
@@ -999,7 +1001,7 @@ cmd({
     react: '➖'
 }, async (conn, mek, m, { isOwner, reply, args }) => {
     if (!isOwner) return reply(ownerOnlyDenied());
-    const jid = args[0];
+    const jid = normalizeAllowedJid(args[0]);
     if (!jid) return reply(`➖ ${toFancy('Usage')}: .removejid <jid>`);
     whitelist.delete(jid);
     reply(`✅ ${toFancy('JID Removed')}: ${jid}`);
