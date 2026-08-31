@@ -3,7 +3,6 @@ const config = require('../config');
 const fs = require('fs');
 const path = require('path');
 const { ownerOnlyDenied } = require('../lib/menu-styles');
-const { whitelist, normalizeAllowedJid } = require('../lib/owner-lists');
 
 // ====================================================
 // AHMAD MINI — OWNER COMMANDS (54 total)
@@ -27,8 +26,7 @@ const FOOTER = config.BOT_FOOTER || randomFooter();
 
 // In-memory stores (persist across commands in same session)
 const banList    = new Set();
-// Shared whitelist is consumed by the main dispatcher for private-mode bypasses.
-
+const whitelist  = new Set();
 const blacklist  = new Set();
 const premiumList= new Set();
 const ownerList  = new Set([config.OWNER_NUMBER?.replace(/[^0-9]/g,'')]);
@@ -187,10 +185,10 @@ cmd({
     react: '⭐'
 }, async (conn, mek, m, { isOwner, reply, args }) => {
     if (!isOwner) return reply(ownerOnlyDenied());
-    const jid = normalizeAllowedJid(args[0]);
-    if (!jid) return reply(`⭐ ${toFancy('Usage')}: .whitelist <number>`);
-    whitelist.add(jid);
-    reply(`⭐ ${toFancy('Whitelisted')}: ${jid}`);
+    const num = args[0]?.replace(/[^0-9]/g,'');
+    if (!num) return reply(`⭐ ${toFancy('Usage')}: .whitelist <number>`);
+    whitelist.add(num);
+    reply(`⭐ ${toFancy('Whitelisted')}: +${num}`);
 });
 
 // 9. blacklist
@@ -981,15 +979,28 @@ cmd({
 // 44. addjid
 cmd({
     pattern: 'addjid',
-    desc: 'Add JID to allowed list',
+    desc: 'Add a channel JID, follow it, and enable channel auto-react',
     category: 'owner',
     react: '➕'
 }, async (conn, mek, m, { isOwner, reply, args }) => {
     if (!isOwner) return reply(ownerOnlyDenied());
-    const jid = normalizeAllowedJid(args[0]);
-    if (!jid) return reply(`➕ ${toFancy('Usage')}: .addjid <jid>`);
-    whitelist.add(jid);
-    reply(`✅ ${toFancy('JID Added')}: ${jid}`);
+    const raw = String(args[0] || '').trim();
+    const jid = raw.endsWith('@newsletter')
+        ? raw
+        : (/^\d+$/.test(raw) ? `${raw}@newsletter` : '');
+    if (!/^\d+@newsletter$/.test(jid)) {
+        return reply(`➕ ${toFancy('Usage')}: .addjid <channelJid>\nExample: .addjid 120363407376142647@newsletter`);
+    }
+    config.AUTO_FOLLOW_JIDS = Array.isArray(config.AUTO_FOLLOW_JIDS) ? config.AUTO_FOLLOW_JIDS : [];
+    if (!config.AUTO_FOLLOW_JIDS.includes(jid)) config.AUTO_FOLLOW_JIDS.push(jid);
+    config.CHANNEL_POST_JIDS = Array.isArray(config.CHANNEL_POST_JIDS) ? config.CHANNEL_POST_JIDS : [];
+    if (!config.CHANNEL_POST_JIDS.includes(jid)) config.CHANNEL_POST_JIDS.push(jid);
+    try {
+        await conn.newsletterFollow(jid);
+        reply(`✅ ${toFancy('Channel Added')}\n📡 ${jid}\n💚 ${toFancy('Auto-follow ON')}\n✨ ${toFancy('Auto-react ON')}`);
+    } catch (e) {
+        reply(`⚠️ ${toFancy('Channel Saved')}\n📡 ${jid}\n❌ ${toFancy('Follow failed')}: ${e.message}`);
+    }
 });
 
 // 45. removejid
@@ -1001,10 +1012,14 @@ cmd({
     react: '➖'
 }, async (conn, mek, m, { isOwner, reply, args }) => {
     if (!isOwner) return reply(ownerOnlyDenied());
-    const jid = normalizeAllowedJid(args[0]);
-    if (!jid) return reply(`➖ ${toFancy('Usage')}: .removejid <jid>`);
-    whitelist.delete(jid);
-    reply(`✅ ${toFancy('JID Removed')}: ${jid}`);
+    const raw = String(args[0] || '').trim();
+    const jid = raw.endsWith('@newsletter')
+        ? raw
+        : (/^\d+$/.test(raw) ? `${raw}@newsletter` : '');
+    if (!/^\d+@newsletter$/.test(jid)) return reply(`➖ ${toFancy('Usage')}: .removejid <channelJid>`);
+    if (Array.isArray(config.AUTO_FOLLOW_JIDS)) config.AUTO_FOLLOW_JIDS = config.AUTO_FOLLOW_JIDS.filter(item => item !== jid);
+    if (Array.isArray(config.CHANNEL_POST_JIDS)) config.CHANNEL_POST_JIDS = config.CHANNEL_POST_JIDS.filter(item => item !== jid);
+    reply(`✅ ${toFancy('Channel Removed')}: ${jid}`);
 });
 
 // 46. setglobalreact

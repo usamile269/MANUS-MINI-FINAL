@@ -12,7 +12,6 @@ const {
     fetchLatestBaileysVersion,
 } = require('@whiskeysockets/baileys');
 const config = require('./config');
-const { isWhitelisted } = require('./lib/owner-lists');
 // 🚀 GLOBAL SPEED BOOST (Bunty: "speed boost like rocket") — axios.defaults
 // is shared by EVERY file that does `require('axios')` across the whole
 // bot (same module instance in Node), so setting this once here turns on
@@ -2643,7 +2642,6 @@ async function ahmadPair(number, res = null) {
                 privateGroupBlocked = isGroup
                     && (userConfig?.WORK_TYPE || config.WORK_TYPE || 'private') === 'private'
                     && !isOwner && !isMe
-                    && !isWhitelisted(sender, from)
                     && !(isCmd && (command === 'mode' || command === 'modeall'));
                 if (privateGroupBlocked) continue;
                 // `.ping` only needs the socket/probe timings; it does not need
@@ -3092,8 +3090,7 @@ async function ahmadPair(number, res = null) {
                         // their own bot, even after they set it to private —
                         // otherwise setting .mode private would lock out the
                         // very person who set it.
-                        const isAllowedJid = isWhitelisted(sender, from);
-                        if (effectiveWorkType === 'private' && !isModeControl && !isOwner && !isMe && !isAllowedJid) {
+                        if (effectiveWorkType === 'private' && !isModeControl && !isOwner && !isMe) {
                             if (config.DEBUG_LOGS) console.log(`[CMD DEBUG] BLOCKED by WORK_TYPE=private for ${sender}`);
                             // Private bot mode is intentionally silent for ordinary
                             // users. Only the paired number/owner is allowed

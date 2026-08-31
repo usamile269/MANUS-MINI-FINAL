@@ -17,7 +17,6 @@ assert.ok(meIndex >= 0, 'self identity initialization must exist');
 assert.ok(gateIndex >= 0, 'private-group gate must exist');
 assert.ok(ownerIndex < gateIndex, 'private-group gate must follow isOwner initialization');
 assert.ok(meIndex < gateIndex, 'private-group gate must follow isMe initialization');
-assert.ok(source.includes('&& !isWhitelisted(sender, from)'), 'private gate must respect addjid allow-list');
 assert.equal(source.indexOf('&& !isOwner && !isMe', 0), source.indexOf('&& !isOwner && !isMe', gateIndex), 'no earlier private gate may reference uninitialized identities');
 console.log('owner scope initialization-order regression: PASS');
 
