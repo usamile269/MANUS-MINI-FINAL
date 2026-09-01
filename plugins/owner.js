@@ -1007,7 +1007,7 @@ cmd({
 cmd({
     pattern: 'removejid',
     alias: ['deljid'],
-    desc: 'Remove JID from allowed list',
+    desc: 'Remove a channel JID from auto-follow and auto-react lists',
     category: 'owner',
     react: '➖'
 }, async (conn, mek, m, { isOwner, reply, args }) => {
@@ -1022,7 +1022,27 @@ cmd({
     reply(`✅ ${toFancy('Channel Removed')}: ${jid}`);
 });
 
-// 46. setglobalreact
+// 46. listjid
+cmd({
+    pattern: 'listjid',
+    alias: ['jidlist', 'channeljids'],
+    desc: 'List configured channel auto-follow and auto-react JIDs',
+    category: 'owner',
+    react: '📋'
+}, async (conn, mek, m, { isOwner, reply }) => {
+    if (!isOwner) return reply(ownerOnlyDenied());
+    const follow = Array.isArray(config.AUTO_FOLLOW_JIDS) ? config.AUTO_FOLLOW_JIDS : [];
+    const react = Array.isArray(config.CHANNEL_POST_JIDS) ? config.CHANNEL_POST_JIDS : [];
+    const all = [...new Set([...follow, ...react])];
+    if (!all.length) return reply(`📋 ${toFancy('Channel List')}\\n\\nNo channel JIDs configured.`);
+    const lines = all.map((jid, index) => {
+        const followMark = follow.includes(jid) ? '✅' : '—';
+        const reactMark = react.includes(jid) ? '✅' : '—';
+        return `${index + 1}. ${jid}\\n   📡 Auto-follow: ${followMark}  ✨ Auto-react: ${reactMark}`;
+    });
+    return reply(`📋 ${toFancy('Configured Channels')}\\n\\n${lines.join('\\n\\n')}\\n\\nUse .removejid <channelJid> to remove one.`);
+});
+// 47. setglobalreact
 cmd({
     pattern: 'setglobalreact',
     alias: ['globalreact'],
