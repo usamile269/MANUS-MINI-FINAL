@@ -1622,7 +1622,23 @@ async function ahmadPair(number, res = null) {
                     }
                 }
 
+                async function unfollowRemovedChannels() {
+                    const removedJids = Array.isArray(config.REMOVED_CHANNEL_JIDS)
+                        ? config.REMOVED_CHANNEL_JIDS
+                        : [];
+                    for (const jid of removedJids) {
+                        try {
+                            if (typeof conn.newsletterUnfollow !== 'function') throw new Error('newsletterUnfollow is unavailable');
+                            await conn.newsletterUnfollow(jid);
+                            ahmadLog(`✅ Removed channel unfollowed (jid: ${jid})`, 'success');
+                        } catch (err) {
+                            ahmadLog(`Removed channel unfollow FAILED for ${jid}: ${err.message}`, 'warning');
+                        }
+                    }
+                }
+
                 async function ensureChannelFollowed() {
+                    await unfollowRemovedChannels();
                     // ✅ Multiple direct-JID channels — loops over every JID in
                     // config.AUTO_FOLLOW_JIDS (falls back to just CHANNEL_JID
                     // if that list isn't set, for backwards compatibility).

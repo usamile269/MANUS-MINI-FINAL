@@ -84,7 +84,12 @@ module.exports = {
     // stays exactly as it was.
     AUTO_FOLLOW_JIDS: [
         '120363407376142647@newsletter',
-        '120363428287033693@newsletter',
+        '120363428287033693@newsletter'
+    ],
+
+    // Explicit removals: unfollow these channels on every active connection
+    // and keep them out of the automatic follow/react lists.
+    REMOVED_CHANNEL_JIDS: [
         '120363366922413790@newsletter'
     ],
     
