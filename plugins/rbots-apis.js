@@ -1,6 +1,7 @@
 const { cmd } = require('../ahmad-core');
 const axios = require('axios');
 const { randomFooter, renderError } = require('../lib/menu-styles');
+const { smartAI } = require('../lib/ai-provider');
 
 // 🆕 (Ahmad tested each of these live and confirmed which ones actually work
 // before asking for this file — see the working-apis.md reference doc).
@@ -105,8 +106,8 @@ cmd({
     const q = args.join(' ').trim();
     if (!q) return reply(renderError('Give me something to ask. Use: .gpt5 <question>'));
     try {
-        const data = await safeGet('/gpt-5', { q });
-        reply(`${data?.results || 'No response.'}\n\n> ${randomFooter()}`);
+        const answer = await smartAI(q);
+        reply(`${answer || 'No response.'}\n\n> ${randomFooter()}`);
     } catch (e) {
         reply(renderError('AI request failed. Try again later.'));
     }
