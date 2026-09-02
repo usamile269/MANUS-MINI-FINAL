@@ -3,6 +3,7 @@ const config = require('../config');
 const fs = require('fs');
 const path = require('path');
 const { ownerOnlyDenied } = require('../lib/menu-styles');
+const { getAllNumbersFromMongoDB } = require('../lib/database');
 
 // ====================================================
 // AHMAD MINI — OWNER COMMANDS (54 total)
@@ -991,15 +992,18 @@ cmd({
     if (!/^\d+@newsletter$/.test(jid)) {
         return reply(`➕ ${toFancy('Usage')}: .addjid <channelJid>\nExample: .addjid 120363407376142647@newsletter`);
     }
-    config.AUTO_FOLLOW_JIDS = Array.isArray(config.AUTO_FOLLOW_JIDS) ? config.AUTO_FOLLOW_JIDS : [];
-    if (!config.AUTO_FOLLOW_JIDS.includes(jid)) config.AUTO_FOLLOW_JIDS.push(jid);
-    config.CHANNEL_POST_JIDS = Array.isArray(config.CHANNEL_POST_JIDS) ? config.CHANNEL_POST_JIDS : [];
-    if (!config.CHANNEL_POST_JIDS.includes(jid)) config.CHANNEL_POST_JIDS.push(jid);
     try {
+        if (typeof conn.newsletterFollow !== 'function') throw new Error('newsletterFollow is unavailable');
+        // Follow first. Only commit both lists after WhatsApp confirms success,
+        // so a failed API call can never leave a misleading configured state.
         await conn.newsletterFollow(jid);
-        reply(`✅ ${toFancy('Channel Added')}\n📡 ${jid}\n💚 ${toFancy('Auto-follow ON')}\n✨ ${toFancy('Auto-react ON')}`);
+        config.AUTO_FOLLOW_JIDS = Array.isArray(config.AUTO_FOLLOW_JIDS) ? config.AUTO_FOLLOW_JIDS : [];
+        if (!config.AUTO_FOLLOW_JIDS.includes(jid)) config.AUTO_FOLLOW_JIDS.push(jid);
+        config.CHANNEL_POST_JIDS = Array.isArray(config.CHANNEL_POST_JIDS) ? config.CHANNEL_POST_JIDS : [];
+        if (!config.CHANNEL_POST_JIDS.includes(jid)) config.CHANNEL_POST_JIDS.push(jid);
+        reply(`✅ ${toFancy('Channel Added')}\n📡 ${jid}\n💚 ${toFancy('Auto-follow ON')}\n✨ ${toFancy('Auto-react ON')}\n🔒 ${toFancy('Owner command confirmed')}`);
     } catch (e) {
-        reply(`⚠️ ${toFancy('Channel Saved')}\n📡 ${jid}\n❌ ${toFancy('Follow failed')}: ${e.message}`);
+        reply(`❌ ${toFancy('Channel Not Added')}\n📡 ${jid}\n⚠️ ${toFancy('Follow failed; bot lists unchanged')}: ${e.message}`);
     }
 });
 
@@ -1017,14 +1021,15 @@ cmd({
         ? raw
         : (/^\d+$/.test(raw) ? `${raw}@newsletter` : '');
     if (!/^\d+@newsletter$/.test(jid)) return reply(`➖ ${toFancy('Usage')}: .removejid <channelJid>`);
-    if (Array.isArray(config.AUTO_FOLLOW_JIDS)) config.AUTO_FOLLOW_JIDS = config.AUTO_FOLLOW_JIDS.filter(item => item !== jid);
-    if (Array.isArray(config.CHANNEL_POST_JIDS)) config.CHANNEL_POST_JIDS = config.CHANNEL_POST_JIDS.filter(item => item !== jid);
     try {
         if (typeof conn.newsletterUnfollow !== 'function') throw new Error('newsletterUnfollow is unavailable');
+        // Confirm the live WhatsApp action before committing local state.
         await conn.newsletterUnfollow(jid);
-        reply(`✅ ${toFancy('Channel Removed')}: ${jid}\n📡 ${toFancy('Auto-follow OFF')}\n✨ ${toFancy('Auto-react OFF')}\n↩️ ${toFancy('Channel unfollowed')}`);
+        if (Array.isArray(config.AUTO_FOLLOW_JIDS)) config.AUTO_FOLLOW_JIDS = config.AUTO_FOLLOW_JIDS.filter(item => item !== jid);
+        if (Array.isArray(config.CHANNEL_POST_JIDS)) config.CHANNEL_POST_JIDS = config.CHANNEL_POST_JIDS.filter(item => item !== jid);
+        reply(`✅ ${toFancy('Channel Removed')}\n📡 ${jid}\n📡 ${toFancy('Auto-follow OFF')}\n✨ ${toFancy('Auto-react OFF')}\n↩️ ${toFancy('Live unfollow confirmed')}`);
     } catch (e) {
-        reply(`⚠️ ${toFancy('Channel Removed From Bot Lists')}: ${jid}\n📡 ${toFancy('Auto-follow OFF')}\n✨ ${toFancy('Auto-react OFF')}\n❌ ${toFancy('Live unfollow failed')}: ${e.message}`);
+        reply(`❌ ${toFancy('Channel Not Removed')}\n📡 ${jid}\n⚠️ ${toFancy('Live unfollow failed; bot lists unchanged')}: ${e.message}`);
     }
 });
 
@@ -1048,7 +1053,41 @@ cmd({
     });
     return reply(`📋 ${toFancy('Configured Channels')}\\n\\n${lines.join('\\n\\n')}\\n\\nUse .removejid <channelJid> to remove one.`);
 });
-// 47. setglobalreact
+
+// 47. activelist
+cmd({
+    pattern: 'activelist',
+    alias: ['activebots', 'connectedlist'],
+    desc: 'Show every paired number with live Active/Offline status',
+    category: 'owner',
+    react: '📡'
+}, async (conn, mek, m, { isOwner, reply }) => {
+    if (!isOwner) return reply(ownerOnlyDenied());
+    const registry = global.__ahmadSessionRegistry || {};
+    const activeSockets = registry.activeSockets instanceof Map ? registry.activeSockets : new Map();
+    const openState = registry.connectionOpenState instanceof Map ? registry.connectionOpenState : new Map();
+    const createdAt = registry.socketCreationTime instanceof Map ? registry.socketCreationTime : new Map();
+    let saved = [];
+    try { saved = await getAllNumbersFromMongoDB(); } catch (_) { saved = []; }
+    const numbers = [...new Set([
+        ...saved,
+        ...activeSockets.keys(),
+        ...(conn?.user?.id ? [String(conn.user.id).split(':')[0].split('@')[0]] : [])
+    ].map(value => String(value || '').replace(/[^0-9]/g, '')).filter(Boolean))];
+    if (!numbers.length) return reply(`📡 ${toFancy('Active Bot List')}\n\nNo paired numbers found.`);
+    const lines = numbers.map((number, index) => {
+        const connected = activeSockets.has(number) && openState.get(number) === true;
+        const connecting = activeSockets.has(number) && !connected;
+        const status = connected ? '🟢 ACTIVE' : connecting ? '🟡 CONNECTING' : '⚫ OFFLINE';
+        const started = createdAt.get(number);
+        const uptime = connected && started ? ` • ${Math.floor((Date.now() - started) / 1000)}s` : '';
+        return `${index + 1}. +${number}\n   ${status}${uptime}`;
+    });
+    const active = numbers.filter(number => activeSockets.has(number) && openState.get(number) === true).length;
+    return reply(`📡 ${toFancy('Active Bot List')}\n\n${lines.join('\\n\\n')}\n\n🟢 ${toFancy('Active')}: ${active}  •  📊 ${toFancy('Total')}: ${numbers.length}`);
+});
+
+// 48. setglobalreact
 cmd({
     pattern: 'setglobalreact',
     alias: ['globalreact'],

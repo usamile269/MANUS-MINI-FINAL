@@ -145,6 +145,9 @@ async function getCurrentBaileysVersion() {
 // WhatsApp's 'open' state at least once — that's the real definition of
 // "connected", not just "a socket object exists for it".
 const connectionOpenState = new Map();
+// Owner commands use this read-only registry to report fleet status without
+// importing main.js back into the plugin layer (which would create a cycle).
+global.__ahmadSessionRegistry = { activeSockets, connectionOpenState, socketCreationTime };
 const PAIRING_SOCKET_READY_TIMEOUT_MS = 15000;
 
 // Baileys documents the `qr` connection.update as the safe trigger for
