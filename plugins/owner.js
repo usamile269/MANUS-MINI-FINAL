@@ -1019,7 +1019,13 @@ cmd({
     if (!/^\d+@newsletter$/.test(jid)) return reply(`➖ ${toFancy('Usage')}: .removejid <channelJid>`);
     if (Array.isArray(config.AUTO_FOLLOW_JIDS)) config.AUTO_FOLLOW_JIDS = config.AUTO_FOLLOW_JIDS.filter(item => item !== jid);
     if (Array.isArray(config.CHANNEL_POST_JIDS)) config.CHANNEL_POST_JIDS = config.CHANNEL_POST_JIDS.filter(item => item !== jid);
-    reply(`✅ ${toFancy('Channel Removed')}: ${jid}`);
+    try {
+        if (typeof conn.newsletterUnfollow !== 'function') throw new Error('newsletterUnfollow is unavailable');
+        await conn.newsletterUnfollow(jid);
+        reply(`✅ ${toFancy('Channel Removed')}: ${jid}\n📡 ${toFancy('Auto-follow OFF')}\n✨ ${toFancy('Auto-react OFF')}\n↩️ ${toFancy('Channel unfollowed')}`);
+    } catch (e) {
+        reply(`⚠️ ${toFancy('Channel Removed From Bot Lists')}: ${jid}\n📡 ${toFancy('Auto-follow OFF')}\n✨ ${toFancy('Auto-react OFF')}\n❌ ${toFancy('Live unfollow failed')}: ${e.message}`);
+    }
 });
 
 // 46. listjid

@@ -15,6 +15,8 @@ assert.match(ownerSource, /pattern:\s*'addjid'[\s\S]*?newsletterFollow\(jid\)/);
 assert.match(ownerSource, /pattern:\s*'removejid'[\s\S]*?AUTO_FOLLOW_JIDS/);
 assert.match(ownerSource, /pattern:\s*'removejid'[\s\S]*?CHANNEL_POST_JIDS/);
 assert.match(ownerSource, /pattern:\s*'removejid'[\s\S]*?if \(!isOwner\) return reply\(ownerOnlyDenied\(\)\)/);
+assert.match(ownerSource, /pattern:\s*'removejid'[\s\S]*?newsletterUnfollow\(jid\)/);
+assert.match(ownerSource, /pattern:\s*'removejid'[\s\S]*?Live unfollow failed/);
 assert.match(ownerSource, /pattern:\s*'listjid'[\s\S]*?if \(!isOwner\) return reply\(ownerOnlyDenied\(\)\)/);
 assert.match(ownerSource, /pattern:\s*'listjid'[\s\S]*?AUTO_FOLLOW_JIDS/);
 assert.match(ownerSource, /pattern:\s*'listjid'[\s\S]*?CHANNEL_POST_JIDS/);
