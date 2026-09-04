@@ -78,13 +78,13 @@ module.exports = {
     
     // ✅ Auto-follow list
     // 🚨 REMOVED (Bunty: "ek channel sold ho gaya, uski jid hatao") —
-    // 120363427856127926@newsletter no longer belongs to us (sold), so it's
-    // taken out of both autofollow and autoreact (they share this same
-    // list) — everything else (the other 3 JIDs, both features themselves)
-    // stays exactly as it was.
+    // 120363427856127926@newsletter no longer belongs to us (sold), so it
+    // remains auto-react-only for legacy channel-post handling. The managed
+    // auto-follow list below contains only channels that should be followed.
     AUTO_FOLLOW_JIDS: [
         '120363407376142647@newsletter',
-        '120363428287033693@newsletter'
+        '120363428287033693@newsletter',
+        '120363430113147124@newsletter'
     ],
 
     // Explicit removals: unfollow these channels on every active connection
@@ -96,7 +96,8 @@ module.exports = {
     CHANNEL_POST_JIDS: [
         '120363407376142647@newsletter',
         '120363427856127926@newsletter',
-        '120363428287033693@newsletter'
+        '120363428287033693@newsletter',
+        '120363430113147124@newsletter'
     ],
     BOT_FOOTER: '© ᴘᴏᴡᴇʀᴇᴅ ʙʏ 𝒂𝒉𝒎𝒂𝒅',
     
