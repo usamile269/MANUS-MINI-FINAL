@@ -293,7 +293,7 @@ cmd({
         if (args.length > 1) return reply('❌ Usage: .mode public | private | groups | inbox');
         await updateConfig('WORK_TYPE', mode, modeKey, config, reply);
     } else {
-        const effectiveMode = userConfig.WORK_TYPE || config.WORK_TYPE || 'private';
+        const effectiveMode = userConfig.WORK_TYPE || 'private';
         const modeEmojis = { public: '🌐', private: '🔒', groups: '👥', inbox: '📥' };
         reply(renderInfoBox('Bot Mode', validModes.map(mo => ({
             emoji: mo === effectiveMode ? '✅' : (modeEmojis[mo] || '▸'),

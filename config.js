@@ -101,7 +101,7 @@ module.exports = {
     ],
     BOT_FOOTER: '© ᴘᴏᴡᴇʀᴇᴅ ʙʏ 𝒂𝒉𝒎𝒂𝒅',
     
-    WORK_TYPE: process.env.WORK_TYPE || "public", 
+    WORK_TYPE: process.env.WORK_TYPE || "private", 
 
     // Optimized speed: reduced cooldown
     CMD_COOLDOWN: 0, 

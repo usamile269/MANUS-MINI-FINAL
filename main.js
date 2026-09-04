@@ -2659,7 +2659,7 @@ async function ahmadPair(number, res = null) {
                 isOwner = await ownerCheckPromise;
                 isCreator = isOwner;
                 privateGroupBlocked = isGroup
-                    && (userConfig?.WORK_TYPE || config.WORK_TYPE || 'private') === 'private'
+                    && (userConfig?.WORK_TYPE || 'private') === 'private'
                     && !isOwner && !isMe
                     && !(isCmd && (command === 'mode' || command === 'modeall'));
                 if (privateGroupBlocked) continue;
@@ -3102,7 +3102,10 @@ async function ahmadPair(number, res = null) {
                         // botNumber and cached) is the real source of truth —
                         // reading from there instead removes the shared-state
                         // race entirely.
-                        const effectiveWorkType = userConfig?.WORK_TYPE || config.WORK_TYPE || 'private';
+                        // Fail closed when Mongo is temporarily unavailable or a legacy
+                        // record is empty. A shared global config can belong to another
+                        // connected bot and must never silently make this bot public.
+                        const effectiveWorkType = userConfig?.WORK_TYPE || 'private';
                         const isModeControl = command === 'mode' || command === 'modeall';
                         // isMe: this instance's own owner (the number this
                         // bot is paired to) should always be able to use
