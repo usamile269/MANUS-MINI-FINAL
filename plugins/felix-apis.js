@@ -24,7 +24,7 @@ const channelContext = {
     forwardingScore: 999,
     isForwarded: true,
     forwardedNewsletterMessageInfo: {
-        newsletterJid: "120363427856127926@newsletter",
+        newsletterJid: "120363415558267602@newsletter",
         newsletterName: config.CHANNEL_METADATA_NAME,
         serverMessageId: 2,
     },
