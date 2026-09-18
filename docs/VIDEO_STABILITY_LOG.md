@@ -66,7 +66,7 @@ The protected media command files were not changed by the `.video` fallback repa
 ```text
 Git commit: 70d5f6790306202a895906cbbd8e67a42f9511b2
 Commit: Make video provider fallback reliable
-Railway service: web-production-f33e1.up.railway.app
+Railway service: web-production-d0274.up.railway.app
 Deployment health: healthy
 ```
 

@@ -6,11 +6,11 @@
   "rewrites": [
     { "source": "/", "destination": "/pair.html" },
     { "source": "/pair", "destination": "/pair.html" },
-    { "source": "/code", "destination": "https://web-production-f33e1.up.railway.app/code" },
-    { "source": "/active", "destination": "https://web-production-f33e1.up.railway.app/active" },
-    { "source": "/status", "destination": "https://web-production-f33e1.up.railway.app/status" },
-    { "source": "/site-settings", "destination": "https://web-production-f33e1.up.railway.app/site-settings" },
-    { "source": "/health", "destination": "https://web-production-f33e1.up.railway.app/health" }
+    { "source": "/code", "destination": "https://web-production-d0274.up.railway.app/code" },
+    { "source": "/active", "destination": "https://web-production-d0274.up.railway.app/active" },
+    { "source": "/status", "destination": "https://web-production-d0274.up.railway.app/status" },
+    { "source": "/site-settings", "destination": "https://web-production-d0274.up.railway.app/site-settings" },
+    { "source": "/health", "destination": "https://web-production-d0274.up.railway.app/health" }
   ],
   "headers": [
     {
