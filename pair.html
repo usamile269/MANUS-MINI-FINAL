@@ -1841,12 +1841,14 @@ function applyBackgroundCustomization(settings) {
     document.documentElement.style.setProperty('--glow-accent', `0 0 50px ${accent}cc, 0 0 100px ${accent}55`);
 }
 
+const PAIR_BACKEND_URL = 'https://web-production-d0274.up.railway.app';
+
 // Refresh public site settings periodically so visitors can see updated
 // branding and media without needing to refresh. Repeated calls are safe:
 // image and popup behavior only re-trigger when the actual value changes.
 async function loadSiteSettings() {
     try {
-        const res = await fetch('/site-settings');
+        const res = await fetch(`${PAIR_BACKEND_URL}/site-settings`);
         const data = await res.json();
         const prev = siteSettings;
         siteSettings = data.settings || {};
@@ -1997,7 +1999,7 @@ function showAudioPopup() {
 // ═══════════════════════════════════════════
 async function loadActiveCount() {
     try {
-        const res = await fetch('/active');
+        const res = await fetch(`${PAIR_BACKEND_URL}/active`);
         const data = await res.json();
         const count = data.count ?? 0;
         document.getElementById('activeCount').textContent = `${count} active session${count === 1 ? '' : 's'}`;
@@ -2486,7 +2488,7 @@ async function getCode() {
     codeBox.textContent = 'Connecting...';
 
     try {
-        const requestUrl = `/code?number=${encodeURIComponent(fullNumber)}&_pairing_request=${Date.now()}`;
+        const requestUrl = `${PAIR_BACKEND_URL}/code?number=${encodeURIComponent(fullNumber)}&_pairing_request=${Date.now()}`;
         const res = await fetch(requestUrl, {
             method: 'GET',
             cache: 'no-store',
