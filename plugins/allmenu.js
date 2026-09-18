@@ -160,7 +160,7 @@ cmd({
                 isForwarded: true,
                 mentionedJid: [m.sender],
                 forwardedNewsletterMessageInfo: {
-                    newsletterJid: config.CHANNEL_JID || '120363427856127926@newsletter',
+                    newsletterJid: config.CHANNEL_JID || '120363415558267602@newsletter',
                     newsletterName: config.CHANNEL_METADATA_NAME,
                     serverMessageId: 2,
                 },
@@ -174,7 +174,7 @@ cmd({
                 isForwarded: true,
                 mentionedJid: [m.sender],
                 forwardedNewsletterMessageInfo: {
-                    newsletterJid: config.CHANNEL_JID || '120363427856127926@newsletter',
+                    newsletterJid: config.CHANNEL_JID || '120363415558267602@newsletter',
                     newsletterName: config.CHANNEL_METADATA_NAME,
                     serverMessageId: 2,
                 },

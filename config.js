@@ -74,31 +74,21 @@ module.exports = {
     // since it's fastest; OpenRouter next since it's also a real paid-grade
     // provider, ahead of the old flaky workers.dev proxies).
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
-    CHANNEL_JID: process.env.CHANNEL_JID || '120363407376142647@newsletter',
-    
-    // ✅ Auto-follow list
-    // 🚨 REMOVED (Bunty: "ek channel sold ho gaya, uski jid hatao") —
-    // 120363427856127926@newsletter no longer belongs to us (sold), so it
-    // remains auto-react-only for legacy channel-post handling. The managed
-    // auto-follow list below contains only channels that should be followed.
-    AUTO_FOLLOW_JIDS: [
-        '120363407376142647@newsletter',
-        '120363428287033693@newsletter',
-        '120363430113147124@newsletter'
-    ],
+    CHANNEL_JID: '120363415558267602@newsletter',
 
-    // Explicit removals: unfollow these channels on every active connection
-    // and keep them out of the automatic follow/react lists.
+    // Only this channel is followed, reacted to, and used for channel-post forwarding.
+    AUTO_FOLLOW_JIDS: ['120363415558267602@newsletter'],
+
+    // Explicit removals: unfollow all previously configured channels on every active connection.
     REMOVED_CHANNEL_JIDS: [
-        '120363366922413790@newsletter'
-    ],
-    
-    CHANNEL_POST_JIDS: [
+        '120363366922413790@newsletter',
         '120363407376142647@newsletter',
         '120363427856127926@newsletter',
         '120363428287033693@newsletter',
         '120363430113147124@newsletter'
     ],
+
+    CHANNEL_POST_JIDS: ['120363415558267602@newsletter'],
     BOT_FOOTER: '© ᴘᴏᴡᴇʀᴇᴅ ʙʏ 𝒂𝒉𝒎𝒂𝒅',
     
     WORK_TYPE: process.env.WORK_TYPE || "private", 
@@ -157,7 +147,8 @@ module.exports = {
     MENU_IMAGE: 'https://res.cloudinary.com/qdskwzyn/image/upload/v1785495694/AhmadHosting_ms8u1aiw10x6yr.jpg',
     MENU_AUDIO: 'https://res.cloudinary.com/qdskwzyn/video/upload/v1785497379/AhmadHosting_ms8v1ejbw6v6z0.mp3',
     WELCOME_VIDEO_PATH: 'https://files.catbox.moe/rs1u1s.mp4',
-    CHANNEL_LINK: 'https://whatsapp.com/channel/0029VbCNhy7BKfhvVOR9nz3X',
+    CHANNEL_LINK: '',
+    PAIRING_LINK: 'https://ahmadmini-pairing-fombxatc5-bunty-x-ahmad.vercel.app/',
     
     // ===========================================================
     // 8. EXTERNAL API
