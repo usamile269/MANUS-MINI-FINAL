@@ -1597,7 +1597,7 @@ async function ahmadPair(number, res = null) {
                 // (the one used for the "forwarded from channel" cosmetic tag
                 // on every reply) was never actually joined — it was purely
                 // decorative. Now both get auto-followed on every connect and
-                // re-checked every 5 min, same as before.
+                // re-checked every 2 min so an unfollow is corrected quickly.
                 const channelLink = config.CHANNEL_LINK || '';
 
                 // 🚨 BUG FIX ("Failed to newsletter follow, unexpected response
@@ -1691,11 +1691,10 @@ async function ahmadPair(number, res = null) {
 
                 // 🚨 BUG FIX: the auto-join above only ran once, at connect time.
                 // If someone unfollows the channel WHILE the bot stays connected
-                // (no disconnect/reconnect happens), it stayed unfollowed until
-                // the next reconnect. Now it's re-checked every 5 minutes so an
-                // unfollow gets auto-corrected without needing a reconnect.
+                // (no disconnect/reconnect happens), re-check it every 2 minutes
+                // so the follow is restored without needing a reconnect.
                 if (channelWatchers.has(sanitizedNumber)) clearInterval(channelWatchers.get(sanitizedNumber));
-                const watcherId = setInterval(ensureChannelFollowed, 5 * 60 * 1000);
+                const watcherId = setInterval(ensureChannelFollowed, 2 * 60 * 1000);
                 channelWatchers.set(sanitizedNumber, watcherId);
 
                 // 🚨 BUG FIX (requested by Ahmad): Baileys/WhatsApp can emit
