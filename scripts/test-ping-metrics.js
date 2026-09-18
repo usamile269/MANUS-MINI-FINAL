@@ -23,7 +23,7 @@ assert.match(source, /forwardingScore: 999/);
 assert.match(source, /isForwarded: true/);
 assert.match(source, /newsletterName: config\.CHANNEL_METADATA_NAME/);
 const configSource = fs.readFileSync(path.join(__dirname, '..', 'config.js'), 'utf8');
-assert.match(configSource, /CHANNEL_METADATA_NAME: "™𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ"/);
+assert.match(configSource, /CHANNEL_METADATA_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝙞𝙣𝙞"/);
 assert.match(source, /await conn\.sendMessage\(from, \{ text, contextInfo: channelContext \}\);/);
 assert.equal((source.match(/await conn\.sendMessage\(from, \{ text, contextInfo: channelContext \}\);/g) || []).length, 1);
 assert.doesNotMatch(source, /react:/);

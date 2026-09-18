@@ -42,7 +42,10 @@ cmd({
         ]);
         // Owner global name wins for every user; personal settings remain available
         // only when no global name has been configured.
-        const botName = userConfig.BOT_NAME || myConfig.BOT_NAME || config.BOT_NAME || '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ';
+        const configuredBotName = userConfig.BOT_NAME || myConfig.BOT_NAME || config.BOT_NAME || '𝘼𝙝𝙢𝙖𝙙 𝙈𝙞𝙣𝙞';
+        const botName = /mini\s+ahmad\s+v0?77/i.test(String(configuredBotName))
+            ? '𝘼𝙝𝙢𝙖𝙙 𝙈𝙞𝙣𝙞'
+            : configuredBotName;
 
         let totalCommands = 0;
         let grouped = {};

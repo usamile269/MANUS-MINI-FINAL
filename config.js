@@ -57,8 +57,8 @@ module.exports = {
     // footer branding ("𝙊𝘽𝙎𝙄𝘿𝙄𝘼𝙉 𝙇𝙐𝙓𝙀 • ™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ" — see
     // lib/menu-styles.js FOOTERS), so the bot name and the footer now
     // visually match everywhere.
-    BOT_NAME: "™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ",
-    CHANNEL_METADATA_NAME: "™𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ",
+    BOT_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝙞𝙣𝙞",
+    CHANNEL_METADATA_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝙞𝙣𝙞",
     RAPID_API_KEY: process.env.RAPID_API_KEY || 'b98acee8f5msh4a4fba7da6018ddp1caf30jsn44a2220ad16f',
     // 🆕 (Bunty: "Groq api lagain?") — Groq's free tier (console.groq.com,
     // no card needed) is a real, fast, reliable LLM host — used as the new
