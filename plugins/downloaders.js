@@ -654,6 +654,26 @@ async function getQuickAudioBuffer(videoUrl) {
 }
 
 async function dlAudio(videoUrl, outPath) {
+    // Fast path: the working video provider returns a single progressive MP4;
+    // extract its audio locally instead of waiting on dead audio-only APIs.
+    try {
+        const videoBuf = await raceVideoMedia(videoUrl);
+        const tempVideoPath = outPath.replace(/\.mp3$/, '_fast_video.mp4');
+        fs.writeFileSync(tempVideoPath, videoBuf);
+        try {
+            await new Promise((resolve, reject) => {
+                ffmpeg(tempVideoPath).noVideo().audioCodec('libmp3lame').audioBitrate('128k').format('mp3')
+                    .on('end', resolve).on('error', reject).save(outPath);
+            });
+        } finally {
+            try { fs.unlinkSync(tempVideoPath); } catch {}
+        }
+        if (fs.existsSync(outPath) && isLikelyAudio(fs.readFileSync(outPath))) return;
+        try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
+    } catch (e) {
+        console.log('[YTMP3] fast video-provider path failed, trying audio fallbacks:', e.message);
+    }
+
     // Fastest .play path: JawadTech's direct MP3, with validation. If its CDN
     // link is expired or unavailable, continue immediately to the shared MP4
     // provider path and then yt-dlp; no error is exposed until all fallbacks
@@ -1051,23 +1071,6 @@ async (conn, mek, m, { reply, args, from }) => {
             caption: dlBox('YOUTUBE MP3', [`🎵 ${video.title?.slice(0, 60)}`, `👤 ${video.author || 'YouTube'}`, '⏳ Downloading...'], '🎵'),
             contextInfo: chanCtx()
         }, { quoted: fakevCard }).catch(e => console.log('[YTMP3] preview failed:', e.message));
-
-        // Fast path: let WhatsApp fetch the validated MP3 URL directly. This
-        // avoids downloading the whole file into Railway before sending it.
-        try {
-            const directAudioUrl = await getQuickAudioLink(video.url);
-            await sendWithRetry(conn, from, {
-                audio: { url: directAudioUrl },
-                mimetype: 'audio/mpeg',
-                fileName: `${video.title?.slice(0, 35) || 'audio'}.mp3`,
-                ptt: false
-            }, { quoted: fakevCard });
-            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            console.log(`[YTMP3] direct provider completed in ${Date.now() - started}ms`);
-            return;
-        } catch (e) {
-            console.log('[YTMP3] direct provider failed; using buffered fallback:', e.message);
-        }
 
         // Fallback: preserve the existing validated buffered path.
         if (!YTDlpWrapLib) throw new Error('yt-dlp is unavailable on this server.');
