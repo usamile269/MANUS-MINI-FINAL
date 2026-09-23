@@ -1337,9 +1337,9 @@ async (conn, mek, m, { reply, args, from }) => {
             try {
                 const media = await fetchPinterestMedia(item);
                 if (item.isVideo) {
-                    await conn.sendMessage(from, { video: media.buffer, mimetype: media.mimetype, caption, contextInfo: chanCtx() }, { quoted: fakevCard });
+                    await conn.sendMessage(from, { video: media.buffer, mimetype: media.mimetype, caption }, { quoted: fakevCard });
                 } else {
-                    await conn.sendMessage(from, { image: media.buffer, mimetype: media.mimetype, caption, contextInfo: chanCtx() }, { quoted: fakevCard });
+                    await conn.sendMessage(from, { image: media.buffer, mimetype: media.mimetype, caption }, { quoted: fakevCard });
                 }
             } catch (e) {
                 console.log(`[PINSEARCH] failed to send result ${i}:`, e.message);
