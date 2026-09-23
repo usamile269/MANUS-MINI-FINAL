@@ -1328,7 +1328,11 @@ async (conn, mek, m, { reply, args, from }) => {
         const results = await searchPinterest(query);
         if (!results.length) throw new Error('No results found');
 
-        const picks = results.slice(0, 5);
+        const wantsVideo = /\b(video|reel|status|edit|clip)\b/i.test(query);
+        const orderedResults = wantsVideo
+            ? [...results.filter(item => item.isVideo), ...results.filter(item => !item.isVideo)]
+            : results;
+        const picks = orderedResults.slice(0, 5);
         for (let i = 0; i < picks.length; i++) {
             const item = picks[i];
             const caption = i === 0
