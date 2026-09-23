@@ -1272,10 +1272,24 @@ function normalizePinResults(payload) {
     if (!Array.isArray(arr)) return [];
     return arr.map(item => {
         if (typeof item === 'string') return { url: item, isVideo: false };
-        const url = item.url || item.image || item.image_url || item.thumbnail || item.video || item.link;
-        const isVideo = !!item.video || item.type === 'video' || /\.mp4($|\?)/i.test(url || '');
+        const videoUrl = item.video_url || item.video || null;
+        const imageUrl = item.image_url || item.image || item.thumbnail || null;
+        const isVideo = !!videoUrl || item.type === 'video' || /\.mp4($|\?)/i.test(item.url || '');
+        const url = isVideo ? (videoUrl || item.url || imageUrl || item.link) : (imageUrl || item.url || item.link || videoUrl);
         return url ? { url, isVideo } : null;
     }).filter(Boolean);
+}
+
+async function fetchPinterestMedia(item) {
+    const response = await axios.get(item.url, {
+        responseType: 'arraybuffer',
+        timeout: 20000,
+        maxContentLength: 20 * 1024 * 1024,
+        maxBodyLength: 20 * 1024 * 1024,
+        headers: { 'User-Agent': 'Mozilla/5.0', Accept: '*/*' }
+    });
+    const mimetype = response.headers['content-type'] || (item.isVideo ? 'video/mp4' : 'image/jpeg');
+    return { buffer: Buffer.from(response.data), mimetype };
 }
 
 async function searchPinterest(query) {
@@ -1321,10 +1335,11 @@ async (conn, mek, m, { reply, args, from }) => {
                 ? dlBox('PINTEREST SEARCH', [`🔎 ${query}`, `📸 ${picks.length} results`], '📌')
                 : undefined;
             try {
+                const media = await fetchPinterestMedia(item);
                 if (item.isVideo) {
-                    await conn.sendMessage(from, { video: { url: item.url }, mimetype: 'video/mp4', caption, contextInfo: chanCtx() }, { quoted: fakevCard });
+                    await conn.sendMessage(from, { video: media.buffer, mimetype: media.mimetype, caption, contextInfo: chanCtx() }, { quoted: fakevCard });
                 } else {
-                    await conn.sendMessage(from, { image: { url: item.url }, caption, contextInfo: chanCtx() }, { quoted: fakevCard });
+                    await conn.sendMessage(from, { image: media.buffer, mimetype: media.mimetype, caption, contextInfo: chanCtx() }, { quoted: fakevCard });
                 }
             } catch (e) {
                 console.log(`[PINSEARCH] failed to send result ${i}:`, e.message);
