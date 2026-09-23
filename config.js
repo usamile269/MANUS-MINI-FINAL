@@ -148,7 +148,7 @@ module.exports = {
     MENU_AUDIO: 'https://res.cloudinary.com/qdskwzyn/video/upload/v1785497379/AhmadHosting_ms8v1ejbw6v6z0.mp3',
     WELCOME_VIDEO_PATH: 'https://files.catbox.moe/rs1u1s.mp4',
     CHANNEL_LINK: '',
-    PAIRING_LINK: 'https://ahmadmini-pairing-fombxatc5-bunty-x-ahmad.vercel.app/',
+    PAIRING_LINK: 'https://ahmadminipair.vercel.app/',
     
     // ===========================================================
     // 8. EXTERNAL API
