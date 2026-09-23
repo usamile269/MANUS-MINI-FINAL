@@ -63,12 +63,6 @@ const AXIOS_DEFAULTS = {
     }
 };
 
-// Still used by the separate .video/.ytmp4 command below (untouched in this
-// fix — Bunty asked specifically for .play, not .video) — kept so that
-// command doesn't break.
-let ytdl = null;
-try { ytdl = require('@distube/ytdl-core'); } catch { ytdl = null; }
-
 // 🚨 REWRITE (Bunty: ".play API se nahi, pkg.js se banao" — all 6 free
 // scraper APIs were confirmed dead from live logs: Vreden/Alya = DNS dead,
 // Okatsu = now paid (402), Cobalt public = blocked YouTube + needs auth
@@ -430,65 +424,9 @@ const MAX_QUICKAPI_VIDEO_BYTES = 60 * 1024 * 1024; // Video-only cap: above What
 //     opus/voice-note conversion pipeline), so its bytes are downloaded
 //     and the audio extracted via ffmpeg — slower than the video path,
 //     but still just one API call instead of spawning yt-dlp.
-async function getJawadTechResult(videoUrl) {
-    const apiUrl = `https://jawad-tech.vercel.app/download/ytdl?url=${encodeURIComponent(videoUrl)}`;
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
-    const result = data?.result;
-    // The API returns separate mp3 and mp4 fields. Older code validated only
-    // mp4, then discarded mp3, so `.play` always fell through to slow yt-dlp.
-    if (!data?.status || (!result?.mp3 && !result?.mp4)) throw new Error('JawadTech: no usable result');
-    return {
-        mp3: result.mp3 || null,
-        mp4: result.mp4 || null,
-        title: result.title || null,
-        thumbnail: result.thumbnail || null,
-        duration: result.duration || null
-    };
-}
-
-async function getAdeelXtechVideoLink(videoUrl) {
-    const apiUrl = `https://adeel-xtech-apis.vercel.app/api/ytmp4?url=${encodeURIComponent(videoUrl)}`;
-    // Live-tested pasted endpoint: commonly responds in several seconds,
-    // so give it a bounded 12s window instead of the generic 3s API timeout.
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 7000 });
-    return (data?.status && data?.result?.video_download) || null;
-}
-
-async function fetchMediaBuffer(mediaUrl, maxBytes, timeout = 60000) {
-    const response = await axios.get(mediaUrl, {
-        responseType: 'arraybuffer',
-        timeout,
-        family: 4,
-        maxContentLength: maxBytes,
-        maxBodyLength: maxBytes,
-        // These public media CDNs return a complete stream reliably as 206;
-        // without the open-ended range some valid links answer 403/410.
-        headers: { 'User-Agent': 'Mozilla/5.0', Range: 'bytes=0-' }
-    });
-    if (![200, 206].includes(response.status)) throw new Error(`media HTTP ${response.status}`);
-    const buf = Buffer.from(response.data);
-    if (buf.length < 15000) throw new Error('media file too small');
-    return buf;
-}
-
-async function resolveVideoLink(videoUrl) {
-    const providers = [
-        { name: 'JawadTech', resolve: async () => (await getJawadTechResult(videoUrl)).mp4 },
-        { name: 'AdeelXTech', resolve: async () => getAdeelXtechVideoLink(videoUrl) },
-        { name: 'EliteProTech', resolve: async () => getEliteProTechVideoLink(videoUrl) }
-    ];
-    const attempts = providers.map(async ({ name, resolve }) => {
-        const link = await resolve();
-        if (!link) throw new Error(`${name}: no usable link`);
-        return { name, link };
-    });
-    try { return await Promise.any(attempts); }
-    catch (e) { throw new Error((e.errors || []).map(x => x.message).join(' | ') || 'All video providers failed'); }
-}
-
 // Public scraper APIs are frequently retired or rate-limited. Keep YouTube
 // downloads independent from them and retry current player-client profiles.
-const YT_EXTRACTOR_PROFILES = ['android,web', 'web,android', 'tv,web'];
+const YT_EXTRACTOR_PROFILES = ['android', 'web'];
 function ytExtractorArgs(profile) {
     return ['--extractor-args', `youtube:player_client=${profile}`];
 }
@@ -521,208 +459,7 @@ async function raceVideoMedia(videoUrl) {
     return downloadYtDlpBuffer(videoUrl);
 }
 
-// 🆕 (Bunty: "BUNTY_MD wali file may .song/.video fully working hai, hamare
-// may bhi lagao, branding hamari rahay") — ported straight from that
-// confirmed-working code as extra providers in the SAME quick-API chains
-// below, not a replacement UI/box/branding stays exactly as it was.
-async function getEliteProTechAudioLink(videoUrl) {
-    const apiUrl = `https://eliteprotech-apis.zone.id/ytdown?url=${encodeURIComponent(videoUrl)}&format=mp3`;
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
-    return (data?.success && data?.downloadURL) || null;
-}
-async function getEliteProTechVideoLink(videoUrl) {
-    const apiUrl = `https://eliteprotech-apis.zone.id/ytdown?url=${encodeURIComponent(videoUrl)}&format=mp4`;
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
-    return (data?.success && data?.downloadURL) || null;
-}
-async function getYupraAudioLink(videoUrl) {
-    const apiUrl = `https://api.yupra.my.id/api/downloader/ytmp3?url=${encodeURIComponent(videoUrl)}`;
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
-    return (data?.success && data?.data?.download_url) || null;
-}
-async function getYupraVideoLink(videoUrl) {
-    const apiUrl = `https://api.yupra.my.id/api/downloader/ytmp4?url=${encodeURIComponent(videoUrl)}`;
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
-    return (data?.success && data?.data?.download_url) || null;
-}
-async function getOkatsuAudioLink(videoUrl) {
-    const apiUrl = `https://okatsu-rolezapiiz.vercel.app/downloader/ytmp3?url=${encodeURIComponent(videoUrl)}`;
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
-    return data?.dl || null;
-}
-async function getOkatsuVideoLink(videoUrl) {
-    const apiUrl = `https://okatsu-rolezapiiz.vercel.app/downloader/ytmp4?url=${encodeURIComponent(videoUrl)}`;
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
-    return (data?.result && data.result.mp4) || null;
-}
-async function getAlyaAudioLink(videoUrl) {
-    const apiUrl = `https://api.alyachan.pro/api/ytmp3?url=${encodeURIComponent(videoUrl)}&apikey=G7I6X7`;
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
-    return (data?.status && data?.data?.url) || null;
-}
-async function getVredenAudioLink(videoUrl) {
-    const apiUrl = `https://api.vreden.my.id/api/ytmp3?url=${encodeURIComponent(videoUrl)}`;
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 3000 });
-    return (data?.status && data?.result?.download?.url) || null;
-}
-
-// 🚀 RELIABILITY FIX (Bunty: "gc me downloader kabhi to chalta hai kabhi
-// nahi" — intermittent, no fixed pattern): since JawadTech was dropped
-// there's only ONE quick-API provider left (AdeelXtech). A single provider
-// having a momentary blip (cold start, brief rate-limit, one slow response)
-// used to fail the whole quick path instantly and fall through straight to
-// the much slower yt-dlp route — which is exactly the "sometimes fast,
-// sometimes crawls" pattern. One short retry catches those transient blips
-// without meaningfully slowing down the common case where it just works.
-//
-// Live-tested provider order. Adeel XTech returned HTTP 200 with a valid
-// video_download URL and its media endpoint returned video/mp4. Keep this
-// fast path before yt-dlp; failed/slow responses still fall through safely.
-const VIDEO_LINK_PROVIDERS = [
-    { name: 'JawadTech', method: async url => (await getJawadTechResult(url)).mp4 },
-    { name: 'AdeelXTech', method: getAdeelXtechVideoLink }
-];
-
-async function raceQuickApis(videoUrl) {
-    try { return await raceVideoMedia(videoUrl); }
-    catch (e) { console.log('[QUICK-VIDEO] all providers failed:', e.message); throw e; }
-}
-
-// 🚀 EASY-MODE FIX (Bunty: ".play bhi aisay fast/no-cookies, audio wala") —
-// same idea as getQuickVideoLink for .video: ask AdeelXtech for a direct
-// audio link first, skip yt-dlp (and its cookies dependency) entirely when
-// this works. Unlike video though, we still pull the bytes into memory and
-// run them through the EXISTING isLikelyAudio/opus-conversion pipeline
-// below (rather than handing WhatsApp a raw URL) — audio has a real history
-// in this bot of "audio not available" errors caused by wrong/raw
-// mimetypes (see the CRASH/BUG FIX comments above), so keeping the proven
-// validate+convert step is worth the small extra memory cost (audio files
-// are only a few MB, nowhere near the video OOM risk this bot hit).
-// Capped at 20MB and marked invalid if it doesn't look like real audio, so
-// a dead/wrong-shaped API response falls straight through to yt-dlp.
-const MAX_QUICKAPI_AUDIO_BYTES = 20 * 1024 * 1024;
-
-// 🚨 EMPTIED (Bunty: "jo fail hai sab nikal do, only jo working wo rakho")
-// — same three providers, same result: not one single success for audio
-// across every log Bunty's sent (AdeelXtech = 500 every time, EliteProTech
-// = timeout/now 410, Yupra = timeout every time). No quick-audio source has
-// ever actually worked in this whole debugging session, so .play now skips
-// straight to yt-dlp instead of burning ~9s probing dead endpoints first.
-// If a genuinely working free API turns up later, add it back here.
-// JawadTech is restored as the first .play provider because its live endpoint
-// currently returns an MP3 link in about a second. The short media timeout keeps
-// a dead/expired CDN link from delaying the normal fallback chain.
-async function getEliteProTechAudioLink(videoUrl) {
-    const apiUrl = `https://eliteprotech-apis.zone.id/ytdown?url=${encodeURIComponent(videoUrl)}&format=mp3`;
-    const { data } = await axios.get(apiUrl, { ...AXIOS_DEFAULTS, timeout: 5000 });
-    if (!data?.success || !data?.downloadURL) throw new Error('EliteProTech: no usable MP3 link');
-    return data.downloadURL;
-}
-
-const AUDIO_LINK_PROVIDERS = [
-    { name: 'JawadTech', method: async url => (await getJawadTechResult(url)).mp3 },
-    { name: 'EliteProTech', method: getEliteProTechAudioLink }
-];
-
-async function getQuickAudioLink(videoUrl) {
-    let lastError;
-    for (const provider of AUDIO_LINK_PROVIDERS) {
-        try {
-            const link = await provider.method(videoUrl);
-            if (!link) throw new Error(`${provider.name}: no usable MP3 link`);
-            console.log(`[YTMP3] ${provider.name} direct MP3 ready`);
-            return link;
-        } catch (e) {
-            console.log(`[YTMP3] ${provider.name} direct path failed:`, e.message);
-            lastError = e;
-        }
-    }
-    throw lastError || new Error('All direct MP3 providers failed');
-}
-
-async function getQuickAudioBuffer(videoUrl) {
-    let lastError;
-    for (const provider of AUDIO_LINK_PROVIDERS) {
-        try {
-            const link = await provider.method(videoUrl);
-            if (!link) throw new Error(`${provider.name}: no usable result`);
-            const res = await axios.get(link, {
-                responseType: 'arraybuffer',
-                timeout: 7000,
-                family: 4,
-                maxContentLength: MAX_QUICKAPI_AUDIO_BYTES,
-                maxBodyLength: MAX_QUICKAPI_AUDIO_BYTES,
-                headers: { 'User-Agent': 'Mozilla/5.0', Range: 'bytes=0-' }
-            });
-            const buf = Buffer.from(res.data);
-            if (!isLikelyAudio(buf)) throw new Error(`${provider.name}: response not valid audio`);
-            return buf;
-        } catch (e) {
-            console.log(`[QUICK-AUDIO] ${provider.name} failed:`, e.message);
-            lastError = e;
-        }
-    }
-    throw lastError || new Error('All quick-audio providers failed');
-}
-
 async function dlAudio(videoUrl, outPath) {
-    // Fast path: the working video provider returns a single progressive MP4;
-    // extract its audio locally instead of waiting on dead audio-only APIs.
-    try {
-        const videoBuf = await raceVideoMedia(videoUrl);
-        const tempVideoPath = outPath.replace(/\.mp3$/, '_fast_video.mp4');
-        fs.writeFileSync(tempVideoPath, videoBuf);
-        try {
-            await new Promise((resolve, reject) => {
-                ffmpeg(tempVideoPath).noVideo().audioCodec('libmp3lame').audioBitrate('128k').format('mp3')
-                    .on('end', resolve).on('error', reject).save(outPath);
-            });
-        } finally {
-            try { fs.unlinkSync(tempVideoPath); } catch {}
-        }
-        if (fs.existsSync(outPath) && isLikelyAudio(fs.readFileSync(outPath))) return;
-        try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
-    } catch (e) {
-        console.log('[YTMP3] fast video-provider path failed, trying audio fallbacks:', e.message);
-    }
-
-    // Fastest .play path: JawadTech's direct MP3, with validation. If its CDN
-    // link is expired or unavailable, continue immediately to the shared MP4
-    // provider path and then yt-dlp; no error is exposed until all fallbacks
-    // have failed.
-    try {
-        const quickAudio = await getQuickAudioBuffer(videoUrl);
-        fs.writeFileSync(outPath, quickAudio);
-        if (isLikelyAudio(quickAudio)) return;
-        try { fs.unlinkSync(outPath); } catch {}
-    } catch (e) {
-        console.log('[YTMP3] JawadTech direct-audio path failed, using shared video path:', e.message);
-    }
-
-    // One shared fallback path for .play/.song: resolve a real public MP4 from
-    // the same providers as .video, fetch it with the range-aware media
-    // helper, then extract audio once. This avoids waiting for a 120s yt-dlp
-    // bot-check before trying a working provider.
-    try {
-        const videoBuf = await raceVideoMedia(videoUrl);
-        const tempVideoPath = outPath.replace(/\.mp3$/, '_shared_temp.mp4');
-        fs.writeFileSync(tempVideoPath, videoBuf);
-        try {
-            await new Promise((resolve, reject) => {
-                ffmpeg(tempVideoPath).noVideo().audioCodec('libmp3lame').audioBitrate('128k').format('mp3')
-                    .on('end', resolve).on('error', reject).save(outPath);
-            });
-        } finally {
-            try { fs.unlinkSync(tempVideoPath); } catch {}
-        }
-        if (fs.existsSync(outPath) && isLikelyAudio(fs.readFileSync(outPath))) return;
-        try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
-    } catch (e) {
-        console.log('[YTMP3] shared provider path failed, using direct audio fallback:', e.message);
-    }
-
-    // Direct audio-only yt-dlp is the next path: one small stream and one
-    // conversion in the command handler, with cookies if the host has them.
     const wrap = await ensureYtDlp();
     const fastArgs = [videoUrl, '-f', 'bestaudio/best', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
@@ -730,7 +467,7 @@ async function dlAudio(videoUrl, outPath) {
         if (fs.existsSync(outPath) && isLikelyAudio(fs.readFileSync(outPath))) return;
         try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
     } catch (e) {
-        console.log('[YTMP3] direct bestaudio failed:', e.message);
+        console.log('[YTMP3] bestaudio failed, trying MP3 extraction:', e.message);
     }
 
     // Last-resort extraction for formats where bestaudio is unavailable.
