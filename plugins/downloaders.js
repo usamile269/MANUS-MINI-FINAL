@@ -486,27 +486,39 @@ async function resolveVideoLink(videoUrl) {
     catch (e) { throw new Error((e.errors || []).map(x => x.message).join(' | ') || 'All video providers failed'); }
 }
 
-async function raceVideoMedia(videoUrl) {
-    // Resolve and fetch within the same attempt. If the first provider returns
-    // an expired or rate-limited media URL, the next provider must still run.
-    const providers = [
-        { name: 'JawadTech', resolve: async () => (await getJawadTechResult(videoUrl)).mp4 },
-        { name: 'AdeelXTech', resolve: async () => getAdeelXtechVideoLink(videoUrl) },
-        { name: 'EliteProTech', resolve: async () => getEliteProTechVideoLink(videoUrl) }
-    ];
-    const attempts = providers.map(async ({ name, resolve }) => {
-        const link = await resolve();
-        if (!link) throw new Error(`${name}: no usable link`);
+// Public scraper APIs are frequently retired or rate-limited. Keep YouTube
+// downloads independent from them and retry current player-client profiles.
+const YT_EXTRACTOR_PROFILES = ['android,web', 'web,android', 'tv,web'];
+function ytExtractorArgs(profile) {
+    return ['--extractor-args', `youtube:player_client=${profile}`];
+}
+async function runYtDlpProfiles(wrap, baseArgs, outputPath) {
+    let lastError;
+    for (const profile of YT_EXTRACTOR_PROFILES) {
         try {
-            return await fetchMediaBuffer(link, MAX_QUICKAPI_VIDEO_BYTES, 60000);
+            if (outputPath && fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+            await wrap.execPromise([...baseArgs, ...ytExtractorArgs(profile)]);
+            if (!outputPath || (fs.existsSync(outputPath) && fs.statSync(outputPath).size >= 15000)) return;
+            throw new Error('yt-dlp produced no usable media');
         } catch (error) {
-            throw new Error(`${name}: ${error.message}`);
+            lastError = error;
+            console.log(`[YTDLP] profile ${profile} failed:`, error.message);
         }
-    });
-    try { return await Promise.any(attempts); }
-    catch (error) {
-        throw new Error((error.errors || []).map(item => item.message).join(' | ') || 'All video providers failed');
     }
+    throw lastError || new Error('all yt-dlp profiles failed');
+}
+async function downloadYtDlpBuffer(videoUrl) {
+    const tempPath = path.join('/tmp', `ytquick_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
+    try {
+        await dlVideo(videoUrl, tempPath);
+        return fs.readFileSync(tempPath);
+    } finally {
+        try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
+    }
+}
+
+async function raceVideoMedia(videoUrl) {
+    return downloadYtDlpBuffer(videoUrl);
 }
 
 // 🆕 (Bunty: "BUNTY_MD wali file may .song/.video fully working hai, hamare
@@ -714,7 +726,7 @@ async function dlAudio(videoUrl, outPath) {
     const wrap = await ensureYtDlp();
     const fastArgs = [videoUrl, '-f', 'bestaudio/best', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
-        await wrap.execPromise(fastArgs);
+        await runYtDlpProfiles(wrap, fastArgs, outPath);
         if (fs.existsSync(outPath) && isLikelyAudio(fs.readFileSync(outPath))) return;
         try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
     } catch (e) {
@@ -724,7 +736,7 @@ async function dlAudio(videoUrl, outPath) {
     // Last-resort extraction for formats where bestaudio is unavailable.
     const args = [videoUrl, '-x', '--audio-format', 'mp3', '--audio-quality', '0', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
-        await wrap.execPromise(args);
+        await runYtDlpProfiles(wrap, args, outPath);
     } catch (e) {
         throw new Error('yt-dlp: ' + e.message);
     }
@@ -760,11 +772,10 @@ async function dlVideo(videoUrl, outPath) {
     //    speedup on longer videos even when a merge does still happen.
     const wrap = await ensureYtDlp();
     const args = [videoUrl, '-f', '18/best[height<=360][ext=mp4]/best[height<=360]/best[ext=mp4]/best', '--no-playlist',
-        '--extractor-args', 'youtube:player_client=android,ios',
         '--force-ipv4', '--socket-timeout', '25', '--retries', '3', '--fragment-retries', '3',
         '--merge-output-format', 'mp4', '--concurrent-fragments', '8', '--buffer-size', '1M', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
-        await wrap.execPromise(args);
+        await runYtDlpProfiles(wrap, args, outPath);
     } catch (e) {
         throw new Error('yt-dlp: ' + e.message);
     }
