@@ -32,52 +32,6 @@ const FOOTER = '> ' + randomFooter();
 // media files themselves are never kept in RAM.
 const ytSearchCache = new Map();
 const YT_SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
-const MEDIA_CACHE_DIR = path.join('/tmp', 'ahmad-mini-media-cache');
-const MEDIA_CACHE_MAX_FILES = 24;
-const MEDIA_CACHE_MAX_BYTES = 300 * 1024 * 1024;
-function youtubeVideoId(url) {
-    const match = String(url || '').match(/(?:v=|youtu\.be\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{6,})/i);
-    return match ? match[1] : null;
-}
-function mediaCachePath(url, type) {
-    const id = youtubeVideoId(url);
-    return id ? path.join(MEDIA_CACHE_DIR, `${id}.${type}`) : null;
-}
-function getCachedMedia(url, type) {
-    const file = mediaCachePath(url, type);
-    if (!file) return null;
-    try {
-        const stat = fs.statSync(file);
-        if (!stat.isFile() || stat.size < 15000) return null;
-        fs.utimesSync(file, new Date(), new Date());
-        return file;
-    } catch (_) { return null; }
-}
-function saveCachedMedia(url, type, source) {
-    const target = mediaCachePath(url, type);
-    if (!target || !source) return;
-    try {
-        fs.mkdirSync(MEDIA_CACHE_DIR, { recursive: true });
-        const temp = `${target}.${process.pid}.${Date.now()}.tmp`;
-        if (Buffer.isBuffer(source)) fs.writeFileSync(temp, source);
-        else {
-            if (!fs.existsSync(source)) return;
-            fs.copyFileSync(source, temp);
-        }
-        fs.renameSync(temp, target);
-        const files = fs.readdirSync(MEDIA_CACHE_DIR).map(name => {
-            const file = path.join(MEDIA_CACHE_DIR, name);
-            try { return { file, stat: fs.statSync(file) }; } catch (_) { return null; }
-        }).filter(item => item && item.stat.isFile()).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
-        let total = files.reduce((sum, item) => sum + item.stat.size, 0);
-        while (files.length > MEDIA_CACHE_MAX_FILES || total > MEDIA_CACHE_MAX_BYTES) {
-            const old = files.shift();
-            if (!old) break;
-            total -= old.stat.size;
-            try { fs.unlinkSync(old.file); } catch (_) {}
-        }
-    } catch (e) { console.log('[MEDIA CACHE] save skipped:', e.message); }
-}
 function rememberYtResult(key, result) {
     const now = Date.now();
     if (ytSearchCache.size > 500) {
@@ -1111,13 +1065,6 @@ async (conn, mek, m, { reply, args, from }) => {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const started = Date.now();
         const video = await ytSearch(query);
-        const cachedAudio = getCachedMedia(video.url, 'mp3');
-        if (cachedAudio) {
-            await sendWithRetry(conn, from, { audio: fs.readFileSync(cachedAudio), mimetype: 'audio/mpeg', fileName: `${video.title?.slice(0, 35) || 'audio'}.mp3`, ptt: false }, { quoted: fakevCard });
-            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            console.log(`[YTMP3] cache hit in ${Date.now() - started}ms`);
-            return;
-        }
         // Preview immediately, before any heavy queue work.
         await conn.sendMessage(from, {
             image: { url: video.thumb },
@@ -1130,7 +1077,6 @@ async (conn, mek, m, { reply, args, from }) => {
         outPath = path.join('/tmp', `ytaudio_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`);
         await heavyQueue.run(async () => {
             await dlAudio(video.url, outPath);
-            saveCachedMedia(video.url, 'mp3', outPath);
             const audio = fs.readFileSync(outPath);
             await sendWithRetry(conn, from, { audio, mimetype: detectAudioFormat(audio).mimetype, fileName: `${video.title?.slice(0, 35) || 'audio'}.mp3`, ptt: false }, { quoted: fakevCard });
             try { fs.unlinkSync(outPath); } catch {}
@@ -1159,13 +1105,6 @@ async (conn, mek, m, { reply, args, from }) => {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const started = Date.now();
         const video = await ytSearch(query);
-        const cachedVideo = getCachedMedia(video.url, 'mp4');
-        if (cachedVideo) {
-            await sendWithRetry(conn, from, { video: fs.readFileSync(cachedVideo), mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Cached'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
-            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            console.log(`[YTMP4] cache hit in ${Date.now() - started}ms`);
-            return;
-        }
         // Restored from the previously fast, working implementation: resolve
         // and fetch the provider media once inside the bounded queue, then send
         // the bytes directly. This avoids WhatsApp performing a slow/unstable
@@ -1173,7 +1112,6 @@ async (conn, mek, m, { reply, args, from }) => {
         try {
             await heavyQueue.run(async () => {
                 const buffer = await raceVideoMedia(video.url);
-                saveCachedMedia(video.url, 'mp4', buffer);
                 await sendWithRetry(conn, from, { video: buffer, mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
                 await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
             }, async position => {
@@ -1188,7 +1126,6 @@ async (conn, mek, m, { reply, args, from }) => {
             await dlVideo(video.url, outPath);
             if (!fs.existsSync(outPath)) throw new Error('No video file produced');
             if (fs.statSync(outPath).size > 100 * 1024 * 1024) throw new Error('Video too large (100 MB limit)');
-            saveCachedMedia(video.url, 'mp4', outPath);
             await sendWithRetry(conn, from, { video: fs.readFileSync(outPath), mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
             try { fs.unlinkSync(outPath); } catch {}
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
