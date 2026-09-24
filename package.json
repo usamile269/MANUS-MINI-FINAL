@@ -4,7 +4,7 @@
   "description": "WhatsApp Bot Base - AHMAD MD",
   "main": "index.js",
   "engines": {
-    "node": ">=18.x <=20.x"
+    "node": "24.x"
   },
   "scripts": {
     "start": "node index.js",
