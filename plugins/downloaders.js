@@ -589,15 +589,28 @@ async (conn, mek, m, { reply, args, from, q }) => {
     const url = q || args[0];
     if (!url || !url.includes('tiktok')) return reply(dlBox('TIKTOK', ['❌ TikTok link do!', '📝 .tiktok <link>'], '🎵'));
     try {
-        await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
-        // Try tikwm first (confirmed working)
-        const res = await axios.get(`https://tikwm.com/api/?url=${encodeURIComponent(url)}`, { timeout: 10000 });
-        if (!res.data?.data) throw new Error('tikwm failed');
+        await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } }).catch(e => console.log('[TT] start reaction failed:', e.message));
+        // TikWM rejects requests without a browser-like User-Agent/Referer.
+        // Keep this fix local to .tt; no other downloader provider is changed.
+        const tikwmHeaders = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': 'https://www.tiktok.com/'
+        };
+        const res = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`, {
+            timeout: 15000,
+            family: 4,
+            headers: tikwmHeaders
+        });
+        if (res.data?.code !== 0 || !res.data?.data) throw new Error(res.data?.msg || 'TikWM returned no media');
         const d = res.data.data;
-        const videoUrl = d.play.startsWith('http') ? d.play : `https://tikwm.com${d.play}`;
+        const rawVideoUrl = d.hdplay || d.play || d.wmplay || d.download;
+        if (!rawVideoUrl) throw new Error('TikWM returned no video URL');
+        const videoUrl = rawVideoUrl.startsWith('http') ? rawVideoUrl : `https://www.tikwm.com${rawVideoUrl}`;
         // Fetch actual bytes with proper headers — handing WhatsApp a raw URL directly
         // can result in a black screen / no-sound video (tikwm's CDN needs a browser-like UA)
-        const videoRes = await axios.get(videoUrl, { responseType: 'arraybuffer', timeout: 40000, headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Referer': 'https://www.tiktok.com/' } });
+        const videoRes = await axios.get(videoUrl, { responseType: 'arraybuffer', timeout: 40000, family: 4, headers: tikwmHeaders });
+        if (!videoRes.data || videoRes.data.length < 15000) throw new Error('TikTok media response was empty');
         await conn.sendMessage(from, {
             video: Buffer.from(videoRes.data),
             mimetype: 'video/mp4',
@@ -610,7 +623,8 @@ async (conn, mek, m, { reply, args, from, q }) => {
             contextInfo: chanCtx()
         }, { quoted: fakevCard });
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-    } catch {
+    } catch (primaryError) {
+        console.log('[TT] TikWM path failed, trying fallback:', primaryError.message);
         // Fallback: RapidAPI
         try {
             const data = await socialDownload(url);
@@ -618,9 +632,10 @@ async (conn, mek, m, { reply, args, from, q }) => {
             if (!video?.url) throw new Error('No video');
             await conn.sendMessage(from, { video: { url: video.url }, caption: dlBox('TIKTOK', ['✅ Downloaded!'], '🎵'), contextInfo: chanCtx() }, { quoted: fakevCard });
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-        } catch {
-            await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-            reply('❌ TikTok download failed!');
+        } catch (fallbackError) {
+            console.log('[TT] fallback failed:', fallbackError.message);
+            await conn.sendMessage(from, { react: { text: '❌', key: mek.key } }).catch(e => console.log('[TT] failure reaction failed:', e.message));
+            await reply('❌ TikTok download failed! Send a direct public TikTok link and try again.');
         }
     }
 });
