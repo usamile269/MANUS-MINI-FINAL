@@ -1629,10 +1629,6 @@ body { overflow-x:hidden; }
             <span id="countryFlag" style="font-size:1.2rem;">🌐</span>
             <span id="countryName">Type your full number with country code</span>
         </div>
-        <div id="workerPicker" style="display:none; margin:12px 0 0; text-align:left;">
-            <label for="workerSelect" style="display:block; margin-bottom:6px; font-size:.8rem; color:var(--text-secondary);">Worker server</label>
-            <select id="workerSelect" style="width:100%; border:1px solid rgba(91,75,183,.18); border-radius:999px; padding:12px 14px; background:rgba(255,255,255,.72); color:#24234f;"></select>
-        </div>
 
         <p class="hint-text">
             <i class="fas fa-info-circle"></i>
@@ -1846,10 +1842,6 @@ function applyBackgroundCustomization(settings) {
 }
 
 const PAIR_BACKEND_URL = 'https://web-production-ca060.up.railway.app';
-// Leave empty to preserve the current single-backend flow. Set this to the
-// separate control-plane URL only after cluster workers are deployed.
-const PAIR_CONTROL_URL = '';
-let selectedWorkerId = '';
 
 // Refresh public site settings periodically so visitors can see updated
 // branding and media without needing to refresh. Repeated calls are safe:
@@ -2017,25 +2009,6 @@ async function loadActiveCount() {
 }
 loadActiveCount();
 setInterval(loadActiveCount, 30000);
-
-async function loadWorkers() {
-    if (!PAIR_CONTROL_URL) return;
-    try {
-        const res = await fetch(`${PAIR_CONTROL_URL}/workers`, { cache: 'no-store' });
-        const data = await res.json();
-        const workers = Array.isArray(data.workers) ? data.workers : [];
-        const picker = document.getElementById('workerPicker');
-        const select = document.getElementById('workerSelect');
-        if (!workers.length || !picker || !select) return;
-        select.innerHTML = '<option value="">Auto assign (least loaded)</option>' + workers.map(w =>
-            `<option value="${String(w.workerId).replace(/"/g, '&quot;')}" ${w.available < 1 ? 'disabled' : ''}>${w.workerId} — ${w.connected}/${w.capacity} connected</option>`
-        ).join('');
-        select.onchange = () => { selectedWorkerId = select.value; };
-        picker.style.display = 'block';
-    } catch (_) {}
-}
-loadWorkers();
-setInterval(loadWorkers, 30000);
 
 // ═══════════════════════════════════════════
 // USER THEME PICKER (per-visitor, saved locally in this browser).
@@ -2515,9 +2488,7 @@ async function getCode() {
     codeBox.textContent = 'Connecting...';
 
     try {
-        const codeBackend = PAIR_CONTROL_URL || PAIR_BACKEND_URL;
-        const workerParam = selectedWorkerId ? `&workerId=${encodeURIComponent(selectedWorkerId)}` : '';
-        const requestUrl = `${codeBackend}/code?number=${encodeURIComponent(fullNumber)}${workerParam}&_pairing_request=${Date.now()}`;
+        const requestUrl = `${PAIR_BACKEND_URL}/code?number=${encodeURIComponent(fullNumber)}&_pairing_request=${Date.now()}`;
         const res = await fetch(requestUrl, {
             method: 'GET',
             cache: 'no-store',
