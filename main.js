@@ -12,6 +12,9 @@ const {
     fetchLatestBaileysVersion,
 } = require('@whiskeysockets/baileys');
 const config = require('./config');
+// Optional multi-worker runtime. WORKER_MODE defaults to standalone, so the
+// existing single-process bot path remains unchanged unless explicitly enabled.
+const workerRuntime = require('./cluster/worker-runtime');
 // 🚀 GLOBAL SPEED BOOST (Bunty: "speed boost like rocket") — axios.defaults
 // is shared by EVERY file that does `require('axios')` across the whole
 // bot (same module instance in Node), so setting this once here turns on
@@ -235,6 +238,12 @@ const groupMetadataRefreshing = new Set(); // groupId -> in-flight background re
 // instead of recreated, means the cache only resets on an actual full
 // restart of the whole bot process, not on every reconnect.
 const ahmadStores = new Map(); // number -> store, persists across reconnects
+
+workerRuntime.start(() => ({
+    connected: activeSockets.size,
+    capacity: workerRuntime.capacity,
+    status: 'online'
+}));
 
 // 🚨 BUG FIX (welcome video repeating): same idea as ahmadStores above —
 // tracked at PROCESS level, not per-socket. A number goes in here the first
@@ -3386,6 +3395,9 @@ router.get('/code', requireApiKey, async (req, res) => {
         'Surrogate-Control': 'no-store'
     });
     if (!req.query.number) return res.json({ error: 'Number required' });
+    if (workerRuntime.enabled && !workerRuntime.ownsNumber(req.query.number)) {
+        return res.status(409).json({ status: 'wrong_worker', workerId: workerRuntime.workerId, message: 'This number belongs to another worker shard.' });
+    }
     await ahmadPair(req.query.number, res);
 });
 router.get('/status', async (req, res) => {
@@ -3420,6 +3432,7 @@ router.get('/connect-all', requireApiKey, async (req, res) => {
         if (!numbers.length) return res.status(404).json({ error: 'No numbers found' });
         const results = [];
         for (const number of numbers) {
+            if (!workerRuntime.ownsNumber(number)) continue;
             if (activeSockets.has(number)) { results.push({ number, status: 'already_connected' }); continue; }
             const mockRes = { headersSent: false, json: () => {}, status: () => mockRes };
             await ahmadPair(number, mockRes);
@@ -3473,6 +3486,7 @@ async function autoReconnectFromMongoDB() {
         const numbers = await getAllNumbersFromMongoDB();
         if (!numbers.length) { ahmadLog('No numbers in MongoDB', 'info'); return; }
         for (const number of numbers) {
+            if (!workerRuntime.ownsNumber(number)) continue;
             if (!activeSockets.has(number)) {
                 const mockRes = { headersSent: false, json: () => {}, status: () => mockRes };
                 await ahmadPair(number, mockRes);
@@ -3488,6 +3502,7 @@ setTimeout(() => { autoReconnectFromMongoDB(); }, 3000);
 
 
 process.on('exit', () => {
+    workerRuntime.stop();
     // Never erase local auth state on a normal process exit. MongoDB is the
     // durable backup, while this local copy is still useful during graceful
     // restarts and must not be wiped unless the owner explicitly logs out.
