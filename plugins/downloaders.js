@@ -87,22 +87,6 @@ const YTDLP_BIN = path.join(__dirname, '..', 'bin', 'yt-dlp' + (process.platform
 const COOKIES_PATH = path.join(__dirname, '..', 'cookies.txt');
 let ytDlpWrap = null;
 
-// Railway deployments do not include the ignored cookies.txt file. If the
-// owner supplies YOUTUBE_COOKIES_BASE64 as a Railway variable, materialize it
-// at runtime without ever committing cookies to the public repository.
-function ensureRuntimeCookies() {
-    if (fs.existsSync(COOKIES_PATH)) return;
-    const encoded = String(process.env.YOUTUBE_COOKIES_BASE64 || '').trim();
-    if (!encoded) return;
-    try {
-        const contents = Buffer.from(encoded, 'base64');
-        if (contents.length > 100 && contents.length < 10 * 1024 * 1024) {
-            fs.writeFileSync(COOKIES_PATH, contents, { mode: 0o600 });
-            console.log('[YTDLP] runtime YouTube cookies loaded');
-        }
-    } catch (e) { console.error('[YTDLP] runtime cookies ignored:', e.message); }
-}
-
 // One-time binary fetch + reusable wrap instance. Safe to call every
 // command run — after the first successful download this just returns the
 // cached instance immediately.
@@ -122,7 +106,6 @@ function ensureRuntimeCookies() {
 async function ensureYtDlp() {
     if (!YTDlpWrapLib) throw new Error('yt-dlp-wrap package missing — run: npm install yt-dlp-wrap');
     if (ytDlpWrap) return ytDlpWrap;
-    ensureRuntimeCookies();
     // If a bin/ directory persists across redeploys (e.g. a mounted volume)
     // it may still hold the OLD broken python-zipapp binary from before
     // this fix — the marker file below only exists once the standalone
@@ -179,7 +162,6 @@ async function ensureYtDlp() {
 }
 
 function cookieArgs() {
-    ensureRuntimeCookies();
     return fs.existsSync(COOKIES_PATH) ? ['--cookies', COOKIES_PATH] : [];
 }
 
@@ -444,13 +426,9 @@ const MAX_QUICKAPI_VIDEO_BYTES = 60 * 1024 * 1024; // Video-only cap: above What
 //     but still just one API call instead of spawning yt-dlp.
 // Public scraper APIs are frequently retired or rate-limited. Keep YouTube
 // downloads independent from them and retry current player-client profiles.
-const YT_EXTRACTOR_PROFILES = ['android', 'android_vr', 'web_safari'];
+const YT_EXTRACTOR_PROFILES = ['android', 'web'];
 function ytExtractorArgs(profile) {
-    const args = ['--extractor-args', `youtube:player_client=${profile}`];
-    // Current web clients require the EJS challenge solver. Android remains
-    // first because it still exposes a progressive MP4 on most videos.
-    if (profile === 'web_safari') args.push('--js-runtimes', 'node', '--remote-components', 'ejs:github');
-    return args;
+    return ['--extractor-args', `youtube:player_client=${profile}`];
 }
 async function runYtDlpProfiles(wrap, baseArgs, outputPath) {
     let lastError;
@@ -483,7 +461,7 @@ async function raceVideoMedia(videoUrl) {
 
 async function dlAudio(videoUrl, outPath) {
     const wrap = await ensureYtDlp();
-    const fastArgs = [videoUrl, '-f', '18/bestaudio/best', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
+    const fastArgs = [videoUrl, '-f', 'bestaudio/best', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
         await runYtDlpProfiles(wrap, fastArgs, outPath);
         if (fs.existsSync(outPath) && isLikelyAudio(fs.readFileSync(outPath))) return;
@@ -493,7 +471,7 @@ async function dlAudio(videoUrl, outPath) {
     }
 
     // Last-resort extraction for formats where bestaudio is unavailable.
-    const args = [videoUrl, '-f', '18/bestaudio/best', '-x', '--audio-format', 'mp3', '--audio-quality', '0', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
+    const args = [videoUrl, '-x', '--audio-format', 'mp3', '--audio-quality', '0', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
         await runYtDlpProfiles(wrap, args, outPath);
     } catch (e) {
