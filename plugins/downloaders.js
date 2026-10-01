@@ -465,7 +465,7 @@ async function dlAudio(videoUrl, outPath) {
     // SABR experiment. Format 18 is the stable progressive MP4 (audio+video),
     // and yt-dlp/ffmpeg can extract its audio reliably before trying the
     // older bestaudio path.
-    const progressiveArgs = [videoUrl, '-f', '18', '-x', '--audio-format', 'mp3', '--audio-quality', '0', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
+    const progressiveArgs = [videoUrl, '-f', '18', '-x', '--audio-format', 'm4a', '--audio-quality', '0', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
         await runYtDlpProfiles(wrap, progressiveArgs, outPath);
         if (fs.existsSync(outPath) && isLikelyAudio(fs.readFileSync(outPath))) return;
@@ -483,7 +483,7 @@ async function dlAudio(videoUrl, outPath) {
     }
 
     // Last-resort extraction for formats where bestaudio is unavailable.
-    const args = [videoUrl, '-x', '--audio-format', 'mp3', '--audio-quality', '0', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
+    const args = [videoUrl, '-x', '--audio-format', 'm4a', '--audio-quality', '0', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
         await runYtDlpProfiles(wrap, args, outPath);
     } catch (e) {
@@ -849,11 +849,12 @@ async (conn, mek, m, { reply, args, from }) => {
 
         // Fallback: preserve the existing validated buffered path.
         if (!YTDlpWrapLib) throw new Error('yt-dlp is unavailable on this server.');
-        outPath = path.join('/tmp', `ytaudio_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`);
+        outPath = path.join('/tmp', `ytaudio_${Date.now()}_${Math.random().toString(36).slice(2)}.m4a`);
         await heavyQueue.run(async () => {
             await dlAudio(video.url, outPath);
             const audio = fs.readFileSync(outPath);
-            await sendWithRetry(conn, from, { audio, mimetype: detectAudioFormat(audio).mimetype, fileName: `${video.title?.slice(0, 35) || 'audio'}.mp3`, ptt: false }, { quoted: fakevCard });
+            const audioFormat = detectAudioFormat(audio);
+            await sendWithRetry(conn, from, { audio, mimetype: audioFormat.mimetype, fileName: `${video.title?.slice(0, 35) || 'audio'}.${audioFormat.ext}`, ptt: false }, { quoted: fakevCard });
             try { fs.unlinkSync(outPath); } catch {}
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
             console.log(`[YTMP3] buffered fallback completed in ${Date.now() - started}ms`);
