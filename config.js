@@ -118,8 +118,8 @@ module.exports = {
     // ===========================================================
     // 5. GESTION DES GROUPES
     // ===========================================================
-    WELCOME_ENABLE: 'true',
-    GOODBYE_ENABLE: 'true',
+    WELCOME_ENABLE: 'false',
+    GOODBYE_ENABLE: 'false',
     WELCOME_MSG: null, 
     GOODBYE_MSG: null, 
     WELCOME_IMAGE: null, 
