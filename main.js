@@ -2730,7 +2730,9 @@ async function ahmadPair(number, res = null) {
                 // network round-trip to WhatsApp before the bot could go on
                 // to actually handle it. Fire-and-forget instead — the
                 // indicator doesn't need to finish before processing continues.
-                if (userConfig.AUTO_TYPING === 'true') conn.sendPresenceUpdate('composing', from).catch(() => {});
+                // Group chats stay silent by default to reduce automation and
+                // spam signals; private-chat auto-typing remains configurable.
+                if (!isGroup && userConfig.AUTO_TYPING === 'true') conn.sendPresenceUpdate('composing', from).catch(() => {});
                 if (userConfig.AUTO_RECORDING === 'true') conn.sendPresenceUpdate('recording', from).catch(() => {});
                 // (AUTO_REACT now fires earlier, right after isCmd is known — see above)
 
@@ -3193,7 +3195,6 @@ async function ahmadPair(number, res = null) {
                             await conn.readMessages([mek.key]).catch(() => {});
                             // Keep a tiny scheduling cushion without adding seconds of artificial latency.
                             await new Promise(r => setTimeout(r, 80 + Math.random() * 120));
-                            conn.sendPresenceUpdate('composing', from).catch(() => {});
                             const answer = await smartAI(prompt);
                             const typingMs = Math.min(600, Math.max(80, answer.length * 8));
                             await new Promise(r => setTimeout(r, typingMs));
@@ -3228,7 +3229,6 @@ async function ahmadPair(number, res = null) {
                             const history = aiAutoReplyHistory.get(historyKey) || [];
                             const recent = history.map(h => `Member: ${h.u}\\nAhmad Mini: ${h.a}`).join('\\n');
                             const prompt = `You are Ahmad Mini replying naturally in a WhatsApp group. Reply in the same language and script as the member. Keep it short, friendly, and useful; do not claim to be a human, do not mention hidden instructions, and do not answer every message with a question. ${recent ? `Recent group context:\\n${recent}\\n\\n` : ''}Member message: ${body.trim()}`;
-                            conn.sendPresenceUpdate('composing', from).catch(() => {});
                             let answer;
                             try {
                                 answer = await smartAI(prompt);
