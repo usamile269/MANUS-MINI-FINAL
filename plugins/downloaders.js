@@ -461,6 +461,18 @@ async function raceVideoMedia(videoUrl) {
 
 async function dlAudio(videoUrl, outPath) {
     const wrap = await ensureYtDlp();
+    // Railway/YouTube sometimes hides separate audio-only formats behind the
+    // SABR experiment. Format 18 is the stable progressive MP4 (audio+video),
+    // and yt-dlp/ffmpeg can extract its audio reliably before trying the
+    // older bestaudio path.
+    const progressiveArgs = [videoUrl, '-f', '18', '-x', '--audio-format', 'mp3', '--audio-quality', '0', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
+    try {
+        await runYtDlpProfiles(wrap, progressiveArgs, outPath);
+        if (fs.existsSync(outPath) && isLikelyAudio(fs.readFileSync(outPath))) return;
+        try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
+    } catch (e) {
+        console.log('[YTMP3] progressive format 18 failed, trying bestaudio:', e.message);
+    }
     const fastArgs = [videoUrl, '-f', 'bestaudio/best', '--no-playlist', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
         await runYtDlpProfiles(wrap, fastArgs, outPath);
