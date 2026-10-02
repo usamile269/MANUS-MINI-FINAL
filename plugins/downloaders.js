@@ -428,7 +428,10 @@ const MAX_QUICKAPI_VIDEO_BYTES = 60 * 1024 * 1024; // Video-only cap: above What
 // downloads independent from them and retry current player-client profiles.
 const YT_EXTRACTOR_PROFILES = ['android', 'web'];
 function ytExtractorArgs(profile) {
-    return ['--extractor-args', `youtube:player_client=${profile}`];
+    // Railway's shared IP is currently getting HTTP 429 on YouTube's normal
+    // webpage request. The player API still returns the progressive media, so
+    // skip only that rate-limited preliminary request.
+    return ['--extractor-args', `youtube:player_client=${profile};player_skip=webpage`];
 }
 async function runYtDlpProfiles(wrap, baseArgs, outputPath) {
     let lastError;
