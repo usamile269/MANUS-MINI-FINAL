@@ -426,12 +426,15 @@ const MAX_QUICKAPI_VIDEO_BYTES = 60 * 1024 * 1024; // Video-only cap: above What
 //     but still just one API call instead of spawning yt-dlp.
 // Public scraper APIs are frequently retired or rate-limited. Keep YouTube
 // downloads independent from them and retry current player-client profiles.
-const YT_EXTRACTOR_PROFILES = ['android', 'web'];
+// The current web client is SABR/PO-token gated and is not a useful fallback
+// on a headless Railway IP. Android is the fast progressive-format path that
+// works without browser cookies; retry it once for transient 403/429 errors.
+const YT_EXTRACTOR_PROFILES = ['android', 'android'];
 function ytExtractorArgs(profile) {
     // Railway's shared IP is currently getting HTTP 429 on YouTube's normal
     // webpage request. The player API still returns the progressive media, so
     // skip only that rate-limited preliminary request.
-    return ['--extractor-args', `youtube:player_client=${profile};player_skip=webpage`];
+    return ['--extractor-args', `youtube:player_client=${profile};player_skip=webpage,configs`];
 }
 async function runYtDlpProfiles(wrap, baseArgs, outputPath) {
     let lastError;
