@@ -3,6 +3,7 @@ const config = require('../config');
 
 const { getInactiveMembers } = require('../data/GroupActivity');
 const { toSansBold } = require('../lib/menu-styles');
+const { getOnlineIds } = require('../lib/group-presence');
 
 function fail(reply, msg) {
     return reply(`❌ ${toSansBold(msg)}`);
@@ -229,9 +230,9 @@ cmd({
         const g = groupMetadata || {};
         const participants = Array.isArray(g.participants) ? g.participants : [];
         const admins = participants.filter(p => p.admin);
-        const online = participants.filter(p => p.presence === 'available' || p.status === 'online');
-        const hasPresenceData = participants.some(p => p.presence || p.status);
         const numberOf = jid => String(jid || '').split('@')[0].replace(/:[^@]+$/, '');
+        const presence = getOnlineIds(from, participants.map(p => p.id));
+        const onlineIds = new Set(presence.ids);
         const requester = numberOf(sender);
         const botName = 'Ahmad Mini ✦';
         const created = g.creation
@@ -247,7 +248,7 @@ cmd({
             `┃ 📅 ${toSansBold('Created')}: ${created}\n` +
             `┃ 🕒 ${toSansBold('Time')}: ${currentTime}\n` +
             `┃ 👥 ${toSansBold('Members')}: ${participants.length}\n` +
-            `┃ 🟢 ${toSansBold('Online')}: ${hasPresenceData ? online.length : 'Not available'}\n` +
+            `┃ 🟢 ${toSansBold('Online')}: ${presence.available ? onlineIds.size : 'Not available'}\n` +
             `┃ 🛡️ ${toSansBold('Admins')}: ${admins.length}\n` +
             `┃ 👑 ${toSansBold('Owner')}: ${owner ? '@' + numberOf(owner) : 'Not available'}\n┃\n` +
             `┃ 📝 ${toSansBold('Description')}: ${description}\n` +

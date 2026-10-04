@@ -12,6 +12,7 @@ const {
     fetchLatestBaileysVersion,
 } = require('@whiskeysockets/baileys');
 const config = require('./config');
+const { recordPresence } = require('./lib/group-presence');
 // 🚀 GLOBAL SPEED BOOST (Bunty: "speed boost like rocket") — axios.defaults
 // is shared by EVERY file that does `require('axios')` across the whole
 // bot (same module instance in Node), so setting this once here turns on
@@ -1127,6 +1128,11 @@ async function ahmadPair(number, res = null) {
 
         socketCreationTime.set(sanitizedNumber, Date.now());
         activeSockets.set(sanitizedNumber, conn);
+        // Cache real group presence events for .gcinfo. This is in-memory only;
+        // no presence data is persisted or broadcast automatically.
+        conn.ev.on('presence.update', update => {
+            try { recordPresence(update?.id, update?.presences); } catch {}
+        });
         // 🚨 SAFETY NET for the same "already connected but never really
         // connected" bug: even with connectionOpenState above, belt-and-
         // suspenders in case some disconnect path skips both the 'close'
