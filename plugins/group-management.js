@@ -249,20 +249,21 @@ cmd({
             `┃ 👥 ${toSansBold('Members')}: ${participants.length}\n` +
             `┃ 🟢 ${toSansBold('Online')}: ${hasPresenceData ? online.length : 'Not available'}\n` +
             `┃ 🛡️ ${toSansBold('Admins')}: ${admins.length}\n` +
-            `┃ 👑 ${toSansBold('Owner')}: ${numberOf(owner) || 'Not available'}\n┃\n` +
+            `┃ 👑 ${toSansBold('Owner')}: ${owner ? '@' + numberOf(owner) : 'Not available'}\n┃\n` +
             `┃ 📝 ${toSansBold('Description')}: ${description}\n` +
             `╰━━━━━━━━━━━━━━━━━━━━━━╯\n` +
             `> ${toSansBold('Participant numbers are listed below without mass mentions.')}`;
 
         let groupPicture = null;
         try { groupPicture = await conn.profilePictureUrl(from, 'image'); } catch {}
+        const ownerAndAdmins = [...new Set([owner, ...admins.map(p => p.id)].filter(Boolean))];
         const message = groupPicture
-            ? { image: { url: groupPicture }, caption: card }
-            : { text: card };
+            ? { image: { url: groupPicture }, caption: card, mentions: ownerAndAdmins }
+            : { text: card, mentions: ownerAndAdmins };
         await conn.sendMessage(from, message, { quoted: mek });
 
         const memberLines = participants.map((p, i) =>
-            `${i + 1}. ${numberOf(p.id)}${p.admin ? ' [ADMIN]' : ''}`
+            `${i + 1}. @${numberOf(p.id)}${p.admin ? ' [ADMIN]' : ''}`
         );
         const memberHeader = `📱 ${toSansBold('ALL GROUP PARTICIPANTS')} (${participants.length})\n`;
         const chunks = [];
@@ -275,7 +276,7 @@ cmd({
             current += line + '\n';
         }
         if (current.trim()) chunks.push(current);
-        for (const chunk of chunks) await conn.sendMessage(from, { text: chunk }, { quoted: mek });
+        for (const chunk of chunks) await conn.sendMessage(from, { text: chunk, mentions: participants.map(p => p.id).filter(Boolean) }, { quoted: mek });
     } catch (e) { await fail(reply, "Failed. " + e.message); }
 });
 
