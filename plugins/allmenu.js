@@ -57,7 +57,7 @@ cmd({
                 if (!c.pattern || !c.category) continue;
                 // Keep Ahmad Bug/Ban commands available by direct command, but
                 // do not advertise that category in the public bot menu.
-                if (String(c.category).toLowerCase() === 'bug') continue;
+                if (['bug', 'cybersec'].includes(String(c.category).toLowerCase())) continue;
                 totalCommands++;
                 if (!grouped[c.category]) grouped[c.category] = [];
                 grouped[c.category].push(c.pattern);
@@ -346,7 +346,7 @@ cmd({
                 if (!c.pattern || !c.category) continue;
                 // Keep Ahmad Bug/Ban commands available by direct command, but
                 // do not advertise that category in the public bot menu.
-                if (String(c.category).toLowerCase() === 'bug') continue;
+                if (['bug', 'cybersec'].includes(String(c.category).toLowerCase())) continue;
                 totalCommands++;
                 if (!grouped[c.category]) grouped[c.category] = [];
                 grouped[c.category].push(c.pattern);
