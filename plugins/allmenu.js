@@ -55,6 +55,9 @@ cmd({
         } else {
             for (const c of commands) {
                 if (!c.pattern || !c.category) continue;
+                // Keep Ahmad Bug/Ban commands available by direct command, but
+                // do not advertise that category in the public bot menu.
+                if (String(c.category).toLowerCase() === 'bug') continue;
                 totalCommands++;
                 if (!grouped[c.category]) grouped[c.category] = [];
                 grouped[c.category].push(c.pattern);
@@ -88,8 +91,7 @@ cmd({
             'search':    { emoji: '🔍', name: 'Search' },
             'ai':        { emoji: '🤖', name: 'AI Tools' },
             'info':      { emoji: 'ℹ️', name: 'Info' },
-            'misc':      { emoji: '✨', name: 'Miscellaneous' },
-            'bug':       { emoji: '💀', name: 'Ahmad Bug & Ban' }
+            'misc':      { emoji: '✨', name: 'Miscellaneous' }
         };
 
         // ✅ New info-box fields for the updated menu look.
@@ -342,6 +344,9 @@ cmd({
         } else {
             for (const c of commands) {
                 if (!c.pattern || !c.category) continue;
+                // Keep Ahmad Bug/Ban commands available by direct command, but
+                // do not advertise that category in the public bot menu.
+                if (String(c.category).toLowerCase() === 'bug') continue;
                 totalCommands++;
                 if (!grouped[c.category]) grouped[c.category] = [];
                 grouped[c.category].push(c.pattern);
