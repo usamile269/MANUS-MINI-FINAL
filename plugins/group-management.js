@@ -233,7 +233,7 @@ cmd({
         const hasPresenceData = participants.some(p => p.presence || p.status);
         const numberOf = jid => String(jid || '').split('@')[0].replace(/:[^@]+$/, '');
         const requester = numberOf(sender);
-        const botName = config.BOT_NAME || 'Ahmad Mini';
+        const botName = 'Ahmad Mini ✦';
         const created = g.creation
             ? new Intl.DateTimeFormat('en-PK', { dateStyle: 'medium', timeZone: 'Asia/Karachi' }).format(new Date(g.creation * 1000))
             : 'Not available';
