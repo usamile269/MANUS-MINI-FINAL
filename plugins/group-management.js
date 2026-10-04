@@ -218,17 +218,65 @@ cmd({
 // ==================== GROUPINFO ====================
 cmd({
     pattern: "groupinfo",
-    desc: "ℹ️ Full group details",
+    alias: ["gcinfo"],
+    desc: "ℹ️ Attractive group profile and member details",
     category: "group",
     react: "ℹ️",
     filename: __filename
-}, async (conn, mek, m, { from, isGroup, groupMetadata, reply }) => {
+}, async (conn, mek, m, { from, isGroup, groupMetadata, sender, reply }) => {
     try {
         if (!isGroup) return fail(reply, "This is a group-only command.");
-        const g = groupMetadata;
-        const created = new Date(g.creation * 1000).toLocaleDateString();
-        reply(`╭═══ ℹ️ ${toSansBold('GROUP INFO')} ═══⊷\n┃❃│ ${toSansBold('Name')}: ${toSansBold(g.subject)}\n┃❃│ ${toSansBold('Members')}: ${toSansBold(String(g.participants.length))}\n┃❃│ ${toSansBold('Created')}: ${created}\n┃❃│ ${toSansBold('Description')}: ${g.desc || "None"}\n╰═════════════════⊷`);
-    } catch (e) { fail(reply, "Failed. " + e.message); }
+        const g = groupMetadata || {};
+        const participants = Array.isArray(g.participants) ? g.participants : [];
+        const admins = participants.filter(p => p.admin);
+        const online = participants.filter(p => p.presence === 'available' || p.status === 'online');
+        const hasPresenceData = participants.some(p => p.presence || p.status);
+        const numberOf = jid => String(jid || '').split('@')[0].replace(/:[^@]+$/, '');
+        const requester = numberOf(sender);
+        const botName = config.BOT_NAME || 'Ahmad Mini';
+        const created = g.creation
+            ? new Intl.DateTimeFormat('en-PK', { dateStyle: 'medium', timeZone: 'Asia/Karachi' }).format(new Date(g.creation * 1000))
+            : 'Not available';
+        const currentTime = new Intl.DateTimeFormat('en-PK', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Karachi' }).format(new Date());
+        const description = String(g.desc || 'No group description').replace(/\s+/g, ' ').slice(0, 500);
+        const owner = g.owner || participants.find(p => p.admin === 'superadmin')?.id;
+        const card = `╭━━〔 👥 ${toSansBold('GROUP PROFILE')} 〕━━╮\n` +
+            `┃ 🤖 ${toSansBold('Bot')}: ${toSansBold(botName)}\n` +
+            `┃ 🏷️ ${toSansBold('Group')}: ${toSansBold(g.subject || 'Unknown group')}\n` +
+            `┃ 👤 ${toSansBold('Requested by')}: ${requester || 'Unknown'}\n┃\n` +
+            `┃ 📅 ${toSansBold('Created')}: ${created}\n` +
+            `┃ 🕒 ${toSansBold('Time')}: ${currentTime}\n` +
+            `┃ 👥 ${toSansBold('Members')}: ${participants.length}\n` +
+            `┃ 🟢 ${toSansBold('Online')}: ${hasPresenceData ? online.length : 'Not available'}\n` +
+            `┃ 🛡️ ${toSansBold('Admins')}: ${admins.length}\n` +
+            `┃ 👑 ${toSansBold('Owner')}: ${numberOf(owner) || 'Not available'}\n┃\n` +
+            `┃ 📝 ${toSansBold('Description')}: ${description}\n` +
+            `╰━━━━━━━━━━━━━━━━━━━━━━╯\n` +
+            `> ${toSansBold('Participant numbers are listed below without mass mentions.')}`;
+
+        let groupPicture = null;
+        try { groupPicture = await conn.profilePictureUrl(from, 'image'); } catch {}
+        const message = groupPicture
+            ? { image: { url: groupPicture }, caption: card }
+            : { text: card };
+        await conn.sendMessage(from, message, { quoted: mek });
+
+        const memberLines = participants.map((p, i) =>
+            `${i + 1}. ${numberOf(p.id)}${p.admin ? ' [ADMIN]' : ''}`
+        );
+        const memberHeader = `📱 ${toSansBold('ALL GROUP PARTICIPANTS')} (${participants.length})\n`;
+        const chunks = [];
+        let current = memberHeader;
+        for (const line of memberLines) {
+            if ((current + line + '\n').length > 3500) {
+                chunks.push(current);
+                current = '';
+            }
+            current += line + '\n';
+        }
+        if (current.trim()) chunks.push(current);
+        for (const chunk of chunks) await conn.sendMessage(from, { text: chunk }, { quoted: mek });
+    } catch (e) { await fail(reply, "Failed. " + e.message); }
 });
 
 // ==================== REQUESTLIST ====================
