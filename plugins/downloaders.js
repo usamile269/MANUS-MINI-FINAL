@@ -496,7 +496,7 @@ async function getAdeelMedia(videoUrl, type) {
         throw new Error(`Adeel ${type}: provider returned an error body`);
     }
     if (type === 'audio' && !isLikelyAudio(buffer)) throw new Error('Adeel audio: invalid media');
-    return { buffer, title: data.result.title || null };
+    return { buffer, url: mediaUrl, title: data.result.title || null };
 }
 
 async function dlAudio(videoUrl, outPath) {
@@ -945,12 +945,27 @@ async (conn, mek, m, { reply, args, from }) => {
         try {
             await heavyQueue.run(async () => {
                 const media = await getAdeelMedia(video.url, 'video');
-                await sendWithRetry(conn, from, {
-                    video: media.buffer,
-                    mimetype: 'video/mp4',
-                    caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'),
-                    contextInfo: chanCtx()
-                }, { quoted: fakevCard });
+                const videoCaption = dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬');
+                try {
+                    await sendWithRetry(conn, from, {
+                        video: media.buffer,
+                        mimetype: 'video/mp4',
+                        fileName: `${video.title?.slice(0, 45) || 'video'}.mp4`,
+                        caption: videoCaption,
+                        contextInfo: chanCtx()
+                    }, { quoted: fakevCard });
+                } catch (bufferError) {
+                    // Some Baileys/WhatsApp upload nodes reject a large in-memory
+                    // payload even though the MP4 is valid. The same verified,
+                    // short-lived URL is a safe second attempt before yt-dlp.
+                    console.log('[YTMP4] buffered upload failed, trying verified URL:', bufferError.message);
+                    await sendWithRetry(conn, from, {
+                        video: { url: media.url },
+                        mimetype: 'video/mp4',
+                        caption: videoCaption,
+                        contextInfo: chanCtx()
+                    }, { quoted: fakevCard });
+                }
                 await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
                 console.log(`[YTMP4] Adeel buffered primary completed in ${Date.now() - started}ms`);
             }, async position => {
