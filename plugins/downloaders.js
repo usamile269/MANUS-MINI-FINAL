@@ -472,12 +472,12 @@ async function raceVideoMedia(videoUrl) {
 async function getAdeelMedia(videoUrl, type) {
     const route = type === 'audio' ? 'ytmp3' : 'ytmp4v2';
     const field = type === 'audio' ? 'audio_download' : 'video_download';
-    const maxBytes = type === 'audio' ? 25 * 1024 * 1024 : 60 * 1024 * 1024;
+    const maxBytes = type === 'audio' ? 25 * 1024 * 1024 : 200 * 1024 * 1024;
     const { data } = await axios.get(`https://adeel-xtech-apis.vercel.app/api/${route}`, {
         ...AXIOS_DEFAULTS,
         timeout: 15000,
         family: 4,
-        params: { url: videoUrl }
+        params: type === 'video' ? { url: videoUrl, quality: '1080p' } : { url: videoUrl }
     });
     const mediaUrl = data?.status && data?.result?.[field];
     if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) throw new Error(`Adeel ${type}: no media URL`);
@@ -550,17 +550,19 @@ async function dlVideo(videoUrl, outPath) {
     // 🚀 SPEED FIX #2 (Bunty: "thumbnail turant aata hai, video bohot late" —
     // means the fast no-cookies quick-API path is failing often and falling
     // through to this yt-dlp path every time, which was inherently slower):
-    // 1) 480p often has NO single pre-merged file on YouTube anymore, so
+    // 1) Up to 1080p is preferred when the source/provider supports it; if
+    //    that format is unavailable, yt-dlp falls back to the best available.
+    // 2) 480p often has NO single pre-merged file on YouTube anymore, so
     //    yt-dlp was silently grabbing separate video+audio streams and
     //    merging them locally — an extra local ffmpeg mux step and, more
     //    importantly, TWO separate downloads instead of one. Dropping to
     //    360p makes a real single-file progressive format available far
     //    more often, skipping the merge entirely.
-    // 2) --concurrent-fragments 4 lets yt-dlp pull multiple pieces of a
+    // 3) --concurrent-fragments 4 lets yt-dlp pull multiple pieces of a
     //    fragmented/DASH stream at once instead of one at a time — a real
     //    speedup on longer videos even when a merge does still happen.
     const wrap = await ensureYtDlp();
-    const args = [videoUrl, '-f', '18/best[height<=360][ext=mp4]/best[height<=360]/best[ext=mp4]/best', '--no-playlist',
+    const args = [videoUrl, '-f', 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best', '--no-playlist',
         '--force-ipv4', '--socket-timeout', '25', '--retries', '3', '--fragment-retries', '3',
         '--merge-output-format', 'mp4', '--concurrent-fragments', '8', '--buffer-size', '1M', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
@@ -994,7 +996,7 @@ async (conn, mek, m, { reply, args, from }) => {
         await heavyQueue.run(async () => {
             await dlVideo(video.url, outPath);
             if (!fs.existsSync(outPath)) throw new Error('No video file produced');
-            if (fs.statSync(outPath).size > 100 * 1024 * 1024) throw new Error('Video too large (100 MB limit)');
+            if (fs.statSync(outPath).size > 200 * 1024 * 1024) throw new Error('Video too large (200 MB limit)');
             await sendWithRetry(conn, from, { video: fs.readFileSync(outPath), mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
             try { fs.unlinkSync(outPath); } catch {}
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
@@ -1006,7 +1008,7 @@ async (conn, mek, m, { reply, args, from }) => {
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } }).catch(() => {});
         console.log('[YTMP4 FINAL ERROR]', e.message);
         if (String(e.message).startsWith('YTSEARCH_FAILED')) return replyWithRetry(conn, from, mek, '❌ YouTube search failed. Paste a direct YouTube link and try again.');
-        return replyWithRetry(conn, from, mek, /too large/i.test(e.message) ? '❌ Video is over the 100MB limit.' : '❌ Download failed. Try a direct YouTube link or a shorter video.');
+        return replyWithRetry(conn, from, mek, /too large/i.test(e.message) ? '❌ Video is over the 200MB limit.' : '❌ Download failed. Try a direct YouTube link or a shorter video.');
     }
 });
 
