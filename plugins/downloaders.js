@@ -472,23 +472,45 @@ async function raceVideoMedia(videoUrl) {
 async function getAdeelMedia(videoUrl, type) {
     const route = type === 'audio' ? 'ytmp3' : 'ytmp4v2';
     const field = type === 'audio' ? 'audio_download' : 'video_download';
-    const maxBytes = type === 'audio' ? 25 * 1024 * 1024 : 200 * 1024 * 1024;
-    const { data } = await axios.get(`https://adeel-xtech-apis.vercel.app/api/${route}`, {
-        ...AXIOS_DEFAULTS,
-        timeout: 15000,
-        family: 4,
-        params: type === 'video' ? { url: videoUrl, quality: '1080p' } : { url: videoUrl }
-    });
+    let data;
+    let lastError;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            ({ data } = await axios.get(`https://adeel-xtech-apis.vercel.app/api/${route}`, {
+                ...AXIOS_DEFAULTS,
+                timeout: 20000,
+                family: 4,
+                params: { url: videoUrl }
+            }));
+            break;
+        } catch (e) {
+            lastError = e;
+            if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 800));
+        }
+    }
+    if (!data) throw new Error(`Adeel ${type} API failed: ${lastError?.message || 'no response'}`);
     const mediaUrl = data?.status && data?.result?.[field];
     if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) throw new Error(`Adeel ${type}: no media URL`);
-    const media = await axios.get(mediaUrl, {
-        responseType: 'arraybuffer',
-        timeout: 60000,
-        family: 4,
-        maxContentLength: maxBytes,
-        maxBodyLength: maxBytes,
-        headers: { 'User-Agent': 'Mozilla/5.0', Range: 'bytes=0-' }
-    });
+    let media;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            media = await axios.get(mediaUrl, {
+                responseType: 'arraybuffer',
+                timeout: 180000,
+                family: 4,
+                // No artificial file-size cap: the provider/WhatsApp decides
+                // what it can accept. Keep the payload complete for long media.
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
+                headers: { 'User-Agent': 'Mozilla/5.0', Range: 'bytes=0-' }
+            });
+            break;
+        } catch (e) {
+            lastError = e;
+            if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 800));
+        }
+    }
+    if (!media) throw new Error(`Adeel ${type} media failed: ${lastError?.message || 'no response'}`);
     const buffer = Buffer.from(media.data);
     if (buffer.length < 15000) throw new Error(`Adeel ${type}: media is empty or too small`);
     const head = buffer.slice(0, 32).toString('utf8').trim().toLowerCase();
@@ -550,19 +572,13 @@ async function dlVideo(videoUrl, outPath) {
     // 🚀 SPEED FIX #2 (Bunty: "thumbnail turant aata hai, video bohot late" —
     // means the fast no-cookies quick-API path is failing often and falling
     // through to this yt-dlp path every time, which was inherently slower):
-    // 1) Up to 1080p is preferred when the source/provider supports it; if
-    //    that format is unavailable, yt-dlp falls back to the best available.
-    // 2) 480p often has NO single pre-merged file on YouTube anymore, so
-    //    yt-dlp was silently grabbing separate video+audio streams and
-    //    merging them locally — an extra local ffmpeg mux step and, more
-    //    importantly, TWO separate downloads instead of one. Dropping to
-    //    360p makes a real single-file progressive format available far
-    //    more often, skipping the merge entirely.
-    // 3) --concurrent-fragments 4 lets yt-dlp pull multiple pieces of a
+    // 1) Request the best available MP4/video+audio pair without an artificial
+    //    resolution cap; yt-dlp falls back when a format is unavailable.
+    // 2) --concurrent-fragments 8 lets yt-dlp pull multiple pieces of a
     //    fragmented/DASH stream at once instead of one at a time — a real
     //    speedup on longer videos even when a merge does still happen.
     const wrap = await ensureYtDlp();
-    const args = [videoUrl, '-f', 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best', '--no-playlist',
+    const args = [videoUrl, '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best', '--no-playlist',
         '--force-ipv4', '--socket-timeout', '25', '--retries', '3', '--fragment-retries', '3',
         '--merge-output-format', 'mp4', '--concurrent-fragments', '8', '--buffer-size', '1M', '-o', outPath, ...cookieArgs(), ...ffmpegLocationArgs()];
     try {
@@ -996,7 +1012,6 @@ async (conn, mek, m, { reply, args, from }) => {
         await heavyQueue.run(async () => {
             await dlVideo(video.url, outPath);
             if (!fs.existsSync(outPath)) throw new Error('No video file produced');
-            if (fs.statSync(outPath).size > 200 * 1024 * 1024) throw new Error('Video too large (200 MB limit)');
             await sendWithRetry(conn, from, { video: fs.readFileSync(outPath), mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
             try { fs.unlinkSync(outPath); } catch {}
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
@@ -1008,7 +1023,7 @@ async (conn, mek, m, { reply, args, from }) => {
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } }).catch(() => {});
         console.log('[YTMP4 FINAL ERROR]', e.message);
         if (String(e.message).startsWith('YTSEARCH_FAILED')) return replyWithRetry(conn, from, mek, '❌ YouTube search failed. Paste a direct YouTube link and try again.');
-        return replyWithRetry(conn, from, mek, /too large/i.test(e.message) ? '❌ Video is over the 200MB limit.' : '❌ Download failed. Try a direct YouTube link or a shorter video.');
+        return replyWithRetry(conn, from, mek, '❌ Download failed. Provider/source ne media return nahi ki. Direct YouTube link try karein.');
     }
 });
 
