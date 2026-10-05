@@ -521,6 +521,74 @@ async function getAdeelMedia(videoUrl, type) {
     return { buffer, url: mediaUrl, title: data.result.title || null };
 }
 
+// Video-only path: stream the provider response to disk instead of buffering
+// an entire long/large MP4 in Railway RAM. This keeps .play unchanged while
+// making .video reliable for long files.
+async function getAdeelVideoFile(videoUrl) {
+    let data;
+    let lastError;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            ({ data } = await axios.get('https://adeel-xtech-apis.vercel.app/api/ytmp4v2', {
+                ...AXIOS_DEFAULTS,
+                timeout: 20000,
+                family: 4,
+                params: { url: videoUrl }
+            }));
+            break;
+        } catch (e) {
+            lastError = e;
+            if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 800));
+        }
+    }
+    const mediaUrl = data?.status && data?.result?.video_download;
+    if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) {
+        throw new Error(`Adeel video API failed: ${lastError?.message || 'no media URL'}`);
+    }
+    const filePath = path.join('/tmp', `ytvideo_api_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
+    try {
+        const response = await axios.get(mediaUrl, {
+            responseType: 'stream',
+            timeout: 180000,
+            family: 4,
+            headers: { 'User-Agent': 'Mozilla/5.0', Range: 'bytes=0-' }
+        });
+        await new Promise((resolve, reject) => {
+            const writer = fs.createWriteStream(filePath);
+            response.data.pipe(writer);
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+            response.data.on('error', reject);
+        });
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).size < 15000) {
+            throw new Error('Adeel video stream was empty or incomplete');
+        }
+        return { filePath, url: mediaUrl, title: data.result?.title || null };
+    } catch (e) {
+        try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+        throw e;
+    }
+}
+
+
+async function getAdeelVideoLink(videoUrl) {
+    let lastError;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            const { data } = await axios.get('https://adeel-xtech-apis.vercel.app/api/ytmp4v2', {
+                ...AXIOS_DEFAULTS, timeout: 20000, family: 4, params: { url: videoUrl }
+            });
+            const mediaUrl = data?.status && data?.result?.video_download;
+            if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) throw new Error('no video URL');
+            return mediaUrl;
+        } catch (e) {
+            lastError = e;
+            if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 800));
+        }
+    }
+    throw new Error(`Adeel video link failed: ${lastError?.message || 'no response'}`);
+}
+
 async function dlAudio(videoUrl, outPath) {
     const wrap = await ensureYtDlp();
     // Railway/YouTube sometimes hides separate audio-only formats behind the
@@ -958,40 +1026,41 @@ async (conn, mek, m, { reply, args, from }) => {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const started = Date.now();
         const video = await ytSearch(query);
-        // Verified fast primary. Buffer the MP4 before sending so WhatsApp does
-        // not have to fetch a short-lived third-party URL itself.
+        // Fast primary: let WhatsApp fetch the verified CDN URL directly.
+        // If an upload node rejects it, use the working streamed-file fallback.
         try {
             await heavyQueue.run(async () => {
-                const media = await getAdeelMedia(video.url, 'video');
                 const videoCaption = dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬');
                 try {
+                    const mediaUrl = await getAdeelVideoLink(video.url);
                     await sendWithRetry(conn, from, {
-                        video: media.buffer,
-                        mimetype: 'video/mp4',
-                        fileName: `${video.title?.slice(0, 45) || 'video'}.mp4`,
-                        caption: videoCaption,
-                        contextInfo: chanCtx()
-                    }, { quoted: fakevCard });
-                } catch (bufferError) {
-                    // Some Baileys/WhatsApp upload nodes reject a large in-memory
-                    // payload even though the MP4 is valid. The same verified,
-                    // short-lived URL is a safe second attempt before yt-dlp.
-                    console.log('[YTMP4] buffered upload failed, trying verified URL:', bufferError.message);
-                    await sendWithRetry(conn, from, {
-                        video: { url: media.url },
+                        video: { url: mediaUrl },
                         mimetype: 'video/mp4',
                         caption: videoCaption,
                         contextInfo: chanCtx()
                     }, { quoted: fakevCard });
+                } catch (directError) {
+                    console.log('[YTMP4] direct URL failed, using streamed upload:', directError.message);
+                    const media = await getAdeelVideoFile(video.url);
+                    try {
+                        await sendWithRetry(conn, from, {
+                            video: fs.createReadStream(media.filePath),
+                            mimetype: 'video/mp4',
+                            fileName: `${video.title?.slice(0, 45) || 'video'}.mp4`,
+                            caption: videoCaption,
+                            contextInfo: chanCtx()
+                        }, { quoted: fakevCard });
+                    } finally {
+                        try { if (fs.existsSync(media.filePath)) fs.unlinkSync(media.filePath); } catch {}
+                    }
                 }
                 await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-                console.log(`[YTMP4] Adeel buffered primary completed in ${Date.now() - started}ms`);
+                console.log(`[YTMP4] Adeel fast primary completed in ${Date.now() - started}ms`);
             }, async position => {
                 await replyWithRetry(conn, from, mek, `⏳ Download queue position: #${position}`);
             });
             return;
         } catch (e) { console.log('[YTMP4] Adeel primary failed, using yt-dlp fallback:', e.message); }
-
         // Restored from the previously fast, working implementation: resolve
         // and fetch the provider media once inside the bounded queue, then send
         // the bytes directly. This avoids WhatsApp performing a slow/unstable
