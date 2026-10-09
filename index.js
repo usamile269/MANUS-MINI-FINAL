@@ -79,6 +79,19 @@ app.get('/health', (req, res) => {
     res.status(200).json({ ok: true, service: 'MANUS MINI', build: BUILD_ID, uptime: Math.round(process.uptime()) });
 });
 
+// TEMP DEBUG (2026-10-09): test the AI chain from Railway's network.
+// Remove after diagnosing.
+app.get('/debug-ai', async (req, res) => {
+    try {
+        const { smartAI } = require('./lib/ai-provider');
+        const t0 = Date.now();
+        const answer = await smartAI('Reply with exactly: AI_OK');
+        res.json({ ok: true, ms: Date.now() - t0, answer: String(answer).slice(0, 200) });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: e.message });
+    }
+});
+
 // TEMP DEBUG (2026-10-09): identify which process holds WhatsApp connection locks.
 // Remove after diagnosing the duplicate-instance issue.
 app.get('/debug-locks', async (req, res) => {
@@ -86,16 +99,25 @@ app.get('/debug-locks', async (req, res) => {
         const storage = require('./lib/mongo');
         const locks = await storage.model('ConnectionLock').find({});
         const now = Date.now();
-        res.json(locks.map(l => {
-            const iid = String(l.instanceId || '');
-            const ts = parseInt(iid.split('-')[0], 10);
-            return {
-                number: l.number,
-                instanceId: iid.slice(0, 24) + '...',
-                holderStartedAt: isNaN(ts) ? null : new Date(ts).toISOString(),
-                heartbeatAgeSec: Math.round((now - new Date(l.heartbeatAt).getTime()) / 1000)
-            };
-        }));
+        // Current process's own instance id (same formula as main.js)
+        let selfId = null;
+        try {
+            const mainExports = require('./main');
+            selfId = mainExports.__INSTANCE_ID || null;
+        } catch (e) { /* ignore */ }
+        res.json({
+            self: { uptimeSec: Math.round(process.uptime()), instanceId: selfId },
+            locks: locks.map(l => {
+                const iid = String(l.instanceId || '');
+                const ts = parseInt(iid.split('-')[0], 10);
+                return {
+                    number: l.number,
+                    instanceId: iid.slice(0, 24) + '...',
+                    holderStartedAt: isNaN(ts) ? null : new Date(ts).toISOString(),
+                    heartbeatAgeSec: Math.round((now - new Date(l.heartbeatAt).getTime()) / 1000)
+                };
+            })
+        });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
