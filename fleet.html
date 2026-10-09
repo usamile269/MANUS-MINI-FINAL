@@ -55,9 +55,18 @@
 </div>
 <script>
 let KEY = '';
+// F4: key sent via header, never in query string (query strings leak into
+// server logs, proxies, and browser history).
+function apiHeaders() { return { 'x-api-key': KEY }; }
+// F4: XSS-safe rendering — worker events/errors are untrusted strings.
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 async function unlock() {
   KEY = document.getElementById('key').value;
-  const r = await fetch('/fleet/status?apikey=' + encodeURIComponent(KEY));
+  const r = await fetch('/fleet/status', { headers: apiHeaders() });
   if (!r.ok) {
     document.getElementById('loginErr').textContent = 'Invalid key';
     document.getElementById('loginErr').classList.remove('hidden');
@@ -70,8 +79,8 @@ async function unlock() {
 async function load() {
   try {
     const [s, e] = await Promise.all([
-      fetch('/fleet/status?apikey=' + encodeURIComponent(KEY)).then(r => r.json()),
-      fetch('/fleet/events?apikey=' + encodeURIComponent(KEY)).then(r => r.json()),
+      fetch('/fleet/status', { headers: apiHeaders() }).then(r => r.json()),
+      fetch('/fleet/events', { headers: apiHeaders() }).then(r => r.json()),
     ]);
     render(s.fleet, e.events || []);
     document.getElementById('refreshInfo').textContent =
@@ -93,16 +102,16 @@ function render(fleet, events) {
     const pct = Math.round((w.activeSessions / w.capacityMax) * 100);
     const hb = w.lastHeartbeat ? new Date(w.lastHeartbeat).toLocaleTimeString() : '—';
     return `<div class="worker">
-      <div class="head"><span class="id">${w.workerId}</span>${badge}</div>
+      <div class="head"><span class="id">${esc(w.workerId)}</span>${badge}</div>
       <div class="bar"><div style="width:${pct}%"></div></div>
       <div class="meta">
         <b>${w.activeSessions}</b> / ${w.capacityMax} sessions<br>
-        ${w.provisioned ? `Last heartbeat: <b>${hb}</b><br>RAM: <b>${w.rssMB || 0} MB</b> · Uptime: <b>${w.uptimeSec || 0}s</b>${w.error ? `<br><span style="color:#f87171">${w.error}</span>` : ''}`
+        ${w.provisioned ? `Last heartbeat: <b>${esc(hb)}</b><br>RAM: <b>${w.rssMB || 0} MB</b> · Uptime: <b>${w.uptimeSec || 0}s</b>${w.error ? `<br><span style="color:#f87171">${esc(w.error)}</span>` : ''}`
         : 'Slot reserved. Deploy a worker to activate.'}
       </div></div>`;
   }).join('');
   document.getElementById('events').innerHTML = events.length
-    ? events.map(v => `<div class="ev">${new Date(v.ts).toLocaleString()} · <b>${v.workerId}</b> · ${v.event} ${v.detail || ''}</div>`).join('')
+    ? events.map(v => `<div class="ev">${esc(new Date(v.ts).toLocaleString())} · <b>${esc(v.workerId)}</b> · ${esc(v.event)} ${esc(v.detail || '')}</div>`).join('')
     : '<div class="ev">No events yet.</div>';
 }
 document.getElementById('key').addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });

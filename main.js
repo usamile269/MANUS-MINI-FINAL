@@ -567,6 +567,15 @@ function isNumberAlreadyConnected(number) {
     return activeSockets.has(n) && connectionOpenState.get(n) === true;
 }
 
+// 🆕 P2 F5: genuinely-open sessions only (excludes sockets still connecting).
+// Dashboard counts must use this — never raw activeSockets.size.
+function getConnectedNumbers() {
+    return Array.from(activeSockets.keys()).filter(n => connectionOpenState.get(n) === true);
+}
+function getConnectingNumbers() {
+    return Array.from(activeSockets.keys()).filter(n => connectionOpenState.get(n) !== true);
+}
+
 function getConnectionStatus(number) {
     const n = number.replace(/[^0-9]/g, '');
     const isConnected = activeSockets.has(n);
@@ -3437,12 +3446,16 @@ router.get('/status', adminRateLimit, async (req, res) => {
     const authed = (config.PAIR_API_KEY && provided === config.PAIR_API_KEY) ||
                    (provided && provided === config.ADMIN_PANEL_KEY);
     const { number } = req.query;
+    // F5: public sees validated counts only — connected vs connecting split,
+    // never raw socket objects, never double-counted.
+    const connected = getConnectedNumbers();
+    const connecting = getConnectingNumbers();
     if (!authed) {
-        return res.json({ status: 'active', totalActive: activeSockets.size });
+        return res.json({ status: 'active', connected: connected.length, connecting: connecting.length });
     }
     if (!number) {
-        const list = Array.from(activeSockets.keys()).map(n => { const s = getConnectionStatus(n); return { number: n, status: 'connected', connectionTime: s.connectionTime, uptime: `${s.uptime} seconds` }; });
-        return res.json({ totalActive: activeSockets.size, connections: list });
+        const list = connected.map(n => { const s = getConnectionStatus(n); return { number: n, status: 'connected', connectionTime: s.connectionTime, uptime: `${s.uptime} seconds` }; });
+        return res.json({ connected: connected.length, connecting: connecting.length, connections: list });
     }
     const s = getConnectionStatus(number);
     res.json({ number, isConnected: s.isConnected, connectionTime: s.connectionTime, uptime: `${s.uptime} seconds` });
@@ -3467,10 +3480,10 @@ router.get('/active', adminRateLimit, (req, res) => {
     const provided = req.query.apikey || req.headers['x-api-key'];
     const authed = (config.PAIR_API_KEY && provided === config.PAIR_API_KEY) ||
                    (provided && provided === config.ADMIN_PANEL_KEY);
-    if (!authed) return res.json({ count: activeSockets.size });
-    res.json({ count: activeSockets.size, numbers: Array.from(activeSockets.keys()) });
+    if (!authed) return res.json({ count: getConnectedNumbers().length });
+    res.json({ count: getConnectedNumbers().length, numbers: getConnectedNumbers() });
 });
-router.get('/ping', (req, res) => res.json({ status: 'active', message: '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ is running 🔥', activeSessions: activeSockets.size }));
+router.get('/ping', (req, res) => res.json({ status: 'active', message: '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ is running 🔥', connectedSessions: getConnectedNumbers().length }));
 router.get('/connect-all', requireAdminOrApiKey, adminRateLimit, async (req, res) => {
     try {
         const numbers = await getAllNumbersFromMongoDB();
@@ -3627,10 +3640,13 @@ async function workerBoot() {
             try {
                 const mem = process.memoryUsage();
                 await registry.heartbeatWorker(workerId, {
-                    activeSessions: activeSockets.size,
+                    // F5: report GENUINELY CONNECTED sessions, not connecting sockets
+                    activeSessions: getConnectedNumbers().length,
                     rssMB: Math.round(mem.rss / 1024 / 1024),
                     uptimeSec: Math.round(process.uptime()),
                 });
+                // F6: renew leases so the controller never steals live sessions
+                await assigner.renewLeases(workerId);
             } catch (e) { ahmadLog(`[fleet] heartbeat failed: ${e.message}`, 'warning'); }
         }, 10 * 1000);
         // connect assigned sessions (staggered)

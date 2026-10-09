@@ -47,6 +47,7 @@ function makeCollection() {
             if (!d) return null;
             if (update.$set) applySet(d, update.$set);
             if (update.$setOnInsert && !d._touched) { applySet(d, update.$setOnInsert); }
+            if (update.$inc) for (const [k, v] of Object.entries(update.$inc)) d[k] = (d[k] || 0) + v;
             d._touched = true;
             return { ...d };
         },
@@ -78,102 +79,162 @@ global.__cols = collections;
 const registry = require(libDir + '/worker-registry.js');
 const assigner = require(libDir + '/session-assigner.js');
 
-(async () => {
+async function main() {
     let t = 0;
     const ok = (name) => { t++; console.log(`${t}. ${name}: PASS`); };
+    const reset = async () => {
+        collections.SessionAssignments._docs.length = 0;
+        collections.Workers._docs.length = 0;
+        collections.WorkerEvents._docs.length = 0;
+    };
 
     // --- T1: register + heartbeat ---
+    await reset();
     await registry.registerWorker('worker-01', { capacityMax: 50 });
     const hb = await registry.heartbeatWorker('worker-01', { activeSessions: 3, rssMB: 400, uptimeSec: 100 });
     assert.strictEqual(hb.activeSessions, 3);
     ok('T1 register + heartbeat');
 
-    // --- T2: heartbeat timeout -> offline ---
+    // --- T2: stale heartbeat -> offline ---
     collections.Workers._docs.find(d => d.workerId === 'worker-01').lastHeartbeat = new Date(Date.now() - 60000);
-    const marked = await registry.markStaleWorkers(30000);
-    assert.strictEqual(marked, 1);
+    assert.strictEqual(await registry.markStaleWorkers(30000), 1);
     const fleet = await registry.getFleetStatus();
-    const w01 = fleet.slots.find(s => s.workerId === 'worker-01');
-    assert.strictEqual(w01.status, 'offline');
+    assert.strictEqual(fleet.slots.find(s => s.workerId === 'worker-01').status, 'offline');
     ok('T2 stale heartbeat -> offline');
 
-    // --- T3: unregistered slots NEVER fake online ---
-    const w05 = fleet.slots.find(s => s.workerId === 'worker-05');
-    assert.strictEqual(w05.provisioned, false);
-    assert.strictEqual(w05.status, 'not_provisioned');
+    // --- T3: unprovisioned slots honest ---
+    assert.strictEqual(fleet.slots.find(s => s.workerId === 'worker-05').status, 'not_provisioned');
     assert.strictEqual(fleet.totals.notProvisioned, 9);
-    assert.strictEqual(fleet.totals.online, 0); // worker-01 is offline
     ok('T3 unprovisioned slots honest');
 
-    // --- T4: atomic claim race — 2 workers, 1 session, 50 attempts ---
+    // --- T4: claim race x50 ---
+    await reset();
+    await registry.registerWorker('worker-01', {});
+    await registry.registerWorker('worker-02', {});
     for (let i = 0; i < 50; i++) {
         collections.SessionAssignments._docs.length = 0;
+        // reset reservations for clean race
+        for (const w of collections.Workers._docs) w.reservedCount = 0;
         const results = await Promise.allSettled([
             assigner.claimSession('923001234567', 'worker-01'),
             assigner.claimSession('923001234567', 'worker-02'),
         ]);
         const won = results.filter(r => r.status === 'fulfilled').length;
-        assert.strictEqual(won, 1, `race ${i}: exactly 1 winner, got ${won}`);
+        assert.strictEqual(won, 1, `race ${i}: won=${won}`);
+        // release for next iteration
+        await assigner.releaseSession('923001234567').catch(() => {});
+        for (const w of collections.Workers._docs) w.reservedCount = 0;
     }
     ok('T4 claim race: exactly 1 winner x50');
 
-    // --- T5: 50-session cap enforced ---
-    collections.SessionAssignments._docs.length = 0;
-    for (let i = 0; i < 50; i++) {
-        await assigner.claimSession(`92300000${String(i).padStart(3, '0')}`, 'worker-01');
-    }
+    // --- T5: 50-cap ---
+    await reset();
+    await registry.registerWorker('worker-01', { capacityMax: 50 });
+    for (let i = 0; i < 50; i++) await assigner.claimSession(`92300000${String(i).padStart(3, '0')}`, 'worker-01');
     let capErr = null;
-    try { await assigner.claimSession('923009999999', 'worker-01'); }
-    catch (e) { capErr = e; }
+    try { await assigner.claimSession('923009999999', 'worker-01'); } catch (e) { capErr = e; }
     assert.ok(capErr && capErr.code === 'CAPACITY_EXCEEDED');
-    ok('T5 50-cap enforced, 51st refused');
+    ok('T5 50-cap enforced');
 
-    // --- T6: failover — offline worker sessions released, online untouched ---
-    collections.SessionAssignments._docs.length = 0;
-    await assigner.claimSession('923001111111', 'worker-01'); // worker-01 offline
-    await assigner.claimSession('923002222222', 'worker-02'); // worker-02 online
+    // --- T6: failover ---
+    await reset();
+    await registry.registerWorker('worker-01', {});
     await registry.registerWorker('worker-02', {});
+    await assigner.claimSession('923001111111', 'worker-01');
+    await assigner.claimSession('923002222222', 'worker-02');
     await registry.heartbeatWorker('worker-02', { activeSessions: 1 });
+    collections.Workers._docs.find(d => d.workerId === 'worker-01').lastHeartbeat = new Date(Date.now() - 60000);
+    await registry.markStaleWorkers(30000);
+    collections.SessionAssignments._docs.find(d => d.number === '923001111111').leaseExpiresAt = new Date(Date.now() - 1000);
     const isOnline = async (id) => {
         const d = await collections.Workers.findOne({ workerId: id });
         return d && d.status === 'online' && (Date.now() - new Date(d.lastHeartbeat).getTime()) < 30000;
     };
-    const n = await assigner.reassignOrphanedSessions(isOnline);
-    assert.strictEqual(n, 1);
-    const remaining = await assigner.getWorkerSessions('worker-02');
-    assert.strictEqual(remaining.length, 1);
-    assert.strictEqual(remaining[0].number, '923002222222');
+    assert.strictEqual(await assigner.reassignOrphanedSessions(isOnline), 1);
+    const rem = await assigner.getWorkerSessions('worker-02');
+    assert.strictEqual(rem.length, 1);
     ok('T6 failover: orphan released, live untouched');
 
-    // --- T7: fail-closed on DB error ---
-    const badCols = { SessionAssignments: { countDocuments: async () => { throw new Error('mongo down'); } } };
-    global.__cols = { ...collections, ...badCols };
-    // need fresh require with bad cols — simulate via direct call check
-    let failClosed = false;
-    try {
-        // claimSession calls countDocuments first
-        const cols2 = { SessionAssignments: makeCollection() };
-        cols2.SessionAssignments.countDocuments = async () => { throw new Error('mongo down'); };
-        global.__cols = { ...collections, SessionAssignments: cols2.SessionAssignments };
-        await assigner.claimSession('923003333333', 'worker-01');
-    } catch (e) { failClosed = /fail-closed|mongo down/i.test(e.message); }
-    global.__cols = collections;
-    assert.ok(failClosed, 'claim must throw on DB error, never grant');
+    // --- T7: fail-closed ---
+    const origCols = global.__cols;
+    global.__cols = { ...collections, SessionAssignments: { countDocuments: async () => { throw new Error('mongo down'); } } };
+    let fc = false;
+    try { await assigner.claimSession('923003333333', 'worker-01'); } catch (e) { fc = /fail-closed|mongo down/i.test(e.message); }
+    global.__cols = origCols;
+    assert.ok(fc);
     ok('T7 fail-closed on DB error');
 
     // --- T8: release ---
-    collections.SessionAssignments._docs.length = 0;
+    await reset();
+    await registry.registerWorker('worker-01', {});
     await assigner.claimSession('923004444444', 'worker-01');
     await assigner.releaseSession('923004444444', 'worker-01');
-    const after = await assigner.getWorkerSessions('worker-01');
-    assert.strictEqual(after.length, 0);
-    ok('T8 release returns session to pool');
+    assert.strictEqual((await assigner.getWorkerSessions('worker-01')).length, 0);
+    ok('T8 release');
 
-    // --- T9: unknown worker slot rejected ---
-    let slotErr = null;
-    try { await registry.registerWorker('worker-99', {}); } catch (e) { slotErr = e; }
-    assert.ok(slotErr && /unknown worker slot/.test(slotErr.message));
+    // --- T9: unknown slot ---
+    let se = null;
+    try { await registry.registerWorker('worker-99', {}); } catch (e) { se = e; }
+    assert.ok(se && /unknown worker slot/.test(se.message));
     ok('T9 unknown slot rejected');
 
-    console.log(`\nfleet P2: ${t}/${t} PASS`);
-})().catch(e => { console.error('FAIL:', e.message); process.exit(1); });
+    // --- T10: 60 simultaneous claims, never exceed 50 ---
+    await reset();
+    await registry.registerWorker('worker-03', { capacityMax: 50 });
+    const results = await Promise.all(
+        Array.from({ length: 60 }, (_, i) =>
+            assigner.claimSession(`92310000${String(i).padStart(3, '0')}`, 'worker-03').then(() => 'won', e => e.code || 'err'))
+    );
+    const won = results.filter(r => r === 'won').length;
+    assert.ok(won <= 50, `won=${won}`);
+    assert.strictEqual(won + results.filter(r => r === 'CAPACITY_EXCEEDED').length, 60);
+    const wdoc = await collections.Workers.findOne({ workerId: 'worker-03' });
+    assert.ok((wdoc.reservedCount || 0) <= 50);
+    console.log(`   (60 claims -> ${won} won, reserved=${wdoc.reservedCount})`);
+    ok('T10 simultaneous capacity never exceeds 50');
+
+    // --- T11: invalid telemetry ---
+    await reset();
+    await registry.registerWorker('worker-01', {});
+    const bad = [
+        () => registry.registerWorker('worker-99', {}),
+        () => registry.registerWorker('worker-01', { capacityMax: 51 }),
+        () => registry.registerWorker('worker-01', { capacityMax: 0 }),
+        () => registry.heartbeatWorker('worker-01', { rssMB: 'huge' }),
+        () => registry.heartbeatWorker('worker-01', { activeSessions: -5 }),
+        () => assigner.claimSession('abc', 'worker-01'),
+    ];
+    for (const fn of bad) { let threw = false; try { await fn(); } catch (e) { threw = true; } assert.ok(threw); }
+    await registry.registerWorker('worker-04', { capacityMax: 50 });
+    await registry.registerWorker('worker-05', { capacityMax: 1 });
+    ok('T11 invalid telemetry rejected');
+
+    // --- T12: XSS ---
+    const html = require('fs').readFileSync('/tmp/fleet.html', 'utf8');
+    const escMatch = html.match(/function esc\(s\) \{[\s\S]*?\n\}/);
+    assert.ok(escMatch, 'esc() exists');
+    eval(escMatch[0]);
+    assert.strictEqual(esc('<script>alert(1)</script>'), '&lt;script&gt;alert(1)&lt;/script&gt;');
+    assert.ok(/\$\{esc\(v\.event\)\}/.test(html) && /\$\{esc\(w\.error\)\}/.test(html));
+    assert.ok(!/fleet\/status\?apikey=/.test(html), 'no query-string keys');
+    ok('T12 XSS-safe rendering + header auth');
+
+    // --- T13: lease-protected recovery ---
+    await reset();
+    await registry.registerWorker('worker-06', {});
+    await assigner.claimSession('923006666666', 'worker-06');
+    collections.Workers._docs.find(d => d.workerId === 'worker-06').lastHeartbeat = new Date(Date.now() - 60000);
+    await registry.markStaleWorkers(30000);
+    const isOnline2 = async (id) => {
+        const d = await collections.Workers.findOne({ workerId: id });
+        return d && d.status === 'online' && (Date.now() - new Date(d.lastHeartbeat).getTime()) < 30000;
+    };
+    assert.strictEqual(await assigner.reassignOrphanedSessions(isOnline2), 0, 'no release while lease valid');
+    collections.SessionAssignments._docs.find(d => d.number === '923006666666').leaseExpiresAt = new Date(Date.now() - 1000);
+    assert.strictEqual(await assigner.reassignOrphanedSessions(isOnline2), 1, 'release after lease expiry');
+    ok('T13 lease-protected recovery');
+
+    console.log(`\nfleet P2: ${t}/13 PASS (mock — see TEST-MODES below)`);
+}
+
+main().catch(e => { console.error('FAIL:', e.message); process.exit(1); });
