@@ -110,8 +110,16 @@ cmd({
     // it's the primary now — the old felix endpoint stays as a fallback
     // in case it comes back.
     try {
+        // 🚨 FIX (Spidy: ".waifu — Error found"): waifu.pics returns JSON
+        // {"url": "..."}, NOT a direct image. Must fetch JSON first, then
+        // extract the real image URL — sending the API URL directly fails.
+        const { data } = await axios.get('https://api.waifu.pics/sfw/waifu', {
+            timeout: 12000, family: 4,
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+        });
+        if (!data || !data.url) throw new Error('waifu.pics: no url in response');
         await conn.sendMessage(from, {
-            image: { url: 'https://api.waifu.pics/sfw/waifu' },
+            image: { url: data.url },
             caption: `╭═══ 👘 WAIFU ═══⊷\n╰═════════════════⊷\n\n> ${randomFooter()}`,
             contextInfo: channelContext
         }, { quoted: mek });
