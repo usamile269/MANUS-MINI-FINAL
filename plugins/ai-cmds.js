@@ -3,29 +3,18 @@ const axios = require('axios');
 const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
 const { looksLikeIdentityQuestion, identityAnswer, withLanguageMatch } = require('../lib/ai-persona');
-const { smartAI, groqReply, looksLikeErrorPayload } = require('../lib/ai-provider');
+const { smartAI, pollinationsReply, looksLikeErrorPayload } = require('../lib/ai-provider');
 const { plainAIResponse } = require('../lib/plain-ai-response');
 
 const FOOTER = '> ' + randomFooter();
 
-// 🚨 FIX (Bunty: "Ai working ni Ahmad mini ka koi bhi") — gpt/deepseek/gemini
-// all pointed at random personal workers.dev Cloudflare Worker proxies
-// (apis-bj-devs, officialhectormanuel, bjcoderx). These are hobby projects
-// with no uptime guarantee and had gone dark, which is why every one of
-// these commands was failing — including the "fallback", which just pointed
-// at the same dead gpt-3-5.apis-bj-devs.workers.dev host as the primary, so
-// there was no real second option.
-// felix-rdx-unlimited-free-apis.vercel.app is the endpoint plugins/felix-apis.js
-// already uses for the working .ai and .imagine commands, so it's a proven-live
-// host rather than another guess. It's now the last-resort fallback for all
-// three chat commands: each still tries its own named model first (in case
-// those come back up), but if that fails, it lands on a host we know is up
-// instead of a second dead one.
-// Verified fallback: use the same reachable Groq provider directly instead of
-// waiting on the dead Felix workers endpoint.
+// 🚨 FIX (2026-10-09): the old "fallback" just re-called groqReply() with the
+// SAME dead Groq key (401 Invalid API Key), so it was never a real fallback —
+// every AI command died here. Now uses the KEYLESS Pollinations fallback from
+// lib/ai-provider.js, which needs no API key at all.
 async function reliableAIFallback(q) {
-    const answer = await groqReply(q);
-    if (!answer || looksLikeErrorPayload(answer)) throw new Error('Groq fallback returned no usable answer');
+    const answer = await pollinationsReply(q);
+    if (!answer || looksLikeErrorPayload(answer)) throw new Error('Pollinations fallback returned no usable answer');
     return answer;
 }
 // (Groq/OpenRouter chain now lives in lib/ai-provider.js — smartAI() below
@@ -118,8 +107,8 @@ async (conn, mek, m, { reply, args, quoted, from }) => {
         } catch (e) {
             console.log('[DEEPSEEK] Groq failed, trying old chain:', e.message);
         }
-        const res = await axios.get(`https://all-in-1-ais.officialhectormanuel.workers.dev/?query=${encodeURIComponent(prompt)}&model=deepseek`, { timeout: 25000 });
-        const answer = res.data?.response || res.data?.reply || res.data?.result || res.data?.answer;
+        // The old workers.dev proxy is DNS-dead; use the keyless fallback directly.
+        const answer = await pollinationsReply(prompt);
         if (!answer || looksLikeErrorPayload(answer)) throw new Error('No reply');
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
         reply(aiReply('DEEPSEEK AI', answer));

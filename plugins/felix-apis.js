@@ -3,7 +3,7 @@ const axios = require('axios');
 const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
 const { looksLikeIdentityQuestion, identityAnswer } = require('../lib/ai-persona');
-const { smartAI, groqReply, looksLikeErrorPayload } = require('../lib/ai-provider');
+const { smartAI, pollinationsReply, looksLikeErrorPayload } = require('../lib/ai-provider');
 const { plainAIResponse } = require('../lib/plain-ai-response');
 
 const BASE = "https://felix-rdx-unlimited-free-apis.vercel.app/api/v1/api";
@@ -367,7 +367,7 @@ cmd({
         } catch (e) {
             console.log('[AI] shared race failed, using direct verified Groq fallback:', e.message);
         }
-        const answer = await groqReply(prompt);
+        const answer = await pollinationsReply(prompt);
         if (!answer || looksLikeErrorPayload(answer)) throw new Error('AI failed to respond');
         return reply(plainAIResponse(answer));
     } catch (e) {

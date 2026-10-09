@@ -2,7 +2,7 @@ const { cmd } = require('../ahmad-core');
 const axios = require('axios');
 const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
-const { smartAI, groqReply } = require('../lib/ai-provider');
+const { smartAI, pollinationsReply } = require('../lib/ai-provider');
 const { plainAIResponse } = require('../lib/plain-ai-response');
 
 // Conversational AI answers stay natural plain text.
@@ -20,8 +20,10 @@ async function callAI(prompt) {
     } catch (e) {
         console.log('[AI-BATCH1] Groq+OpenRouter failed, trying old chain:', e.message);
     }
-    // The old workers.dev chain is dead and added up to 50 seconds of delay.
-    return await groqReply(prompt);
+    // smartAI() already ends with the keyless Pollinations fallback; this is
+    // the last resort if even that threw (kept for a clear error, not the
+    // old dead groqReply chain).
+    return await pollinationsReply(prompt);
 }
 
 function aiCmd(pattern, alias, desc, promptBuilder, emptyMsg) {
