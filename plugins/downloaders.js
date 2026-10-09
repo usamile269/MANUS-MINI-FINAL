@@ -1017,27 +1017,6 @@ async (conn, mek, m, { reply, args, from }) => {
 });
 
 // 8. ytmp4 / video
-// 🚀 VIDEO-SPECIFIC FAST PATH (Ahmad: ".video slow hai") — shorter timeout
-// than the shared getAdeelVideoLink (20s x 2 attempts = up to 40s).
-// .video gets 10s x 2 = max 20s, then falls through to next provider faster.
-async function getAdeelVideoLinkFast(videoUrl) {
-    let lastError;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-            const { data } = await axios.get('https://adeel-xtech-apis.vercel.app/api/ytmp4v2', {
-                ...AXIOS_DEFAULTS, timeout: 10000, family: 4, params: { url: videoUrl }
-            });
-            const mediaUrl = data?.status && data?.result?.video_download;
-            if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) throw new Error('no video URL');
-            return mediaUrl;
-        } catch (e) {
-            lastError = e;
-            if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 500));
-        }
-    }
-    throw new Error(`Adeel video link failed: ${lastError?.message || 'no response'}`);
-}
-
 cmd({ pattern: 'ytmp4', alias: ['video', 'yta', 'ytv'], desc: 'Download YouTube as MP4', category: 'download', react: '🎬' },
 async (conn, mek, m, { reply, args, from }) => {
     const query = args.join(' ').trim();
@@ -1046,18 +1025,14 @@ async (conn, mek, m, { reply, args, from }) => {
     try {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const started = Date.now();
-        // 🚀 SPEED: immediate feedback so user knows it's working
-        const searchingMsg = await replyWithRetry(conn, from, mek, `🔍 Searching: *${query.slice(0, 40)}*...`);
         const video = await ytSearch(query);
-        // Update to downloading status
-        try { await conn.sendMessage(from, { text: `⬇️ Downloading: *${video.title?.slice(0, 40)}*...`, edit: searchingMsg?.key }); } catch {}
         // Fast primary: let WhatsApp fetch the verified CDN URL directly.
         // If an upload node rejects it, use the working streamed-file fallback.
         try {
             await heavyQueue.run(async () => {
                 const videoCaption = dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬');
                 try {
-                    const mediaUrl = await getAdeelVideoLinkFast(video.url);
+                    const mediaUrl = await getAdeelVideoLink(video.url);
                     await sendWithRetry(conn, from, {
                         video: { url: mediaUrl },
                         mimetype: 'video/mp4',
