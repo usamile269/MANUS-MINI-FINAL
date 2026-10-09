@@ -79,6 +79,28 @@ app.get('/health', (req, res) => {
     res.status(200).json({ ok: true, service: 'MANUS MINI', build: BUILD_ID, uptime: Math.round(process.uptime()) });
 });
 
+// TEMP DEBUG (2026-10-09): identify which process holds WhatsApp connection locks.
+// Remove after diagnosing the duplicate-instance issue.
+app.get('/debug-locks', async (req, res) => {
+    try {
+        const storage = require('./lib/mongo');
+        const locks = await storage.model('ConnectionLock').find({});
+        const now = Date.now();
+        res.json(locks.map(l => {
+            const iid = String(l.instanceId || '');
+            const ts = parseInt(iid.split('-')[0], 10);
+            return {
+                number: l.number,
+                instanceId: iid.slice(0, 24) + '...',
+                holderStartedAt: isNaN(ts) ? null : new Date(ts).toISOString(),
+                heartbeatAgeSec: Math.round((now - new Date(l.heartbeatAt).getTime()) / 1000)
+            };
+        }));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // 🚨 502 FIX (Ahmad screenshot: "Application failed to respond" on Railway):
 // app.listen() now happens FIRST, before the heavy require('./main') below —
 // which loads Baileys, connects to Mongo, and require()s 130+ plugin files.
