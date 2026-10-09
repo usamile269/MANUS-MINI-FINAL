@@ -567,6 +567,15 @@ function isNumberAlreadyConnected(number) {
     return activeSockets.has(n) && connectionOpenState.get(n) === true;
 }
 
+// 🆕 P2 F5: genuinely-open sessions only (excludes sockets still connecting).
+// Dashboard counts must use this — never raw activeSockets.size.
+function getConnectedNumbers() {
+    return Array.from(activeSockets.keys()).filter(n => connectionOpenState.get(n) === true);
+}
+function getConnectingNumbers() {
+    return Array.from(activeSockets.keys()).filter(n => connectionOpenState.get(n) !== true);
+}
+
 function getConnectionStatus(number) {
     const n = number.replace(/[^0-9]/g, '');
     const isConnected = activeSockets.has(n);
@@ -3314,6 +3323,8 @@ async function ahmadPair(number, res = null) {
 
 router.get('/', (req, res) => res.sendFile(path.join(__dirname, 'pair.html')));
 router.get('/admin.html', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
+// 🆕 P3 FLEET: worker fleet dashboard (real data only, key-gated via /fleet/* APIs)
+router.get('/fleet.html', (req, res) => res.sendFile(path.join(__dirname, 'fleet.html')));
 
 // 🔐 API key protection (Bunty: "Usman ki file mein API key protection hai,
 // hamari mein nahi") — mirrors Usman-MD's requireApiKey middleware. Only
@@ -3330,6 +3341,40 @@ function requireApiKey(req, res, next) {
     next();
 }
 
+// 🆕 P1 SECURITY (2026-10-09, feature/worker-fleet): destructive routes
+// (/disconnect, /connect-all) must NEVER be public. Accepts PAIR_API_KEY when
+// it is set; otherwise accepts ADMIN_PANEL_KEY — the key the owner already
+// uses for the admin panel — so the legitimate admin workflow keeps working
+// with no new secret to remember. Rejects everything else with 401.
+function requireAdminOrApiKey(req, res, next) {
+    const provided = req.query.apikey || req.headers['x-api-key'];
+    if (config.PAIR_API_KEY && provided === config.PAIR_API_KEY) return next();
+    if (provided && provided === config.ADMIN_PANEL_KEY) return next();
+    return res.status(401).json({ status: 'error', message: 'Invalid or missing API key' });
+}
+
+// 🆕 P1 SECURITY (2026-10-09): tiny in-memory sliding-window rate limiter
+// (per IP). No dependency, no shared state — enough to blunt brute-force and
+// pairing-code spam against a single process.
+function rateLimit({ windowMs, max }) {
+    const hits = new Map();
+    return (req, res, next) => {
+        const ip = (req.ip || req.connection?.remoteAddress || 'unknown').toString();
+        const now = Date.now();
+        const arr = (hits.get(ip) || []).filter(t => now - t < windowMs);
+        arr.push(now);
+        hits.set(ip, arr);
+        if (hits.size > 5000) hits.clear(); // prevent unbounded growth
+        if (arr.length > max) {
+            return res.status(429).json({ status: 'error', message: 'Too many requests, slow down' });
+        }
+        next();
+    };
+}
+const codeRateLimit = rateLimit({ windowMs: 60 * 1000, max: 10 });   // pairing: 10/min/IP
+const adminRateLimit = rateLimit({ windowMs: 60 * 1000, max: 30 });  // destructive/admin: 30/min/IP
+const otpRateLimit = rateLimit({ windowMs: 60 * 1000, max: 5 });     // OTP flows: 5/min/IP (anti-spam/brute-force)
+
 // 🎛️ Public read — pair.html uses this to load bot name / tagline / bg music
 // / channel link so the pairing page reflects whatever the owner set in the
 // hidden admin panel, without exposing the admin key itself.
@@ -3343,7 +3388,7 @@ router.get('/site-settings', async (req, res) => {
 // 🔐 Admin-only write, protected by config.ADMIN_PANEL_KEY. The hidden panel
 // in pair.html sends this key in the request body after the owner unlocks it
 // (tap the crest 5x or Ctrl+Shift+A, then enter the key).
-router.post('/admin/site-settings', async (req, res) => {
+router.post('/admin/site-settings', adminRateLimit, async (req, res) => {
     const { key, settings } = req.body || {};
     if (!key || key !== config.ADMIN_PANEL_KEY) {
         return res.status(401).json({ status: 'error', message: 'Invalid admin key' });
@@ -3361,13 +3406,13 @@ router.post('/admin/site-settings', async (req, res) => {
     res.json({ status: 'success', settings: saved });
 });
 
-router.post('/admin/verify-key', (req, res) => {
+router.post('/admin/verify-key', adminRateLimit, (req, res) => {
     const { key } = req.body || {};
     res.json({ valid: !!key && key === config.ADMIN_PANEL_KEY });
 });
 
 // 🔐 Read-only owner overview for the separate Control Center page.
-router.post('/admin/overview', async (req, res) => {
+router.post('/admin/overview', adminRateLimit, async (req, res) => {
     const { key } = req.body || {};
     if (!key || key !== config.ADMIN_PANEL_KEY) return res.status(401).json({ status: 'error', message: 'Invalid admin key' });
     try {
@@ -3381,7 +3426,7 @@ router.post('/admin/overview', async (req, res) => {
     } catch (e) { res.status(500).json({ status: 'error', message: 'Failed to load overview' }); }
 });
 
-router.get('/code', requireApiKey, async (req, res) => {
+router.get('/code', requireApiKey, codeRateLimit, async (req, res) => {
     // Pairing codes are one-time credentials. Never let Vercel, Railway,
     // browsers, or an intermediary replay a previous response for the same
     // number; every request must reach this process and Baileys.
@@ -3394,16 +3439,28 @@ router.get('/code', requireApiKey, async (req, res) => {
     if (!req.query.number) return res.json({ error: 'Number required' });
     await ahmadPair(req.query.number, res);
 });
-router.get('/status', async (req, res) => {
+router.get('/status', adminRateLimit, async (req, res) => {
+    // 🆕 P2 SECURITY: phone numbers are sensitive — the full list requires a
+    // key. Public callers get only a liveness count (enough for monitoring).
+    const provided = req.query.apikey || req.headers['x-api-key'];
+    const authed = (config.PAIR_API_KEY && provided === config.PAIR_API_KEY) ||
+                   (provided && provided === config.ADMIN_PANEL_KEY);
     const { number } = req.query;
+    // F5: public sees validated counts only — connected vs connecting split,
+    // never raw socket objects, never double-counted.
+    const connected = getConnectedNumbers();
+    const connecting = getConnectingNumbers();
+    if (!authed) {
+        return res.json({ status: 'active', connected: connected.length, connecting: connecting.length });
+    }
     if (!number) {
-        const list = Array.from(activeSockets.keys()).map(n => { const s = getConnectionStatus(n); return { number: n, status: 'connected', connectionTime: s.connectionTime, uptime: `${s.uptime} seconds` }; });
-        return res.json({ totalActive: activeSockets.size, connections: list });
+        const list = connected.map(n => { const s = getConnectionStatus(n); return { number: n, status: 'connected', connectionTime: s.connectionTime, uptime: `${s.uptime} seconds` }; });
+        return res.json({ connected: connected.length, connecting: connecting.length, connections: list });
     }
     const s = getConnectionStatus(number);
     res.json({ number, isConnected: s.isConnected, connectionTime: s.connectionTime, uptime: `${s.uptime} seconds` });
 });
-router.get('/disconnect', requireApiKey, async (req, res) => {
+router.get('/disconnect', requireAdminOrApiKey, adminRateLimit, async (req, res) => {
     const { number } = req.query;
     if (!number) return res.status(400).json({ error: 'Number required' });
     const n = number.replace(/[^0-9]/g, '');
@@ -3418,9 +3475,16 @@ router.get('/disconnect', requireApiKey, async (req, res) => {
         res.json({ status: 'success', message: 'Disconnected' });
     } catch (e) { res.status(500).json({ error: 'Failed to disconnect' }); }
 });
-router.get('/active', (req, res) => res.json({ count: activeSockets.size, numbers: Array.from(activeSockets.keys()) }));
-router.get('/ping', (req, res) => res.json({ status: 'active', message: '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ is running 🔥', activeSessions: activeSockets.size }));
-router.get('/connect-all', requireApiKey, async (req, res) => {
+router.get('/active', adminRateLimit, (req, res) => {
+    // 🆕 P2 SECURITY: numbers only with a key; public callers get the count.
+    const provided = req.query.apikey || req.headers['x-api-key'];
+    const authed = (config.PAIR_API_KEY && provided === config.PAIR_API_KEY) ||
+                   (provided && provided === config.ADMIN_PANEL_KEY);
+    if (!authed) return res.json({ count: getConnectedNumbers().length });
+    res.json({ count: getConnectedNumbers().length, numbers: getConnectedNumbers() });
+});
+router.get('/ping', (req, res) => res.json({ status: 'active', message: '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ is running 🔥', connectedSessions: getConnectedNumbers().length }));
+router.get('/connect-all', requireAdminOrApiKey, adminRateLimit, async (req, res) => {
     try {
         const numbers = await getAllNumbersFromMongoDB();
         if (!numbers.length) return res.status(404).json({ error: 'No numbers found' });
@@ -3435,7 +3499,74 @@ router.get('/connect-all', requireApiKey, async (req, res) => {
         res.json({ status: 'success', total: numbers.length, connections: results });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
-router.get('/update-config', async (req, res) => {
+
+// ============================================================================
+// 🆕 P2 FLEET CONTROLLER (feature/worker-fleet): worker registry + assignment
+// APIs. MongoDB is the control plane; these routes expose it for the
+// dashboard and remote management. Workers authenticate with WORKER_SECRET;
+// dashboard/admin callers use the admin key. Never fabricates data.
+// ============================================================================
+function requireWorkerSecret(req, res, next) {
+    const secret = process.env.WORKER_SECRET || '';
+    const provided = req.headers['x-worker-secret'] || req.query.worker_secret;
+    if (!secret || !provided || provided !== secret) {
+        return res.status(401).json({ status: 'error', message: 'Invalid worker secret' });
+    }
+    next();
+}
+function fleetLibs() {
+    return {
+        registry: require('./lib/worker-registry'),
+        assigner: require('./lib/session-assigner'),
+    };
+}
+router.post('/fleet/register', adminRateLimit, requireWorkerSecret, async (req, res) => {
+    try {
+        const { registry } = fleetLibs();
+        const doc = await registry.registerWorker(req.body.workerId, req.body);
+        res.json({ status: 'success', worker: { workerId: doc.workerId, status: doc.status } });
+    } catch (e) { res.status(400).json({ status: 'error', message: e.message }); }
+});
+router.post('/fleet/heartbeat', adminRateLimit, requireWorkerSecret, async (req, res) => {
+    try {
+        const { registry } = fleetLibs();
+        const doc = await registry.heartbeatWorker(req.body.workerId, req.body);
+        res.json({ status: 'success', worker: { workerId: doc.workerId, activeSessions: doc.activeSessions } });
+    } catch (e) { res.status(400).json({ status: 'error', message: e.message }); }
+});
+router.get('/fleet/status', adminRateLimit, requireAdminOrApiKey, async (req, res) => {
+    try {
+        const { registry } = fleetLibs();
+        await registry.markStaleWorkers();
+        res.json({ status: 'success', fleet: await registry.getFleetStatus() });
+    } catch (e) { res.status(500).json({ status: 'error', message: 'Fleet status unavailable' }); }
+});
+router.get('/fleet/events', adminRateLimit, requireAdminOrApiKey, async (req, res) => {
+    try {
+        const { registry } = fleetLibs();
+        res.json({ status: 'success', events: await registry.getRecentEvents(50) });
+    } catch (e) { res.status(500).json({ status: 'error', message: 'Events unavailable' }); }
+});
+router.post('/fleet/assign', adminRateLimit, requireAdminOrApiKey, async (req, res) => {
+    // Assign a session number to a worker WITHOUT touching existing sessions:
+    // only creates a claim record; the worker connects on its next loop.
+    try {
+        const { assigner } = fleetLibs();
+        const doc = await assigner.claimSession(req.body.number, req.body.workerId);
+        res.json({ status: 'success', assignment: { number: doc.number, workerId: doc.workerId, state: doc.state } });
+    } catch (e) {
+        const code = e.code === 'CAPACITY_EXCEEDED' ? 409 : e.code === 'ALREADY_CLAIMED' ? 409 : 500;
+        res.status(code).json({ status: 'error', message: e.message });
+    }
+});
+router.post('/fleet/release', adminRateLimit, requireAdminOrApiKey, async (req, res) => {
+    try {
+        const { assigner } = fleetLibs();
+        await assigner.releaseSession(req.body.number, req.body.workerId || null);
+        res.json({ status: 'success' });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+router.get('/update-config', otpRateLimit, async (req, res) => {
     const { number, config: configString } = req.query;
     if (!number || !configString) return res.status(400).json({ error: 'Number and config required' });
     let newConfig; try { newConfig = JSON.parse(configString); } catch (_) { return res.status(400).json({ error: 'Invalid config' }); }
@@ -3449,7 +3580,7 @@ router.get('/update-config', async (req, res) => {
         res.json({ status: 'otp_sent' });
     } catch (e) { res.status(500).json({ error: 'Failed to send OTP' }); }
 });
-router.get('/verify-otp', async (req, res) => {
+router.get('/verify-otp', otpRateLimit, async (req, res) => {
     const { number, otp } = req.query;
     if (!number || !otp) return res.status(400).json({ error: 'Number and OTP required' });
     const n = number.replace(/[^0-9]/g, '');
@@ -3489,7 +3620,50 @@ async function autoReconnectFromMongoDB() {
     } catch (e) { ahmadLog(`autoReconnectFromMongoDB error: ${e.message}`, 'error'); }
 }
 
-setTimeout(() => { autoReconnectFromMongoDB(); }, 3000);
+setTimeout(() => {
+    // 🆕 P2 FLEET: WORKER_ID set => claim-only worker mode (connects ONLY
+    // sessions assigned to this worker). Unset => legacy mode, unchanged.
+    if (process.env.WORKER_ID) { workerBoot(); }
+    else { autoReconnectFromMongoDB(); }
+}, 3000);
+
+// 🆕 P2 FLEET: worker boot — register, heartbeat loop, connect assigned sessions.
+// Never touches sessions assigned to other workers or unassigned sessions.
+async function workerBoot() {
+    const workerId = process.env.WORKER_ID;
+    try {
+        const { registry, assigner } = fleetLibs();
+        await registry.registerWorker(workerId, { version: 'p2' });
+        ahmadLog(`[fleet] ${workerId} registered as worker`, 'success');
+        // heartbeat every 10s
+        setInterval(async () => {
+            try {
+                const mem = process.memoryUsage();
+                await registry.heartbeatWorker(workerId, {
+                    // F5: report GENUINELY CONNECTED sessions, not connecting sockets
+                    activeSessions: getConnectedNumbers().length,
+                    rssMB: Math.round(mem.rss / 1024 / 1024),
+                    uptimeSec: Math.round(process.uptime()),
+                });
+                // F6: renew leases so the controller never steals live sessions
+                await assigner.renewLeases(workerId);
+            } catch (e) { ahmadLog(`[fleet] heartbeat failed: ${e.message}`, 'warning'); }
+        }, 10 * 1000);
+        // connect assigned sessions (staggered)
+        const assignments = await assigner.getWorkerSessions(workerId);
+        ahmadLog(`[fleet] ${workerId} has ${assignments.length} assigned sessions`, 'info');
+        for (const a of assignments) {
+            if (!activeSockets.has(a.number)) {
+                const mockRes = { headersSent: false, json: () => {}, status: () => mockRes };
+                await ahmadPair(a.number, mockRes);
+                await assigner.markSessionActive(a.number, workerId).catch(() => {});
+                await delay(2000);
+            }
+        }
+    } catch (e) {
+        ahmadLog(`[fleet] worker boot failed: ${e.message} — NOT falling back to legacy mode (would risk duplicate connections)`, 'error');
+    }
+}
 
 
 
