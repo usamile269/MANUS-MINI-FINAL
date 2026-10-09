@@ -53,3 +53,9 @@ assert.match(main, /config\.ADMIN_PANEL_KEY/); // admin key checks intact
 console.log('8. admin routes rate-limited + key checks intact: PASS');
 
 console.log('\nfleet P1 security regression: ALL PASS');
+
+// --- 9. OTP routes rate-limited (anti-spam), flow unbroken ---
+assert.match(main, /router\.get\('\/update-config', otpRateLimit,/);
+assert.match(main, /router\.get\('\/verify-otp', otpRateLimit,/);
+assert.match(main, /otpRateLimit\s*=\s*rateLimit\(\{\s*windowMs:\s*60\s*\*\s*1000,\s*max:\s*5\s*\}\)/);
+console.log('9. OTP routes rate-limited, flow preserved: PASS');

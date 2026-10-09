@@ -3362,6 +3362,7 @@ function rateLimit({ windowMs, max }) {
 }
 const codeRateLimit = rateLimit({ windowMs: 60 * 1000, max: 10 });   // pairing: 10/min/IP
 const adminRateLimit = rateLimit({ windowMs: 60 * 1000, max: 30 });  // destructive/admin: 30/min/IP
+const otpRateLimit = rateLimit({ windowMs: 60 * 1000, max: 5 });     // OTP flows: 5/min/IP (anti-spam/brute-force)
 
 // 🎛️ Public read — pair.html uses this to load bot name / tagline / bg music
 // / channel link so the pairing page reflects whatever the owner set in the
@@ -3468,7 +3469,7 @@ router.get('/connect-all', requireAdminOrApiKey, adminRateLimit, async (req, res
         res.json({ status: 'success', total: numbers.length, connections: results });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
-router.get('/update-config', async (req, res) => {
+router.get('/update-config', otpRateLimit, async (req, res) => {
     const { number, config: configString } = req.query;
     if (!number || !configString) return res.status(400).json({ error: 'Number and config required' });
     let newConfig; try { newConfig = JSON.parse(configString); } catch (_) { return res.status(400).json({ error: 'Invalid config' }); }
@@ -3482,7 +3483,7 @@ router.get('/update-config', async (req, res) => {
         res.json({ status: 'otp_sent' });
     } catch (e) { res.status(500).json({ error: 'Failed to send OTP' }); }
 });
-router.get('/verify-otp', async (req, res) => {
+router.get('/verify-otp', otpRateLimit, async (req, res) => {
     const { number, otp } = req.query;
     if (!number || !otp) return res.status(400).json({ error: 'Number and OTP required' });
     const n = number.replace(/[^0-9]/g, '');
