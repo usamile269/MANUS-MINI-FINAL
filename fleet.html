@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fleet Dashboard — WhatsApp Session Management</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0f1115; color: #e8eaf0; padding: 24px; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: #8b90a0; font-size: 13px; margin-bottom: 20px; }
+  .totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .card { background: #1a1d24; border: 1px solid #2a2e3a; border-radius: 10px; padding: 16px; }
+  .card .num { font-size: 28px; font-weight: 700; }
+  .card .lbl { font-size: 12px; color: #8b90a0; margin-top: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .worker { background: #1a1d24; border: 1px solid #2a2e3a; border-radius: 10px; padding: 16px; }
+  .worker .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .worker .id { font-weight: 700; font-size: 15px; }
+  .badge { font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 600; }
+  .b-online { background: #123f2a; color: #4ade80; }
+  .b-offline { background: #402012; color: #fb923c; }
+  .b-noprov { background: #262a35; color: #8b90a0; }
+  .bar { height: 8px; background: #262a35; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+  .bar > div { height: 100%; background: #4ade80; border-radius: 4px; transition: width .3s; }
+  .meta { font-size: 12px; color: #8b90a0; line-height: 1.7; }
+  .meta b { color: #c8ccd8; }
+  .events { background: #1a1d24; border: 1px solid #2a2e3a; border-radius: 10px; padding: 16px; }
+  .events h2 { font-size: 16px; margin-bottom: 12px; }
+  .ev { font-size: 12px; padding: 6px 0; border-bottom: 1px solid #23262f; color: #aab; }
+  .ev:last-child { border: none; }
+  #login { max-width: 360px; margin: 80px auto; text-align: center; }
+  #login input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #2a2e3a; background: #1a1d24; color: #fff; margin: 12px 0; }
+  #login button { padding: 12px 32px; border-radius: 8px; border: none; background: #4f7cff; color: #fff; font-weight: 600; cursor: pointer; }
+  .hidden { display: none; }
+  .refresh { font-size: 12px; color: #8b90a0; margin-bottom: 12px; }
+  .err { color: #f87171; font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div id="login">
+  <h1>🖥️ Fleet Dashboard</h1>
+  <p class="sub">Enter admin key to view worker fleet status</p>
+  <input type="password" id="key" placeholder="Admin key">
+  <button onclick="unlock()">Unlock</button>
+  <p class="err hidden" id="loginErr"></p>
+</div>
+<div id="dash" class="hidden">
+  <h1>🖥️ Worker Fleet</h1>
+  <p class="sub">10 worker slots · 50 sessions each · 500 total capacity target</p>
+  <p class="refresh" id="refreshInfo"></p>
+  <div class="totals" id="totals"></div>
+  <div class="grid" id="grid"></div>
+  <div class="events"><h2>Recent Events</h2><div id="events"></div></div>
+</div>
+<script>
+let KEY = '';
+async function unlock() {
+  KEY = document.getElementById('key').value;
+  const r = await fetch('/fleet/status?apikey=' + encodeURIComponent(KEY));
+  if (!r.ok) {
+    document.getElementById('loginErr').textContent = 'Invalid key';
+    document.getElementById('loginErr').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('dash').classList.remove('hidden');
+  load(); setInterval(load, 15000);
+}
+async function load() {
+  try {
+    const [s, e] = await Promise.all([
+      fetch('/fleet/status?apikey=' + encodeURIComponent(KEY)).then(r => r.json()),
+      fetch('/fleet/events?apikey=' + encodeURIComponent(KEY)).then(r => r.json()),
+    ]);
+    render(s.fleet, e.events || []);
+    document.getElementById('refreshInfo').textContent =
+      'Last updated: ' + new Date().toLocaleTimeString() + ' · auto-refresh 15s';
+  } catch (err) { /* keep old data on transient failure */ }
+}
+function render(fleet, events) {
+  const t = fleet.totals;
+  document.getElementById('totals').innerHTML = [
+    [t.activeSessions + ' / ' + t.capacityMax, 'Active sessions'],
+    [t.online + ' / ' + t.provisioned, 'Workers online'],
+    [t.offline, 'Workers offline'],
+    [t.notProvisioned, 'Not provisioned'],
+  ].map(([n, l]) => `<div class="card"><div class="num">${n}</div><div class="lbl">${l}</div></div>`).join('');
+  document.getElementById('grid').innerHTML = fleet.slots.map(w => {
+    const badge = !w.provisioned ? '<span class="badge b-noprov">NOT PROVISIONED</span>'
+      : w.status === 'online' ? '<span class="badge b-online">ONLINE</span>'
+      : '<span class="badge b-offline">OFFLINE</span>';
+    const pct = Math.round((w.activeSessions / w.capacityMax) * 100);
+    const hb = w.lastHeartbeat ? new Date(w.lastHeartbeat).toLocaleTimeString() : '—';
+    return `<div class="worker">
+      <div class="head"><span class="id">${w.workerId}</span>${badge}</div>
+      <div class="bar"><div style="width:${pct}%"></div></div>
+      <div class="meta">
+        <b>${w.activeSessions}</b> / ${w.capacityMax} sessions<br>
+        ${w.provisioned ? `Last heartbeat: <b>${hb}</b><br>RAM: <b>${w.rssMB || 0} MB</b> · Uptime: <b>${w.uptimeSec || 0}s</b>${w.error ? `<br><span style="color:#f87171">${w.error}</span>` : ''}`
+        : 'Slot reserved. Deploy a worker to activate.'}
+      </div></div>`;
+  }).join('');
+  document.getElementById('events').innerHTML = events.length
+    ? events.map(v => `<div class="ev">${new Date(v.ts).toLocaleString()} · <b>${v.workerId}</b> · ${v.event} ${v.detail || ''}</div>`).join('')
+    : '<div class="ev">No events yet.</div>';
+}
+document.getElementById('key').addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
+</script>
+</body>
+</html>

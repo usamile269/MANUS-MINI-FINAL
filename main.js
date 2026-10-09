@@ -3314,6 +3314,8 @@ async function ahmadPair(number, res = null) {
 
 router.get('/', (req, res) => res.sendFile(path.join(__dirname, 'pair.html')));
 router.get('/admin.html', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
+// 🆕 P3 FLEET: worker fleet dashboard (real data only, key-gated via /fleet/* APIs)
+router.get('/fleet.html', (req, res) => res.sendFile(path.join(__dirname, 'fleet.html')));
 
 // 🔐 API key protection (Bunty: "Usman ki file mein API key protection hai,
 // hamari mein nahi") — mirrors Usman-MD's requireApiKey middleware. Only
@@ -3428,8 +3430,16 @@ router.get('/code', requireApiKey, codeRateLimit, async (req, res) => {
     if (!req.query.number) return res.json({ error: 'Number required' });
     await ahmadPair(req.query.number, res);
 });
-router.get('/status', async (req, res) => {
+router.get('/status', adminRateLimit, async (req, res) => {
+    // 🆕 P2 SECURITY: phone numbers are sensitive — the full list requires a
+    // key. Public callers get only a liveness count (enough for monitoring).
+    const provided = req.query.apikey || req.headers['x-api-key'];
+    const authed = (config.PAIR_API_KEY && provided === config.PAIR_API_KEY) ||
+                   (provided && provided === config.ADMIN_PANEL_KEY);
     const { number } = req.query;
+    if (!authed) {
+        return res.json({ status: 'active', totalActive: activeSockets.size });
+    }
     if (!number) {
         const list = Array.from(activeSockets.keys()).map(n => { const s = getConnectionStatus(n); return { number: n, status: 'connected', connectionTime: s.connectionTime, uptime: `${s.uptime} seconds` }; });
         return res.json({ totalActive: activeSockets.size, connections: list });
@@ -3452,7 +3462,14 @@ router.get('/disconnect', requireAdminOrApiKey, adminRateLimit, async (req, res)
         res.json({ status: 'success', message: 'Disconnected' });
     } catch (e) { res.status(500).json({ error: 'Failed to disconnect' }); }
 });
-router.get('/active', (req, res) => res.json({ count: activeSockets.size, numbers: Array.from(activeSockets.keys()) }));
+router.get('/active', adminRateLimit, (req, res) => {
+    // 🆕 P2 SECURITY: numbers only with a key; public callers get the count.
+    const provided = req.query.apikey || req.headers['x-api-key'];
+    const authed = (config.PAIR_API_KEY && provided === config.PAIR_API_KEY) ||
+                   (provided && provided === config.ADMIN_PANEL_KEY);
+    if (!authed) return res.json({ count: activeSockets.size });
+    res.json({ count: activeSockets.size, numbers: Array.from(activeSockets.keys()) });
+});
 router.get('/ping', (req, res) => res.json({ status: 'active', message: '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ is running 🔥', activeSessions: activeSockets.size }));
 router.get('/connect-all', requireAdminOrApiKey, adminRateLimit, async (req, res) => {
     try {
@@ -3468,6 +3485,73 @@ router.get('/connect-all', requireAdminOrApiKey, adminRateLimit, async (req, res
         }
         res.json({ status: 'success', total: numbers.length, connections: results });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// ============================================================================
+// 🆕 P2 FLEET CONTROLLER (feature/worker-fleet): worker registry + assignment
+// APIs. MongoDB is the control plane; these routes expose it for the
+// dashboard and remote management. Workers authenticate with WORKER_SECRET;
+// dashboard/admin callers use the admin key. Never fabricates data.
+// ============================================================================
+function requireWorkerSecret(req, res, next) {
+    const secret = process.env.WORKER_SECRET || '';
+    const provided = req.headers['x-worker-secret'] || req.query.worker_secret;
+    if (!secret || !provided || provided !== secret) {
+        return res.status(401).json({ status: 'error', message: 'Invalid worker secret' });
+    }
+    next();
+}
+function fleetLibs() {
+    return {
+        registry: require('./lib/worker-registry'),
+        assigner: require('./lib/session-assigner'),
+    };
+}
+router.post('/fleet/register', adminRateLimit, requireWorkerSecret, async (req, res) => {
+    try {
+        const { registry } = fleetLibs();
+        const doc = await registry.registerWorker(req.body.workerId, req.body);
+        res.json({ status: 'success', worker: { workerId: doc.workerId, status: doc.status } });
+    } catch (e) { res.status(400).json({ status: 'error', message: e.message }); }
+});
+router.post('/fleet/heartbeat', adminRateLimit, requireWorkerSecret, async (req, res) => {
+    try {
+        const { registry } = fleetLibs();
+        const doc = await registry.heartbeatWorker(req.body.workerId, req.body);
+        res.json({ status: 'success', worker: { workerId: doc.workerId, activeSessions: doc.activeSessions } });
+    } catch (e) { res.status(400).json({ status: 'error', message: e.message }); }
+});
+router.get('/fleet/status', adminRateLimit, requireAdminOrApiKey, async (req, res) => {
+    try {
+        const { registry } = fleetLibs();
+        await registry.markStaleWorkers();
+        res.json({ status: 'success', fleet: await registry.getFleetStatus() });
+    } catch (e) { res.status(500).json({ status: 'error', message: 'Fleet status unavailable' }); }
+});
+router.get('/fleet/events', adminRateLimit, requireAdminOrApiKey, async (req, res) => {
+    try {
+        const { registry } = fleetLibs();
+        res.json({ status: 'success', events: await registry.getRecentEvents(50) });
+    } catch (e) { res.status(500).json({ status: 'error', message: 'Events unavailable' }); }
+});
+router.post('/fleet/assign', adminRateLimit, requireAdminOrApiKey, async (req, res) => {
+    // Assign a session number to a worker WITHOUT touching existing sessions:
+    // only creates a claim record; the worker connects on its next loop.
+    try {
+        const { assigner } = fleetLibs();
+        const doc = await assigner.claimSession(req.body.number, req.body.workerId);
+        res.json({ status: 'success', assignment: { number: doc.number, workerId: doc.workerId, state: doc.state } });
+    } catch (e) {
+        const code = e.code === 'CAPACITY_EXCEEDED' ? 409 : e.code === 'ALREADY_CLAIMED' ? 409 : 500;
+        res.status(code).json({ status: 'error', message: e.message });
+    }
+});
+router.post('/fleet/release', adminRateLimit, requireAdminOrApiKey, async (req, res) => {
+    try {
+        const { assigner } = fleetLibs();
+        await assigner.releaseSession(req.body.number, req.body.workerId || null);
+        res.json({ status: 'success' });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 router.get('/update-config', otpRateLimit, async (req, res) => {
     const { number, config: configString } = req.query;
@@ -3523,7 +3607,47 @@ async function autoReconnectFromMongoDB() {
     } catch (e) { ahmadLog(`autoReconnectFromMongoDB error: ${e.message}`, 'error'); }
 }
 
-setTimeout(() => { autoReconnectFromMongoDB(); }, 3000);
+setTimeout(() => {
+    // 🆕 P2 FLEET: WORKER_ID set => claim-only worker mode (connects ONLY
+    // sessions assigned to this worker). Unset => legacy mode, unchanged.
+    if (process.env.WORKER_ID) { workerBoot(); }
+    else { autoReconnectFromMongoDB(); }
+}, 3000);
+
+// 🆕 P2 FLEET: worker boot — register, heartbeat loop, connect assigned sessions.
+// Never touches sessions assigned to other workers or unassigned sessions.
+async function workerBoot() {
+    const workerId = process.env.WORKER_ID;
+    try {
+        const { registry, assigner } = fleetLibs();
+        await registry.registerWorker(workerId, { version: 'p2' });
+        ahmadLog(`[fleet] ${workerId} registered as worker`, 'success');
+        // heartbeat every 10s
+        setInterval(async () => {
+            try {
+                const mem = process.memoryUsage();
+                await registry.heartbeatWorker(workerId, {
+                    activeSessions: activeSockets.size,
+                    rssMB: Math.round(mem.rss / 1024 / 1024),
+                    uptimeSec: Math.round(process.uptime()),
+                });
+            } catch (e) { ahmadLog(`[fleet] heartbeat failed: ${e.message}`, 'warning'); }
+        }, 10 * 1000);
+        // connect assigned sessions (staggered)
+        const assignments = await assigner.getWorkerSessions(workerId);
+        ahmadLog(`[fleet] ${workerId} has ${assignments.length} assigned sessions`, 'info');
+        for (const a of assignments) {
+            if (!activeSockets.has(a.number)) {
+                const mockRes = { headersSent: false, json: () => {}, status: () => mockRes };
+                await ahmadPair(a.number, mockRes);
+                await assigner.markSessionActive(a.number, workerId).catch(() => {});
+                await delay(2000);
+            }
+        }
+    } catch (e) {
+        ahmadLog(`[fleet] worker boot failed: ${e.message} — NOT falling back to legacy mode (would risk duplicate connections)`, 'error');
+    }
+}
 
 
 
