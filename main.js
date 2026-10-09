@@ -3330,6 +3330,39 @@ function requireApiKey(req, res, next) {
     next();
 }
 
+// 🆕 P1 SECURITY (2026-10-09, feature/worker-fleet): destructive routes
+// (/disconnect, /connect-all) must NEVER be public. Accepts PAIR_API_KEY when
+// it is set; otherwise accepts ADMIN_PANEL_KEY — the key the owner already
+// uses for the admin panel — so the legitimate admin workflow keeps working
+// with no new secret to remember. Rejects everything else with 401.
+function requireAdminOrApiKey(req, res, next) {
+    const provided = req.query.apikey || req.headers['x-api-key'];
+    if (config.PAIR_API_KEY && provided === config.PAIR_API_KEY) return next();
+    if (provided && provided === config.ADMIN_PANEL_KEY) return next();
+    return res.status(401).json({ status: 'error', message: 'Invalid or missing API key' });
+}
+
+// 🆕 P1 SECURITY (2026-10-09): tiny in-memory sliding-window rate limiter
+// (per IP). No dependency, no shared state — enough to blunt brute-force and
+// pairing-code spam against a single process.
+function rateLimit({ windowMs, max }) {
+    const hits = new Map();
+    return (req, res, next) => {
+        const ip = (req.ip || req.connection?.remoteAddress || 'unknown').toString();
+        const now = Date.now();
+        const arr = (hits.get(ip) || []).filter(t => now - t < windowMs);
+        arr.push(now);
+        hits.set(ip, arr);
+        if (hits.size > 5000) hits.clear(); // prevent unbounded growth
+        if (arr.length > max) {
+            return res.status(429).json({ status: 'error', message: 'Too many requests, slow down' });
+        }
+        next();
+    };
+}
+const codeRateLimit = rateLimit({ windowMs: 60 * 1000, max: 10 });   // pairing: 10/min/IP
+const adminRateLimit = rateLimit({ windowMs: 60 * 1000, max: 30 });  // destructive/admin: 30/min/IP
+
 // 🎛️ Public read — pair.html uses this to load bot name / tagline / bg music
 // / channel link so the pairing page reflects whatever the owner set in the
 // hidden admin panel, without exposing the admin key itself.
@@ -3343,7 +3376,7 @@ router.get('/site-settings', async (req, res) => {
 // 🔐 Admin-only write, protected by config.ADMIN_PANEL_KEY. The hidden panel
 // in pair.html sends this key in the request body after the owner unlocks it
 // (tap the crest 5x or Ctrl+Shift+A, then enter the key).
-router.post('/admin/site-settings', async (req, res) => {
+router.post('/admin/site-settings', adminRateLimit, async (req, res) => {
     const { key, settings } = req.body || {};
     if (!key || key !== config.ADMIN_PANEL_KEY) {
         return res.status(401).json({ status: 'error', message: 'Invalid admin key' });
@@ -3361,13 +3394,13 @@ router.post('/admin/site-settings', async (req, res) => {
     res.json({ status: 'success', settings: saved });
 });
 
-router.post('/admin/verify-key', (req, res) => {
+router.post('/admin/verify-key', adminRateLimit, (req, res) => {
     const { key } = req.body || {};
     res.json({ valid: !!key && key === config.ADMIN_PANEL_KEY });
 });
 
 // 🔐 Read-only owner overview for the separate Control Center page.
-router.post('/admin/overview', async (req, res) => {
+router.post('/admin/overview', adminRateLimit, async (req, res) => {
     const { key } = req.body || {};
     if (!key || key !== config.ADMIN_PANEL_KEY) return res.status(401).json({ status: 'error', message: 'Invalid admin key' });
     try {
@@ -3381,7 +3414,7 @@ router.post('/admin/overview', async (req, res) => {
     } catch (e) { res.status(500).json({ status: 'error', message: 'Failed to load overview' }); }
 });
 
-router.get('/code', requireApiKey, async (req, res) => {
+router.get('/code', requireApiKey, codeRateLimit, async (req, res) => {
     // Pairing codes are one-time credentials. Never let Vercel, Railway,
     // browsers, or an intermediary replay a previous response for the same
     // number; every request must reach this process and Baileys.
@@ -3403,7 +3436,7 @@ router.get('/status', async (req, res) => {
     const s = getConnectionStatus(number);
     res.json({ number, isConnected: s.isConnected, connectionTime: s.connectionTime, uptime: `${s.uptime} seconds` });
 });
-router.get('/disconnect', requireApiKey, async (req, res) => {
+router.get('/disconnect', requireAdminOrApiKey, adminRateLimit, async (req, res) => {
     const { number } = req.query;
     if (!number) return res.status(400).json({ error: 'Number required' });
     const n = number.replace(/[^0-9]/g, '');
@@ -3420,7 +3453,7 @@ router.get('/disconnect', requireApiKey, async (req, res) => {
 });
 router.get('/active', (req, res) => res.json({ count: activeSockets.size, numbers: Array.from(activeSockets.keys()) }));
 router.get('/ping', (req, res) => res.json({ status: 'active', message: '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ is running 🔥', activeSessions: activeSockets.size }));
-router.get('/connect-all', requireApiKey, async (req, res) => {
+router.get('/connect-all', requireAdminOrApiKey, adminRateLimit, async (req, res) => {
     try {
         const numbers = await getAllNumbersFromMongoDB();
         if (!numbers.length) return res.status(404).json({ error: 'No numbers found' });

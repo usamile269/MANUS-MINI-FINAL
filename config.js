@@ -5,7 +5,7 @@ if (fs.existsSync('.env')) {
     dotenv.config({ path: '.env' });
 }
 
-module.exports = {
+const config = {
     // 🚨 STORAGE FIX (Bunty: "storage boht ho raha, kaafi jin ki need nahi"):
     // several diagnostic console.log lines were left ON permanently and fire
     // on EVERY single incoming message (not just relevant ones) — on a busy
@@ -161,7 +161,7 @@ module.exports = {
     // ===========================================================
     // 9. ADMIN PANEL
     // ===========================================================
-    ADMIN_PANEL_KEY: 'bunty-admin-2026',
+    ADMIN_PANEL_KEY: process.env.ADMIN_PANEL_KEY || 'bunty-admin-2026',
     // 🔐 Optional API key protection for the /code (pairing), /disconnect,
     // and /connect-all endpoints — same idea as Usman-MD's requireApiKey
     // middleware. Leave blank ('') to keep these endpoints public exactly
@@ -171,3 +171,26 @@ module.exports = {
     PAIR_API_KEY: process.env.PAIR_API_KEY || ''
     
 };
+
+// 🆕 P1 SECURITY (2026-10-09, feature/worker-fleet): warn at startup when a
+// secret falls back to its hardcoded value instead of an env var. Names only
+// are logged — values are NEVER printed.
+(function warnHardcodedSecrets() {
+    const checks = [
+        ['MONGODB_URI', !!process.env.MONGODB_URI],
+        ['GROQ_API_KEY', !!process.env.GROQ_API_KEY],
+        ['OPENROUTER_API_KEY', !!process.env.OPENROUTER_API_KEY],
+        ['CLOUDINARY_API_KEY', !!process.env.CLOUDINARY_API_KEY],
+        ['CLOUDINARY_API_SECRET', !!process.env.CLOUDINARY_API_SECRET],
+        ['RAPID_API_KEY', !!process.env.RAPID_API_KEY],
+        ['ADMIN_PANEL_KEY', !!process.env.ADMIN_PANEL_KEY],
+        ['PAIR_API_KEY', !!process.env.PAIR_API_KEY],
+        ['TELEGRAM_BOT_TOKEN', !!process.env.TELEGRAM_BOT_TOKEN],
+    ];
+    const missing = checks.filter(([, fromEnv]) => !fromEnv).map(([name]) => name);
+    if (missing.length) {
+        console.warn('⚠️ [config] these secrets are NOT set via env vars (using built-in fallback): ' + missing.join(', '));
+    }
+})();
+
+module.exports = config;
