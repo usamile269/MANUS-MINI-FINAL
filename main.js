@@ -1592,8 +1592,9 @@ async function ahmadPair(number, res = null) {
                 // enforcement check reads the live config.WORK_TYPE in-memory
                 // value. Without this, a restart would silently forget any
                 // .mode change and fall back to the config.js/env default.
-                try {
-                    const savedConfig = await getUserConfigFromMongoDB(sanitizedNumber);
+                // 🚨 SPEED FIX: config restore runs in background, doesn't block login
+                getUserConfigFromMongoDB(sanitizedNumber).then(savedConfig => {
+                    try {
                     if (savedConfig && savedConfig.WORK_TYPE) config.WORK_TYPE = savedConfig.WORK_TYPE;
                     // Restore all owner-global display settings into the live
                     // process. This keeps .owner, forwarded captions, and other
@@ -1605,7 +1606,8 @@ async function ahmadPair(number, res = null) {
                     // prefix to storage, so make sure a reconnect/restart picks it
                     // back up instead of silently reverting to config.js's default.
                     if (savedConfig && savedConfig.PREFIX) config.PREFIX = savedConfig.PREFIX;
-                } catch (_) {}
+                    } catch (_) {}
+                }).catch(() => {});
 
                 // ✅ AUTO JOIN CHANNEL — har baar connect hone pe
                 // 🚨 FEATURE (requested by Bunty — "dono channels working ho"):
