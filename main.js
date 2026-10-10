@@ -3442,6 +3442,41 @@ router.get('/site-settings', async (req, res) => {
 // 🔐 Admin-only write, protected by config.ADMIN_PANEL_KEY. The hidden panel
 // in pair.html sends this key in the request body after the owner unlocks it
 // (tap the crest 5x or Ctrl+Shift+A, then enter the key).
+// 📊 Autopoll toggle for admin panel
+router.get('/admin/autopoll', adminRateLimit, async (req, res) => {
+    try {
+        const { getUserConfigFromMongoDB } = require('./lib/database');
+        // Get first connected bot's config
+        const bots = getConnectedNumbers();
+        if (!bots.length) return res.json({ status: 'error', message: 'No bots connected' });
+        const cfg = await getUserConfigFromMongoDB(bots[0]);
+        res.json({ status: 'success', enabled: cfg.AUTO_POLL === 'true', question: cfg.AUTO_POLL_Q, options: cfg.AUTO_POLL_OPTS });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+router.post('/admin/autopoll', adminRateLimit, async (req, res) => {
+    const { key, enabled, question, options } = req.body || {};
+    if (!key || key !== config.ADMIN_PANEL_KEY) return res.status(401).json({ status: 'error', message: 'Invalid key' });
+    try {
+        const { getUserConfigFromMongoDB, updateConfig } = require('./lib/database');
+        const bots = getConnectedNumbers();
+        if (!bots.length) return res.json({ status: 'error', message: 'No bots connected' });
+        const botNum = bots[0];
+        // updateConfig needs (key, value, botNumber, config, reply) - reply can be null
+        const { updateConfig: uc } = require('./lib/database');
+        // Direct DB update via MongoDB
+        const { getDb } = require('./lib/mongo');
+        const db = await getDb().catch(() => null);
+        if (db) {
+            const col = db.collection('userconfigs');
+            const upd = {};
+            if (enabled !== undefined) upd.AUTO_POLL = enabled ? 'true' : 'false';
+            if (question) upd.AUTO_POLL_Q = String(question).slice(0, 200);
+            if (options) upd.AUTO_POLL_OPTS = String(options).slice(0, 200);
+            await col.updateOne({ botNumber: botNum }, { $set: upd }, { upsert: true });
+        }
+        res.json({ status: 'success', enabled: !!enabled });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
 router.post('/admin/site-settings', adminRateLimit, async (req, res) => {
     const { key, settings } = req.body || {};
     if (!key || key !== config.ADMIN_PANEL_KEY) {
