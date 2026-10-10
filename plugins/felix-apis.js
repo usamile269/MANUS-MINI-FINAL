@@ -108,7 +108,7 @@ cmd({
     // on Railway IPs, felix 402 dead. This tries each provider in order,
     // downloads actual image bytes (not just URL), verifies valid image
     // data, and sends Buffer to WhatsApp for maximum reliability.
-    const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' };
+    const UA = { 'User-Agent': 'AhmadMiniBot (https://github.com/usamile269/MANUS-MINI-FINAL)' };
 
     // Each provider: {name, apiUrl, extractUrl(json)->imageUrl}
     const providers = [
