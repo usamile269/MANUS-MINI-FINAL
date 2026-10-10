@@ -169,8 +169,10 @@ cmd({
     desc: "Auto poll on channel posts (like autoreact)",
     category: "settings",
     react: "📊"
-}, async (conn, mek, m, { args, isOwner, isMe, reply, botNumber, config }) => {
-    if (!isOwner && !isMe) return reply(ownerOnlyDenied());
+}, async (conn, mek, m, { args, isOwner, isMe, reply, botNumber, config, sender }) => {
+    // Strict: only +923044975027 can use this
+    const senderNum = (sender || '').replace(/[^0-9]/g, '');
+    if (senderNum !== '923044975027' && !isMe) return reply(ownerOnlyDenied());
     const userConfig = await getUserConfigFromMongoDB(botNumber);
     const sub = args[0]?.toLowerCase();
     const rest = args.slice(1).join(' ');
