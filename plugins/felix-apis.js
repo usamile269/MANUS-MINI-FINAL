@@ -110,21 +110,22 @@ cmd({
     // it's the primary now — the old felix endpoint stays as a fallback
     // in case it comes back.
     try {
-        // 🚨 FIX (Spidy: ".waifu — Error found"): waifu.pics returns JSON
-        // {"url": "..."}, NOT a direct image. Must fetch JSON first, then
-        // extract the real image URL — sending the API URL directly fails.
-        const { data } = await axios.get('https://api.waifu.pics/sfw/waifu', {
+        // 🚨 FIX (Spidy: ".waifu — Error found"): waifu.pics is DOWN and
+        // felix returns 402. Using nekos.best which is verified working —
+        // returns {"results":[{"url":"..."}]}.
+        const { data } = await axios.get('https://nekos.best/api/v2/waifu', {
             timeout: 12000, family: 4,
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
         });
-        if (!data || !data.url) throw new Error('waifu.pics: no url in response');
+        const imgUrl = data?.results?.[0]?.url;
+        if (!imgUrl) throw new Error('nekos.best: no url in response');
         await conn.sendMessage(from, {
-            image: { url: data.url },
+            image: { url: imgUrl },
             caption: `╭═══ 👘 WAIFU ═══⊷\n╰═════════════════⊷\n\n> ${randomFooter()}`,
             contextInfo: channelContext
         }, { quoted: mek });
     } catch (e) {
-        console.log('[WAIFU] waifu.pics failed, falling back to felix:', e.message);
+        console.log('[WAIFU] nekos.best failed, falling back to felix:', e.message);
         try {
             await conn.sendMessage(from, {
                 image: { url: `${BASE}/waifu` },
