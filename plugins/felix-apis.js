@@ -102,39 +102,89 @@ cmd({
     react: "👘",
     filename: __filename
 }, async (conn, mek, m, { from, reply }) => {
-    // 🚨 FIX (Bunty: ".waifu — Error found. Please try later." — logs
-    // showed "Failed to fetch stream from felix-rdx-unlimited-free-
-    // apis.vercel.app/api/v1/api/waifu"): that whole BASE looks to be
-    // down. waifu.pics is already relied on elsewhere in this bot (see
-    // plugins/reactions.js) and wasn't the thing failing in the logs, so
-    // it's the primary now — the old felix endpoint stays as a fallback
-    // in case it comes back.
+    // 🚨 FIX (Spidy: ".waifu — Error found. Please try later."):
+    // Multi-provider fallback with byte-download verification.
+    // Previous issues: waifu.pics ENOTFOUND (intermittent), nekos.best 403
+    // on Railway IPs, felix 402 dead. This tries each provider in order,
+    // downloads actual image bytes (not just URL), verifies valid image
+    // data, and sends Buffer to WhatsApp for maximum reliability.
+    const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' };
+
+    // Each provider: {name, apiUrl, extractUrl(json)->imageUrl}
+    const providers = [
+        {
+            name: 'waifu.pics',
+            apiUrl: 'https://api.waifu.pics/sfw/waifu',
+            extract: (d) => d?.url
+        },
+        {
+            name: 'nekos.best',
+            apiUrl: 'https://nekos.best/api/v2/waifu',
+            extract: (d) => d?.results?.[0]?.url
+        },
+        {
+            name: 'waifu.im',
+            apiUrl: 'https://api.waifu.im/search/?included_tags=waifu',
+            extract: (d) => d?.images?.[0]?.url
+        }
+    ];
+
+    // Verify buffer is actually an image (not HTML/JSON error page)
+    function isValidImage(buf) {
+        if (!buf || buf.length < 100) return false;
+        // JPEG: FF D8 FF | PNG: 89 50 4E 47 | GIF: 47 49 46 | WebP: 52 49 46 46
+        const h = buf.slice(0, 4);
+        return (h[0] === 0xFF && h[1] === 0xD8 && h[2] === 0xFF) ||
+               (h[0] === 0x89 && h[1] === 0x50 && h[2] === 0x4E && h[3] === 0x47) ||
+               (h[0] === 0x47 && h[1] === 0x49 && h[2] === 0x46) ||
+               (h[0] === 0x52 && h[1] === 0x49 && h[2] === 0x46 && h[3] === 0x46);
+    }
+
+    let imageBuffer = null;
+    const errors = [];
+
+    for (const p of providers) {
+        try {
+            // Step 1: Get image URL from provider API
+            const { data, status } = await axios.get(p.apiUrl, {
+                timeout: 10000, family: 4, headers: UA,
+                validateStatus: (s) => s === 200
+            });
+            const imgUrl = p.extract(data);
+            if (!imgUrl || !/^https?:\/\//i.test(imgUrl)) {
+                throw new Error('no valid image URL in response');
+            }
+            // Step 2: Download actual image bytes
+            const imgRes = await axios.get(imgUrl, {
+                responseType: 'arraybuffer', timeout: 20000, family: 4,
+                headers: UA, maxContentLength: 15 * 1024 * 1024
+            });
+            const buf = Buffer.from(imgRes.data);
+            if (!isValidImage(buf)) throw new Error('downloaded data is not a valid image');
+            imageBuffer = buf;
+            console.log(`[WAIFU] success via ${p.name} (${(buf.length/1024).toFixed(0)}KB)`);
+            break;
+        } catch (e) {
+            const msg = `${p.name}: ${e.message}`;
+            errors.push(msg);
+            console.log('[WAIFU] provider failed:', msg);
+        }
+    }
+
+    if (!imageBuffer) {
+        console.log('[WAIFU] all providers failed:', errors.join(' | '));
+        return reply("❌ Waifu images temporarily unavailable. Please try again later! 🙏");
+    }
+
     try {
-        // 🚨 FIX (Spidy: ".waifu — Error found"): waifu.pics is DOWN and
-        // felix returns 402. Using nekos.best which is verified working —
-        // returns {"results":[{"url":"..."}]}.
-        const { data } = await axios.get('https://nekos.best/api/v2/waifu', {
-            timeout: 12000, family: 4,
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-        });
-        const imgUrl = data?.results?.[0]?.url;
-        if (!imgUrl) throw new Error('nekos.best: no url in response');
         await conn.sendMessage(from, {
-            image: { url: imgUrl },
+            image: imageBuffer,
             caption: `╭═══ 👘 WAIFU ═══⊷\n╰═════════════════⊷\n\n> ${randomFooter()}`,
             contextInfo: channelContext
         }, { quoted: mek });
     } catch (e) {
-        console.log('[WAIFU] nekos.best failed, falling back to felix:', e.message);
-        try {
-            await conn.sendMessage(from, {
-                image: { url: `${BASE}/waifu` },
-                caption: `╭═══ 👘 WAIFU ═══⊷\n╰═════════════════⊷\n\n> ${randomFooter()}`,
-                contextInfo: channelContext
-            }, { quoted: mek });
-        } catch (e2) {
-            reply("❌ Error found. Please try later.");
-        }
+        console.log('[WAIFU] send failed:', e.message);
+        reply("❌ Error sending image. Please try later.");
     }
 });
 
