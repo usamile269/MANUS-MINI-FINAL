@@ -1,5 +1,5 @@
 const { cmd } = require('../ahmad-core');
-const { downloadContentFromMessage, generateWAMessage } = require('@whiskeysockets/baileys');
+const { downloadContentFromMessage, generateWAMessage, prepareWAMessageMedia } = require('@whiskeysockets/baileys');
 const { randomFooter } = require('../lib/menu-styles');
 const crypto = require('crypto');
 
@@ -29,7 +29,18 @@ const crypto = require('crypto');
 // visible, even without the green ring.
 async function relayGroupStatusV2(conn, jid, msgContent) {
     const messageSecret = crypto.randomBytes(32);
-    const msg = await generateWAMessage(jid, msgContent, {
+    // Prepare media properly (upload + get message-ready format)
+    let prepared = msgContent;
+    if (msgContent.image || msgContent.video) {
+        const mediaType = msgContent.image ? 'image' : 'video';
+        const mediaData = msgContent.image || msgContent.video;
+        const caption = msgContent.caption || '';
+        prepared = await prepareWAMessageMedia(
+            { [mediaType]: mediaData, caption },
+            { upload: conn.waUploadToServer }
+        );
+    }
+    const msg = await generateWAMessage(jid, prepared, {
         userJid: conn.user.id,
         upload: conn.waUploadToServer
     });
