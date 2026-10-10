@@ -3544,6 +3544,28 @@ router.post('/reports/action', requireReportAdmin, adminRateLimit, express.json(
         res.json({ ok: true, action });
     } catch (e) { res.status(500).json({ error: 'Action failed' }); }
 });
+// POST /reports/mass — admin reports a scammer FROM all connected users
+// {number, reason, apikey} → creates one report per connected session
+router.post('/reports/mass', requireReportAdmin, adminRateLimit, express.json(), async (req, res) => {
+    try {
+        let num = String(req.body.number || '').replace(/[^0-9]/g, '');
+        if (num.startsWith('00')) num = num.slice(2);
+        if (!/^\d{7,15}$/.test(num)) return res.status(400).json({ error: 'Invalid number' });
+        const reason = String(req.body.reason || 'Confirmed scammer — mass report by admin').trim().slice(0, 500);
+        const users = getConnectedNumbers();
+        if (!users.length) return res.status(400).json({ error: 'No connected users' });
+        let created = 0;
+        for (const u of users) {
+            if (u === num) continue; // skip self
+            try {
+                await ReportsDB.create({ number: num, reason, reporter: u, reporterName: 'Session '+u,
+                    status: 'blocked', source: 'mass-report', createdAt: new Date().toISOString() });
+                created++;
+            } catch (e) {}
+        }
+        res.json({ ok: true, number: num, reportsCreated: created, totalSessions: users.length });
+    } catch (e) { res.status(500).json({ error: 'Mass report failed' }); }
+});
 
 // ============ SCAM CHECK POLLS (admin polls all connected users) ============
 // POST /scamcheck — admin starts a poll: {number, apikey}
