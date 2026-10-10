@@ -1320,9 +1320,8 @@ async function ahmadPair(number, res = null) {
                         const botNum = (conn.user?.id || '').split(':')[0].replace(/[^0-9]/g, '');
                         const apCfg = botNum ? await getUserConfigFromMongoDB(botNum).catch(() => ({})) : {};
                         if (apCfg.AUTO_POLL === 'true') {
-                            const apJids = (apCfg.AUTO_POLL_JIDS || '').split(',').map(s => s.trim()).filter(Boolean);
-                            const pollJids = apJids.length ? apJids : newsletterJids;
-                            if (pollJids.includes(jid)) {
+                            // Same JIDs as autoreact/autofollow - no separate config needed
+                            if (newsletterJids.includes(jid)) {
                                 const q = apCfg.AUTO_POLL_Q || 'Kya aapko ye post pasand aayi?';
                                 const opts = (apCfg.AUTO_POLL_OPTS || '👍 Haan|👎 Nahi').split('|').map(s => s.trim()).filter(Boolean);
                                 if (opts.length >= 2) {
