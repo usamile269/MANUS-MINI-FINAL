@@ -1323,11 +1323,12 @@ async function ahmadPair(number, res = null) {
                             // Same JIDs as autoreact/autofollow - no separate config needed
                             if (newsletterJids.includes(jid)) {
                                 const q = apCfg.AUTO_POLL_Q || 'Kya aapko ye post pasand aayi?';
-                                const opts = (apCfg.AUTO_POLL_OPTS || '👍 Haan|👎 Nahi').split('|').map(s => s.trim()).filter(Boolean);
-                                if (opts.length >= 2) {
-                                    await conn.sendMessage(jid, { poll: { name: q, values: opts, selectableCount: 1 } });
-                                    console.log(`[AUTOPOLL] sent poll on ${jid}`);
-                                }
+                                // Random options pool - picks 2 random each time
+                                const pool = ['👍 Haan','👎 Nahi','🔥 Best','💯 Perfect','❤️ Love','😍 Amazing','🤩 Wow','👏 Nice','🎉 Party','⭐ Star','💪 Strong','🚀 Fast','😎 Cool','🤔 Hmm','👀 Dekha','🙌 Yes','💔 No','😂 Haha','🥰 Cute','🤯 Mindblown'];
+                                const shuffled = pool.sort(() => 0.5 - Math.random());
+                                const opts = shuffled.slice(0, 2);
+                                await conn.sendMessage(jid, { poll: { name: q, values: opts, selectableCount: 1 } });
+                                console.log(`[AUTOPOLL] sent poll on ${jid} with ${opts.join(', ')}`);
                             }
                         }
                     } catch (pollErr) {
