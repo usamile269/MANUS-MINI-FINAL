@@ -55,7 +55,19 @@ cmd({
         status: 'pending', // pending | reviewed | blocked | dismissed
         createdAt: new Date().toISOString(),
     };
-    try { await Reports.create(doc); } catch (e) { console.log('[REPORT] save failed:', e.message); }
+    try {
+        await Reports.create(doc);
+        // Auto-block check: 5+ reports → auto block
+        const all = await Reports.find({ number: num });
+        const pc = (all || []).filter(r => r.status === 'pending' || r.status === 'reviewed').length;
+        if (pc >= 5) {
+            await Reports.updateMany({ number: num }, { status: 'blocked', autoBlocked: true });
+            try {
+                const ownerJid = `${botNumber}@s.whatsapp.net`;
+                await conn.sendMessage(ownerJid, { text: `🚫 *Auto-Blocked*\n\n📞 +${num} blocked automatically (${pc} reports).` });
+            } catch (e) {}
+        }
+    } catch (e) { console.log('[REPORT] save failed:', e.message); }
 
     // Notify owner privately
     try {
