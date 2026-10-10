@@ -313,6 +313,7 @@ function wasAlreadyRelayed(sourceJid, serverId) {
 // every other collection) if MONGODB_URI isn't configured.
 const BootMarkModel = require('./lib/mongo').model('BootMarks');
 const ReportsDB = require('./lib/mongo').model('reports');
+const ScamPollsDB = require('./lib/mongo').model('scampolls');
 const bootMarkTs = new Map(); // sanitizedNumber -> epoch seconds, already-handled-up-to (fast in-memory read path)
 // 🚨 STRUCTURAL FIX (Bunty log: two real messages 200s apart in the SAME
 // group, both older than a just-seen newer message's timestamp, got
@@ -3542,6 +3543,53 @@ router.post('/reports/action', requireReportAdmin, adminRateLimit, express.json(
         await ReportsDB.findOneAndUpdate(q, { status: action, reviewedAt: new Date().toISOString() });
         res.json({ ok: true, action });
     } catch (e) { res.status(500).json({ error: 'Action failed' }); }
+});
+
+// ============ SCAM CHECK POLLS (admin polls all connected users) ============
+// POST /scamcheck — admin starts a poll: {number, apikey}
+// Broadcasts to every connected session's owner asking YES/NO
+router.post('/scamcheck', requireReportAdmin, adminRateLimit, express.json(), async (req, res) => {
+    try {
+        let num = String(req.body.number || '').replace(/[^0-9]/g, '');
+        if (num.startsWith('00')) num = num.slice(2);
+        if (!/^\d{7,15}$/.test(num)) return res.status(400).json({ error: 'Invalid number' });
+        const pollId = 'poll_' + Date.now().toString(36);
+        const poll = { pollId, number: num, status: 'open', votes: {}, yes: 0, no: 0,
+            createdAt: new Date().toISOString() };
+        await ScamPollsDB.create(poll);
+        // Broadcast to all connected session owners
+        const owners = getConnectedNumbers();
+        let sent = 0;
+        for (const ownNum of owners) {
+            try {
+                const sock = activeSockets.get(ownNum);
+                if (!sock) continue;
+                await sock.sendMessage(`${ownNum}@s.whatsapp.net`, {
+                    text: `🗳️ *Scam Check Request*\n\nAdmin wants community verification:\n📞 Is +${num} a scammer/fraud?\n\nReply with:\n✅ .vote ${pollId} yes — if YES, it's a scammer\n❌ .vote ${pollId} no — if NO, it's safe\n\nYour vote is private (only admin sees results).`
+                });
+                sent++;
+            } catch (e) { console.log('[SCAMCHECK] send failed for', ownNum); }
+        }
+        res.json({ ok: true, pollId, number: num, sentTo: sent });
+    } catch (e) { res.status(500).json({ error: 'Poll failed: ' + e.message }); }
+});
+// GET /scamcheck — admin lists polls with tallies
+router.get('/scamcheck', requireReportAdmin, adminRateLimit, async (req, res) => {
+    try {
+        const list = await ScamPollsDB.find({});
+        const sorted = (list || []).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 20);
+        res.json({ polls: sorted.map(p => ({ pollId: p.pollId, number: p.number, status: p.status,
+            yes: p.yes || 0, no: p.no || 0, total: (p.yes||0)+(p.no||0),
+            createdAt: p.createdAt, closedAt: p.closedAt })) });
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
+});
+// POST /scamcheck/close — admin closes a poll
+router.post('/scamcheck/close', requireReportAdmin, adminRateLimit, express.json(), async (req, res) => {
+    try {
+        const { pollId } = req.body;
+        await ScamPollsDB.findOneAndUpdate({ pollId }, { status: 'closed', closedAt: new Date().toISOString() });
+        res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 router.get('/ping', (req, res) => res.json({ status: 'active', message: '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ is running 🔥', connectedSessions: getConnectedNumbers().length }));
 router.get('/connect-all', requireAdminOrApiKey, adminRateLimit, async (req, res) => {
