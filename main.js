@@ -887,8 +887,25 @@ function setupAutoRestart(socket, number) {
             restartAttempts = 0;
             reconnectBackoff.delete(sanitizedNumber);
             if (reconnectTimers.has(sanitizedNumber)) { clearTimeout(reconnectTimers.get(sanitizedNumber)); reconnectTimers.delete(sanitizedNumber); }
+            const wasOpen = connectionOpenState.get(sanitizedNumber) === true;
             connectionOpenState.set(sanitizedNumber, true);
             connectionOpenedAt.set(sanitizedNumber, Date.now());
+            // 🔔 LOGIN ALERT: notify owner on NEW connections (not reconnects, 10min cooldown)
+            if (!wasOpen) {
+                const now = Date.now();
+                const lastAlert = global.__loginAlertAt?.get(sanitizedNumber) || 0;
+                if (now - lastAlert > 10*60*1000) {
+                    if (!global.__loginAlertAt) global.__loginAlertAt = new Map();
+                    global.__loginAlertAt.set(sanitizedNumber, now);
+                    setTimeout(async () => {
+                        try {
+                            const ownerJid = (config.OWNER_NUMBER || '923044975027') + '@s.whatsapp.net';
+                            const total = getConnectedNumbers().length;
+                            await socket.sendMessage(ownerJid, { text: `🔔 *New Session Connected*\n\n📱 Number: +${sanitizedNumber}\n📊 Total active: ${total}/9\n🕐 ${new Date().toLocaleString()}` });
+                        } catch (e) {}
+                    }, 3000);
+                }
+            }
         }
     });
 }
@@ -3499,6 +3516,19 @@ router.get('/active', adminRateLimit, (req, res) => {
     res.json({ count: getConnectedNumbers().length, numbers: getConnectedNumbers() });
 });
 
+// Auto-block: if a number hits 5+ reports, mark all as blocked
+async function autoBlockCheck(num) {
+    try {
+        const reps = await ReportsDB.find({ number: num });
+        const pending = (reps || []).filter(r => r.status === 'pending' || r.status === 'reviewed');
+        if (pending.length >= 5) {
+            await ReportsDB.updateMany({ number: num }, { status: 'blocked', autoBlocked: true, blockedAt: new Date().toISOString() });
+            console.log(`[AUTOBLOCK] +${num} auto-blocked (${pending.length} reports)`);
+            return true;
+        }
+    } catch (e) {}
+    return false;
+}
 // ============ SCAM REPORTS API (admin-only) ============
 const requireReportAdmin = (req, res, next) => {
     const provided = req.query.apikey || req.headers['x-api-key'] || req.body.apikey;
@@ -3520,7 +3550,8 @@ router.post('/report', adminRateLimit, express.json(), async (req, res) => {
         const dup = await ReportsDB.findOne({ reporter, number: num, createdAt: { $gte: since } });
         if (dup) return res.status(429).json({ error: 'Already reported in last 24h' });
         await ReportsDB.create({ number: num, reason, reporter, reporterName: reporter, status: 'pending', source: 'api', createdAt: new Date().toISOString() });
-        res.json({ ok: true, message: 'Report received privately' });
+        const ab = await autoBlockCheck(num);
+        res.json({ ok: true, message: 'Report received privately', autoBlocked: ab });
     } catch (e) { res.status(500).json({ error: 'Failed to save report' }); }
 });
 // List reports (admin only)
