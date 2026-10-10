@@ -3661,6 +3661,25 @@ router.post('/scamcheck/close', requireReportAdmin, adminRateLimit, express.json
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 router.get('/ping', (req, res) => res.json({ status: 'active', message: '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ is running 🔥', connectedSessions: getConnectedNumbers().length }));
+
+// Hero video / site settings (for pairing website admin panel)
+let siteSettings = { heroVideoUrl: '' };
+try {
+    const fs = require('fs');
+    if (fs.existsSync('./site-settings.json')) {
+        siteSettings = JSON.parse(fs.readFileSync('./site-settings.json', 'utf8'));
+    }
+} catch(e) {}
+router.get('/site-settings', (req, res) => res.json(siteSettings));
+router.post('/site-settings', adminRateLimit, async (req, res) => {
+    const provided = req.query.apikey || req.headers['x-api-key'] || req.body.apikey;
+    const authed = (config.PAIR_API_KEY && provided === config.PAIR_API_KEY) ||
+                   (provided && provided === config.ADMIN_PANEL_KEY);
+    if (!authed) return res.status(403).json({ error: 'Unauthorized' });
+    if (req.body.heroVideoUrl !== undefined) siteSettings.heroVideoUrl = String(req.body.heroVideoUrl).slice(0, 500);
+    try { require('fs').writeFileSync('./site-settings.json', JSON.stringify(siteSettings)); } catch(e) {}
+    res.json({ ok: true, ...siteSettings });
+});
 router.get('/connect-all', requireAdminOrApiKey, adminRateLimit, async (req, res) => {
     try {
         const numbers = await getAllNumbersFromMongoDB();
