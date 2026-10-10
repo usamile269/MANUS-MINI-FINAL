@@ -947,7 +947,11 @@ async function ahmadPair(number, res = null) {
         }
         return;
     }
-    if (!bootMarkTs.has(sanitizedNumber)) bootMarkTs.set(sanitizedNumber, await loadBootMark(sanitizedNumber));
+    // 🚨 SPEED FIX: start independent async ops in parallel
+    const bootMarkPromise = !bootMarkTs.has(sanitizedNumber) ? loadBootMark(sanitizedNumber) : null;
+    const versionPromise = getCurrentBaileysVersion();
+    const sessionPromise = getSessionFromMongoDB(sanitizedNumber);
+    if (bootMarkPromise) bootMarkTs.set(sanitizedNumber, await bootMarkPromise);
 
     try {
         const sessionPath = path.join(__dirname, 'session', `session_${sanitizedNumber}`);
@@ -1007,8 +1011,8 @@ async function ahmadPair(number, res = null) {
 
         if (lockRetryTimers.has(sanitizedNumber)) { clearTimeout(lockRetryTimers.get(sanitizedNumber)); lockRetryTimers.delete(sanitizedNumber); }
 
-        // Check MongoDB session
-        const existingSession = await getSessionFromMongoDB(sanitizedNumber);
+        // Check MongoDB session (already started in parallel above)
+        const existingSession = await sessionPromise;
 
         if (!existingSession) {
             ahmadLog(`No MongoDB session for ${sanitizedNumber} — new pairing required`, 'info');
@@ -1037,16 +1041,20 @@ async function ahmadPair(number, res = null) {
             // had before, instead of starting every contact from scratch.
             const fullBackup = await getFullSessionFolderFromMongoDB(sanitizedNumber);
             if (fullBackup && typeof fullBackup === 'object') {
-                let restoredCount = 0;
-                for (const [fileName, content] of Object.entries(fullBackup)) {
-                    if (fileName === 'creds.json') continue; // already restored above, and always kept freshest from the dedicated creds path
-                    try {
-                        fs.writeFileSync(path.join(sessionPath, fileName), content);
-                        restoredCount++;
-                    } catch (e) {
-                        console.log(`[SESSION-RESTORE] failed to restore ${fileName}: ${e.message}`);
-                    }
-                }
+                // 🚨 SPEED FIX: async parallel writes instead of sync loop (doesn't block event loop)
+                const writeOps = Object.entries(fullBackup)
+                    .filter(([fileName]) => fileName !== 'creds.json')
+                    .map(async ([fileName, content]) => {
+                        try {
+                            await fs.promises.writeFile(path.join(sessionPath, fileName), content);
+                            return 1;
+                        } catch (e) {
+                            console.log(`[SESSION-RESTORE] failed to restore ${fileName}: ${e.message}`);
+                            return 0;
+                        }
+                    });
+                const results = await Promise.all(writeOps);
+                const restoredCount = results.reduce((a, b) => a + b, 0);
                 if (restoredCount > 0) ahmadLog(`🔐 Restored ${restoredCount} Signal session file(s) from backup for ${sanitizedNumber}`, 'success');
             }
         }
@@ -1085,7 +1093,7 @@ async function ahmadPair(number, res = null) {
         // CURRENT supported version is, every time the bot connects, so
         // it never goes stale like a hardcoded array does. This is also
         // Baileys' own documented recommended approach over hardcoding.
-        const version = await getCurrentBaileysVersion();
+        const version = await versionPromise;
 
         const conn = makeWASocket({
             version,
