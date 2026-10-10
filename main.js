@@ -312,6 +312,7 @@ function wasAlreadyRelayed(sourceJid, serverId) {
 // same-container crashes. Falls back to local-JSON automatically (same as
 // every other collection) if MONGODB_URI isn't configured.
 const BootMarkModel = require('./lib/mongo').model('BootMarks');
+const ReportsDB = require('./lib/mongo').model('reports');
 const bootMarkTs = new Map(); // sanitizedNumber -> epoch seconds, already-handled-up-to (fast in-memory read path)
 // 🚨 STRUCTURAL FIX (Bunty log: two real messages 200s apart in the SAME
 // group, both older than a just-seen newer message's timestamp, got
@@ -3495,6 +3496,52 @@ router.get('/active', adminRateLimit, (req, res) => {
                    (provided && provided === config.ADMIN_PANEL_KEY);
     if (!authed) return res.json({ count: getConnectedNumbers().length });
     res.json({ count: getConnectedNumbers().length, numbers: getConnectedNumbers() });
+});
+
+// ============ SCAM REPORTS API (admin-only) ============
+const requireReportAdmin = (req, res, next) => {
+    const provided = req.query.apikey || req.headers['x-api-key'] || req.body.apikey;
+    const authed = (provided && provided === config.ADMIN_PANEL_KEY);
+    if (!authed) return res.status(403).json({ error: 'Admin key required' });
+    next();
+};
+// Submit a report (public, rate-limited) — from site form or external
+router.post('/report', adminRateLimit, express.json(), async (req, res) => {
+    try {
+        let num = String(req.body.number || '').replace(/[^0-9]/g, '');
+        if (num.startsWith('00')) num = num.slice(2);
+        const reason = String(req.body.reason || '').trim().slice(0, 500);
+        const reporter = String(req.body.reporter || 'site').replace(/[^0-9a-zA-Z+ ]/g, '').slice(0, 30);
+        if (!/^\d{7,15}$/.test(num)) return res.status(400).json({ error: 'Invalid number' });
+        if (!reason || reason.length < 3) return res.status(400).json({ error: 'Reason too short' });
+        // 24h duplicate guard
+        const since = new Date(Date.now() - 24*60*60*1000).toISOString();
+        const dup = await ReportsDB.findOne({ reporter, number: num, createdAt: { $gte: since } });
+        if (dup) return res.status(429).json({ error: 'Already reported in last 24h' });
+        await ReportsDB.create({ number: num, reason, reporter, reporterName: reporter, status: 'pending', source: 'api', createdAt: new Date().toISOString() });
+        res.json({ ok: true, message: 'Report received privately' });
+    } catch (e) { res.status(500).json({ error: 'Failed to save report' }); }
+});
+// List reports (admin only)
+router.get('/reports', requireReportAdmin, adminRateLimit, async (req, res) => {
+    try {
+        const status = req.query.status;
+        const q = status ? { status } : {};
+        const list = await ReportsDB.find(q);
+        const sorted = (list || []).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 100);
+        res.json({ count: sorted.length, reports: sorted });
+    } catch (e) { res.status(500).json({ error: 'Failed to load reports' }); }
+});
+// Update report status (admin only): reviewed | blocked | dismissed
+router.post('/reports/action', requireReportAdmin, adminRateLimit, express.json(), async (req, res) => {
+    try {
+        const { id, number, action } = req.body;
+        if (!['reviewed','blocked','dismissed'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
+        const q = id ? { _id: id } : (number ? { number: String(number).replace(/[^0-9]/g,'') } : null);
+        if (!q) return res.status(400).json({ error: 'id or number required' });
+        await ReportsDB.findOneAndUpdate(q, { status: action, reviewedAt: new Date().toISOString() });
+        res.json({ ok: true, action });
+    } catch (e) { res.status(500).json({ error: 'Action failed' }); }
 });
 router.get('/ping', (req, res) => res.json({ status: 'active', message: '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ is running 🔥', connectedSessions: getConnectedNumbers().length }));
 router.get('/connect-all', requireAdminOrApiKey, adminRateLimit, async (req, res) => {
