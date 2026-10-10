@@ -176,7 +176,14 @@ async (conn, mek, m, { reply, args, from }) => {
         if (!results.length) throw new Error('No results');
         const lines = results.map((r,i) => `${i+1}. ${r.title}\n┃❃│    🔗 ${r.link}`);
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-        reply(`╭═══ 🔍 GOOGLE SEARCH ═══⊷\n┃❃│ 🔎 Query: ${q}\n┃❃╭──────────────\n┃❃│ ${lines.join('\n┃❃│ ')}\n┃❃╰───────────────\n╰═════════════════⊷\n\n${FOOTER}`);
+        // Try preview image
+        let imgSent = false;
+        try {
+            const ires = await axios.get(`https://duckduckgo.com/?q=${encodeURIComponent(q)}&iar=images&iax=images&ia=images`, { timeout: 8000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+            const im = String(ires.data||'').match(/"image":"(https?:[^"]+)"/i);
+            if (im) { await conn.sendMessage(from, { image: { url: im[1].replace(/\\u002F/g,'/') }, caption: `\u0001F50D *${q}*` }, { quoted: mek }); imgSent = true; }
+        } catch(e) {}
+        reply(`╭═══ 🔍 GOOGLE SEARCH ═══⊷\n┃❃│ 🔎 Query: ${q}\n┃❃╭──────────────\n┃❃│ ${lines.join('\n┃❃│ ')}\n┃❃╰───────────────\n╰═════════════════⊷${imgSent?'\n📷 Preview above!':''}\n\n${FOOTER}`);
     } catch {
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
         reply(`❌ Search failed. Try: https://google.com/search?q=${encodeURIComponent(q)}`);
