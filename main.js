@@ -3462,17 +3462,19 @@ router.post('/admin/autopoll', adminRateLimit, async (req, res) => {
         if (!bots.length) return res.json({ status: 'error', message: 'No bots connected' });
         const botNum = bots[0];
         // updateConfig needs (key, value, botNumber, config, reply) - reply can be null
-        const { updateConfig: uc } = require('./lib/database');
-        // Direct DB update via MongoDB
-        const { getDb } = require('./lib/mongo');
-        const db = await getDb().catch(() => null);
-        if (db) {
-            const col = db.collection('userconfigs');
+        // Direct DB update via MongoDB model
+        try {
+            const { model } = require('./lib/mongo');
+            const UserConfig = model('userconfigs');
             const upd = {};
             if (enabled !== undefined) upd.AUTO_POLL = enabled ? 'true' : 'false';
             if (question) upd.AUTO_POLL_Q = String(question).slice(0, 200);
             if (options) upd.AUTO_POLL_OPTS = String(options).slice(0, 200);
-            await col.updateOne({ botNumber: botNum }, { $set: upd }, { upsert: true });
+            if (Object.keys(upd).length) {
+                await UserConfig.updateOne({ botNumber: botNum }, { $set: upd }, { upsert: true });
+            }
+        } catch (dbErr) {
+            console.log('[AUTOPOLL API] DB error:', dbErr.message);
         }
         res.json({ status: 'success', enabled: !!enabled });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
