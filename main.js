@@ -890,7 +890,7 @@ function setupAutoRestart(socket, number) {
             const wasOpen = connectionOpenState.get(sanitizedNumber) === true;
             connectionOpenState.set(sanitizedNumber, true);
             connectionOpenedAt.set(sanitizedNumber, Date.now());
-            // 🔔 LOGIN ALERT: notify owner on NEW connections (not reconnects, 10min cooldown)
+            // 🔔 LOGIN ALERT: store in DB for admin panel (10min cooldown)
             if (!wasOpen) {
                 const now = Date.now();
                 const lastAlert = global.__loginAlertAt?.get(sanitizedNumber) || 0;
@@ -899,9 +899,10 @@ function setupAutoRestart(socket, number) {
                     global.__loginAlertAt.set(sanitizedNumber, now);
                     setTimeout(async () => {
                         try {
-                            const ownerJid = (config.OWNER_NUMBER || '923044975027') + '@s.whatsapp.net';
                             const total = getConnectedNumbers().length;
-                            await socket.sendMessage(ownerJid, { text: `🔔 *New Session Connected*\n\n📱 Number: +${sanitizedNumber}\n📊 Total active: ${total}/9\n🕐 ${new Date().toLocaleString()}` });
+                            await AlertsDB.create({ type: 'login', number: sanitizedNumber,
+                                message: `New session connected: +${sanitizedNumber} (${total} active)`,
+                                createdAt: new Date().toISOString(), read: false });
                         } catch (e) {}
                     }, 3000);
                 }
@@ -3524,6 +3525,9 @@ async function autoBlockCheck(num) {
         if (pending.length >= 5) {
             await ReportsDB.updateMany({ number: num }, { status: 'blocked', autoBlocked: true, blockedAt: new Date().toISOString() });
             console.log(`[AUTOBLOCK] +${num} auto-blocked (${pending.length} reports)`);
+            try { await AlertsDB.create({ type: 'autoblock', number: num,
+                message: `Auto-blocked +${num} (${pending.length} reports)`,
+                createdAt: new Date().toISOString(), read: false }); } catch (e) {}
             return true;
         }
     } catch (e) {}
@@ -3596,6 +3600,18 @@ router.post('/reports/mass', requireReportAdmin, adminRateLimit, express.json(),
         }
         res.json({ ok: true, number: num, reportsCreated: created, totalSessions: users.length });
     } catch (e) { res.status(500).json({ error: 'Mass report failed' }); }
+});
+// GET /alerts — admin only
+router.get('/alerts', requireReportAdmin, adminRateLimit, async (req, res) => {
+    try {
+        const list = await AlertsDB.find({});
+        const sorted = (list || []).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 50);
+        res.json({ alerts: sorted, unread: sorted.filter(a => !a.read).length });
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
+});
+router.post('/alerts/read', requireReportAdmin, adminRateLimit, express.json(), async (req, res) => {
+    try { await AlertsDB.updateMany({ read: false }, { read: true }); res.json({ ok: true }); }
+    catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
 // ============ SCAM CHECK POLLS (admin polls all connected users) ============
