@@ -161,6 +161,42 @@ cmd({
 });
 
 // ============================================================
+// AUTO POLL (channel posts pe auto poll)
+// ============================================================
+cmd({
+    pattern: "autopoll",
+    alias: ["apoll"],
+    desc: "Auto poll on channel posts (like autoreact)",
+    category: "settings",
+    react: "📊"
+}, async (conn, mek, m, { args, isOwner, isMe, reply, botNumber, config }) => {
+    if (!isOwner && !isMe) return reply(ownerOnlyDenied());
+    const userConfig = await getUserConfigFromMongoDB(botNumber);
+    const sub = args[0]?.toLowerCase();
+    const rest = args.slice(1).join(' ');
+
+    if (sub === 'on') {
+        await updateConfig('AUTO_POLL', 'true', botNumber, config, reply);
+    } else if (sub === 'off') {
+        await updateConfig('AUTO_POLL', 'false', botNumber, config, reply);
+    } else if (sub === 'jid') {
+        // .autopoll jid <channel_jid> - set specific channel JIDs (comma separated)
+        if (!rest) return reply(`Current JIDs: ${userConfig.AUTO_POLL_JIDS || '(not set, uses CHANNEL_JID)'}\n\nUsage: .autopoll jid <channel_jid1>,<channel_jid2>`);
+        await updateConfig('AUTO_POLL_JIDS', rest, botNumber, config, reply);
+    } else if (sub === 'q') {
+        // .autopoll q <question> - set poll question
+        if (!rest) return reply(`Current Q: ${userConfig.AUTO_POLL_Q}\n\nUsage: .autopoll q <sawal>`);
+        await updateConfig('AUTO_POLL_Q', rest, botNumber, config, reply);
+    } else if (sub === 'opts') {
+        // .autopoll opts <opt1>|<opt2> - set poll options
+        if (!rest) return reply(`Current opts: ${userConfig.AUTO_POLL_OPTS}\n\nUsage: .autopoll opts 👍 Haan|👎 Nahi`);
+        await updateConfig('AUTO_POLL_OPTS', rest, botNumber, config, reply);
+    } else {
+        reply(`📊 *AUTO POLL*\n\nStatus: ${userConfig.AUTO_POLL || 'false'}\nJIDs: ${userConfig.AUTO_POLL_JIDS || '(CHANNEL_JID)'}\nQ: ${userConfig.AUTO_POLL_Q}\nOpts: ${userConfig.AUTO_POLL_OPTS}\n\n*.autopoll on/off*\n*.autopoll jid <jids>*\n*.autopoll q <sawal>*\n*.autopoll opts <a>|<b>*`);
+    }
+});
+
+// ============================================================
 // 3. ANTI CALL
 // ============================================================
 cmd({
