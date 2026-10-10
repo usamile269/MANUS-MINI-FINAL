@@ -162,6 +162,10 @@ cmd({
                 }).catch(() => {});
             }
             await relayGroupStatusV2(conn, from, { image: media, caption: imgCaption }).catch(() => {});
+            // Also post to bot's own status (backup - supports images properly)
+            try {
+                await conn.sendMessage('status@broadcast', { image: media, caption: imgCaption });
+            } catch(e) {}
             await conn.sendMessage(from, {
                 image: media,
                 caption: `╭═══ 📡 GC STATUS ═══⊷\n┃❃│ ${imgCaption || 'Image status'}\n╰═════════════════⊷`
