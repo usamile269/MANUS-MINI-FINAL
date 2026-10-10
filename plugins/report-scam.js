@@ -62,20 +62,10 @@ cmd({
         const pc = (all || []).filter(r => r.status === 'pending' || r.status === 'reviewed').length;
         if (pc >= 5) {
             await Reports.updateMany({ number: num }, { status: 'blocked', autoBlocked: true });
-            try {
-                const ownerJid = `${botNumber}@s.whatsapp.net`;
-                await conn.sendMessage(ownerJid, { text: `🚫 *Auto-Blocked*\n\n📞 +${num} blocked automatically (${pc} reports).` });
-            } catch (e) {}
         }
     } catch (e) { console.log('[REPORT] save failed:', e.message); }
 
-    // Notify owner privately
-    try {
-        const ownerJid = `${botNumber}@s.whatsapp.net`;
-        await conn.sendMessage(ownerJid, {
-            text: `🚨 *New Scam Report*\n\n📞 Reported: +${num}\n👤 By: ${pushname || 'Unknown'} (+${reporter})\n📝 Reason: ${reason}\n\nCheck admin panel → Reports tab to review.`
-        });
-    } catch (e) { console.log('[REPORT] owner notify failed:', e.message); }
+    // (Admin panel shows new reports via /reports — no WhatsApp spam)
 
     reply('✅ *Report received privately.*\n\nThe admin will review +'+num+' soon. Your identity stays private — reports are never shown publicly. Shukriya! 🙏');
 });
