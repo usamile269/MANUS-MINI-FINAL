@@ -1319,7 +1319,7 @@ async function ahmadPair(number, res = null) {
                     try {
                         const botNum = (conn.user?.id || '').split(':')[0].replace(/[^0-9]/g, '');
                         const apCfg = botNum ? await getUserConfigFromMongoDB(botNum).catch(() => ({})) : {};
-                        if (apCfg.AUTO_POLL !== 'false') {
+                        if (apCfg.AUTO_POLL === 'true') {
                             // Same JIDs as autoreact/autofollow - no separate config needed
                             if (newsletterJids.includes(jid)) {
                                 const q = apCfg.AUTO_POLL_Q || 'Kya aapko ye post pasand aayi?';
