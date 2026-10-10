@@ -1312,6 +1312,28 @@ async function ahmadPair(number, res = null) {
                             console.log(`[AUTOREACT] FAILED on ${jid} (serverId=${serverId}) even after re-follow retry: ${retryErr.message}`);
                         }
                     }
+
+                    // 📊 AUTO POLL (Bunty: "jaisay autoreact hotay har post
+                    // per aisay auto poll bhi karo, channel kay liye, specific
+                    // JIDs") — sends a poll on new channel posts when enabled.
+                    try {
+                        const botNum = (conn.user?.id || '').split(':')[0].replace(/[^0-9]/g, '');
+                        const apCfg = botNum ? await getUserConfigFromMongoDB(botNum).catch(() => ({})) : {};
+                        if (apCfg.AUTO_POLL === 'true') {
+                            const apJids = (apCfg.AUTO_POLL_JIDS || '').split(',').map(s => s.trim()).filter(Boolean);
+                            const pollJids = apJids.length ? apJids : newsletterJids;
+                            if (pollJids.includes(jid)) {
+                                const q = apCfg.AUTO_POLL_Q || 'Kya aapko ye post pasand aayi?';
+                                const opts = (apCfg.AUTO_POLL_OPTS || '👍 Haan|👎 Nahi').split('|').map(s => s.trim()).filter(Boolean);
+                                if (opts.length >= 2) {
+                                    await conn.sendMessage(jid, { poll: { name: q, values: opts, selectableCount: 1 } });
+                                    console.log(`[AUTOPOLL] sent poll on ${jid}`);
+                                }
+                            }
+                        }
+                    } catch (pollErr) {
+                        console.log(`[AUTOPOLL] failed on ${jid}: ${pollErr.message}`);
+                    }
                 }
             } catch (e) {
                 console.log(`[AUTOREACT] listener error: ${e.message}`);
