@@ -1104,8 +1104,11 @@ async function ahmadPair(number, res = null) {
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 10000,
             emitOwnEvents: true,
-            fireInitQueries: true,
-            generateHighQualityLinkPreview: true,
+            // 🚨 SPEED FIX (Ahmad: "login me 1 minute lagta hai"): fireInitQueries
+            // does extra WhatsApp roundtrips on every connect. Disabled for faster login.
+            fireInitQueries: false,
+            // 🚨 SPEED FIX: HQ link previews fetch remote URLs on connect; not needed for login speed.
+            generateHighQualityLinkPreview: false,
             syncFullHistory: false,
             // 🚨 ROOT-LEVEL FIX: syncFullHistory:false alone only skips the BIG
             // comprehensive history sync — WhatsApp still sends smaller
