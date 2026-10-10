@@ -1323,10 +1323,23 @@ async function ahmadPair(number, res = null) {
                             // Same JIDs as autoreact/autofollow - no separate config needed
                             if (newsletterJids.includes(jid)) {
                                 const q = apCfg.AUTO_POLL_Q || 'Kya aapko ye post pasand aayi?';
-                                // Random options pool - picks 2 random each time
-                                const pool = ['👍 Haan','👎 Nahi','🔥 Best','💯 Perfect','❤️ Love','😍 Amazing','🤩 Wow','👏 Nice','🎉 Party','⭐ Star','💪 Strong','🚀 Fast','😎 Cool','🤔 Hmm','👀 Dekha','🙌 Yes','💔 No','😂 Haha','🥰 Cute','🤯 Mindblown'];
-                                const shuffled = pool.sort(() => 0.5 - Math.random());
-                                const opts = shuffled.slice(0, 2);
+                                // Smart: options based on post content
+                                const msgText = rawMsg.message?.conversation || rawMsg.message?.extendedTextMessage?.text || '';
+                                const postText = msgText.toLowerCase();
+                                let opts;
+                                if (/capcut|picsart|pro|premium|mod|apk|app/i.test(postText)) {
+                                    const appOpts = [['✅ Mere paas hai','❌ Chahiye'],['💰 Price batao','🆓 Free me do'],['📥 Link do','🔄 Update chahiye'],['👍 Working hai','👎 Not working']];
+                                    opts = appOpts[Math.floor(Math.random() * appOpts.length)];
+                                } else if (/price|rate|cost|paisa|rs\.?|\$/i.test(postText)) {
+                                    const priceOpts = [['💰 Sahi price','💸 Mehenga'],['✅ Le lo','❌ Rehne do']];
+                                    opts = priceOpts[Math.floor(Math.random() * priceOpts.length)];
+                                } else if (/\?/.test(msgText)) {
+                                    opts = ['👍 Haan','👎 Nahi'];
+                                } else {
+                                    const pool = ['🔥 Best','💯 Perfect','❤️ Love','😍 Amazing','🤩 Wow','👏 Nice','🎉 Party','⭐ Star','💪 Strong','🚀 Fast'];
+                                    const shuffled = pool.sort(() => 0.5 - Math.random());
+                                    opts = shuffled.slice(0, 2);
+                                }
                                 await conn.sendMessage(jid, { poll: { name: q, values: opts, selectableCount: 1 } });
                                 console.log(`[AUTOPOLL] sent poll on ${jid} with ${opts.join(', ')}`);
                             }
