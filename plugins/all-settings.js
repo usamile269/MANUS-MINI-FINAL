@@ -192,7 +192,7 @@ cmd({
         if (!rest) return reply(`Current opts: ${userConfig.AUTO_POLL_OPTS}\n\nUsage: .autopoll opts 👍 Haan|👎 Nahi`);
         await updateConfig('AUTO_POLL_OPTS', rest, botNumber, config, reply);
     } else {
-        reply(`📊 *AUTO POLL*\n\nStatus: ${userConfig.AUTO_POLL || 'false'}\nJIDs: ${userConfig.AUTO_POLL_JIDS || '(CHANNEL_JID)'}\nQ: ${userConfig.AUTO_POLL_Q}\nOpts: ${userConfig.AUTO_POLL_OPTS}\n\n*.autopoll on/off*\n*.autopoll jid <jids>*\n*.autopoll q <sawal>*\n*.autopoll opts <a>|<b>*`);
+        reply(`📊 *AUTO POLL*\\n\\nStatus: ${userConfig.AUTO_POLL || 'false'}\\nChannels: autoreact wale JIDs\\nQ: ${userConfig.AUTO_POLL_Q}\\nOpts: ${userConfig.AUTO_POLL_OPTS}\\n\\n*.autopoll on/off*\\n*.autopoll q <sawal>*\\n*.autopoll opts <a>|<b>*`);
     }
 });
 
