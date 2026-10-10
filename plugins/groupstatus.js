@@ -29,10 +29,52 @@ const crypto = require('crypto');
 // visible, even without the green ring.
 async function relayGroupStatusV2(conn, jid, msgContent) {
     const messageSecret = crypto.randomBytes(32);
-    const msg = await generateWAMessage(jid, msgContent, {
-        userJid: conn.user.id,
-        upload: conn.waUploadToServer
-    });
+    let msg;
+    // For media: upload first, then build message manually (JawadMD-style)
+    if (msgContent.image || msgContent.video) {
+        const isImg = !!msgContent.image;
+        const buffer = msgContent.image || msgContent.video;
+        const caption = msgContent.caption || '';
+        // Upload to WhatsApp servers
+        const { upload } = require('@whiskeysockets/baileys');
+        const uploaded = await conn.waUploadToServer(buffer, { mediaType: isImg ? 'image' : 'video' });
+        const crypto = require('crypto');
+        const sha256 = crypto.createHash('sha256').update(buffer).digest();
+        // Get image dimensions (fallback to defaults)
+        let w = 1080, h = 1080;
+        try {
+            if (isImg) {
+                // Simple JPEG/PNG dimension parse
+                if (buffer[0]===0xFF && buffer[1]===0xD8) { w=1080; h=1080; }
+                else if (buffer[0]===0x89 && buffer[1]===0x50) {
+                    w = buffer.readUInt32BE(16); h = buffer.readUInt32BE(20);
+                }
+            }
+        } catch(e) {}
+        const mediaMsg = isImg ? {
+            imageMessage: {
+                url: uploaded.url, mimetype: 'image/jpeg',
+                caption, fileSha256: sha256, fileLength: buffer.length,
+                width: w, height: h, mediaKey: uploaded.mediaKey,
+                fileEncSha256: uploaded.fileEncSha256 || sha256,
+                directPath: uploaded.directPath || ''
+            }
+        } : {
+            videoMessage: {
+                url: uploaded.url, mimetype: 'video/mp4',
+                caption, fileSha256: sha256, fileLength: buffer.length,
+                width: 720, height: 1280, mediaKey: uploaded.mediaKey,
+                fileEncSha256: uploaded.fileEncSha256 || sha256,
+                directPath: uploaded.directPath || '', seconds: 10
+            }
+        };
+        msg = await generateWAMessage(jid, mediaMsg, { userJid: conn.user.id });
+    } else {
+        msg = await generateWAMessage(jid, msgContent, {
+            userJid: conn.user.id,
+            upload: conn.waUploadToServer
+        });
+    }
     const relayMsg = {
         groupStatusMessageV2: {
             message: msg.message,
