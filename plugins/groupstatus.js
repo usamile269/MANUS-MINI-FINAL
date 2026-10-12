@@ -27,6 +27,63 @@ const crypto = require('crypto');
 // still attempt the real relay (harmless no-op if it fails) but are then
 // also sent as a normal group message so the actual content is always
 // visible, even without the green ring.
+// ---------------------------------------------------------------------------
+// Invite-link preview for .gcstatus.
+// Ahmad's screenshot: other bots' .gcstatus shows the group invite CARD
+// (pic + name + "Group chat invite") in the status, ours shows plain text.
+// Root cause: link previews are sender-embedded; bots must attach them.
+// NOTE: earlier attempts used `externalAdReplyInfo` inside contextInfo —
+// that is NOT a real Baileys field (correct name is `externalAdReply`),
+// so Baileys silently dropped it and the "black render" tests were invalid.
+// This uses the correct field.
+// ---------------------------------------------------------------------------
+function extractInviteLink(text) {
+    if (!text) return null;
+    const m = text.match(/https?:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/i);
+    return m ? m[0] : null;
+}
+
+async function buildInvitePreview(conn, inviteUrl, fallbackJid) {
+    const code = inviteUrl.split('/').pop();
+    let groupName = 'WhatsApp Group';
+    let groupJid = fallbackJid || null;
+    try {
+        if (typeof conn.groupGetInviteInfo === 'function') {
+            const info = await conn.groupGetInviteInfo(code);
+            if (info) {
+                if (info.subject) groupName = info.subject;
+                if (info.id) groupJid = info.id;
+            }
+        }
+    } catch (e) {}
+    if (groupName === 'WhatsApp Group' && fallbackJid) {
+        try {
+            const meta = await conn.groupMetadata(fallbackJid);
+            if (meta && meta.subject) groupName = meta.subject;
+        } catch (e) {}
+    }
+    let thumb = null;
+    if (groupJid) {
+        try {
+            const picUrl = await conn.profilePictureUrl(groupJid, 'image');
+            if (picUrl) {
+                const res = await fetch(picUrl, { signal: AbortSignal.timeout(8000) });
+                if (res.ok) thumb = Buffer.from(await res.arrayBuffer());
+            }
+        } catch (e) {}
+    }
+    const ad = {
+        title: groupName,
+        body: 'Group chat invite',
+        sourceUrl: inviteUrl,
+        mediaType: 1,
+        renderLargerThumbnail: true,
+        showAdAttribution: false
+    };
+    if (thumb) ad.thumbnail = thumb;
+    return ad;
+}
+
 async function relayGroupStatusV2(conn, jid, msgContent) {
     const messageSecret = crypto.randomBytes(32);
     let msg;
@@ -121,9 +178,15 @@ cmd({
         const done = (label) => `╭═══ ✅ STATUS ═══⊷\n┃❃╭──────────────\n┃❃│ ✅ ${label}\n┃❃│ 🟢 Posted as this group's Status\n┃❃╰───────────────\n╰═════════════════⊷\n\n> ${randomFooter()}`;
 
         if (!quoted && caption) {
-            // 🆕 (Bunty: "fallback koi na, AURA wala hi lagao") — dropped
-            // the fallback entirely, groupStatusMessageV2 only now.
-            await relayGroupStatusV2(conn, from, { text: caption });
+            // 🆕 Invite-link preview card in the status itself (Ahmad's
+            // screenshot: other bots show pic+name card, ours was plain).
+            const inviteUrl = extractInviteLink(caption);
+            if (inviteUrl) {
+                const adReply = await buildInvitePreview(conn, inviteUrl, from);
+                await relayGroupStatusV2(conn, from, { text: caption, contextInfo: { externalAdReply: adReply } });
+            } else {
+                await relayGroupStatusV2(conn, from, { text: caption });
+            }
             await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
             return reply(done('Text status posted!'));
         }
@@ -166,9 +229,17 @@ cmd({
             try {
                 await conn.sendMessage('status@broadcast', { image: media, caption: imgCaption });
             } catch(e) {}
+            // 🆕 Invite-link preview card on the visible group message too
+            // (Ahmad: ".gcstatus may pic atii, link [ka preview] nii").
+            let imgCtx = {};
+            const imgInvite = extractInviteLink(imgCaption);
+            if (imgInvite) {
+                imgCtx = { externalAdReply: await buildInvitePreview(conn, imgInvite, from) };
+            }
             await conn.sendMessage(from, {
                 image: media,
-                caption: `╭═══ 📡 GC STATUS ═══⊷\n┃❃│ ${imgCaption || 'Image status'}\n╰═════════════════⊷`
+                caption: `╭═══ 📡 GC STATUS ═══⊷\n┃❃│ ${imgCaption || 'Image status'}\n╰═════════════════⊷`,
+                contextInfo: imgCtx
             }, { quoted: mek });
             await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
             return reply(done('Image status posted!'));
@@ -191,10 +262,16 @@ cmd({
                 }).catch(() => {});
             }
             await relayGroupStatusV2(conn, from, { video: media, caption: vidCaption, mimetype: 'video/mp4' }).catch(() => {});
+            let vidCtx = {};
+            const vidInvite = extractInviteLink(vidCaption);
+            if (vidInvite) {
+                vidCtx = { externalAdReply: await buildInvitePreview(conn, vidInvite, from) };
+            }
             await conn.sendMessage(from, {
                 video: media,
                 mimetype: 'video/mp4',
-                caption: `╭═══ 📡 GC STATUS ═══⊷\n┃❃│ ${vidCaption || 'Video status'}\n╰═════════════════⊷`
+                caption: `╭═══ 📡 GC STATUS ═══⊷\n┃❃│ ${vidCaption || 'Video status'}\n╰═════════════════⊷`,
+                contextInfo: vidCtx
             }, { quoted: mek });
             await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
             return reply(done('Video status posted!'));
