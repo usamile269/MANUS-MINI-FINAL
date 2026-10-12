@@ -9,6 +9,41 @@ function fail(reply, msg) {
     return reply(`❌ ${toSansBold(msg)}`);
 }
 
+// Rich preview for group invite links: WhatsApp only shows the group
+// icon + name preview (like in the screenshot Ahmad sent) when the
+// sender embeds it. Bots must attach externalAdReply manually — plain
+// text links never unfurl.
+async function sendGroupInviteWithPreview(conn, from, mek, header) {
+    const code = await conn.groupInviteCode(from);
+    const inviteUrl = `https://chat.whatsapp.com/${code}`;
+    let groupName = 'WhatsApp Group';
+    let thumb = null;
+    try {
+        const meta = await conn.groupMetadata(from);
+        if (meta && meta.subject) groupName = meta.subject;
+    } catch (e) {}
+    try {
+        const picUrl = await conn.profilePictureUrl(from, 'image');
+        if (picUrl) {
+            const res = await fetch(picUrl, { signal: AbortSignal.timeout(8000) });
+            if (res.ok) thumb = Buffer.from(await res.arrayBuffer());
+        }
+    } catch (e) {}
+    const adReply = {
+        title: groupName,
+        body: 'Group chat invite',
+        sourceUrl: inviteUrl,
+        mediaType: 1,
+        renderLargerThumbnail: true,
+        showAdAttribution: false
+    };
+    if (thumb) adReply.thumbnail = thumb;
+    await conn.sendMessage(from, {
+        text: `${header}\n${inviteUrl}`,
+        contextInfo: { externalAdReply: adReply }
+    }, { quoted: mek });
+}
+
 // ==================== KICK INACTIVE MEMBERS ====================
 // 🆕 (Ahmad: "group management mein naya command chahiye") — kicks members
 // who haven't sent a message in this group for N days. Uses activity data
@@ -177,7 +212,7 @@ cmd({
         if (!isAdmins) return fail(reply, "Only group admins can use this.");
         if (!isBotAdmins) return fail(reply, "Bot needs to be admin for this.");
         const code = await conn.groupInviteCode(from);
-        reply(`🔗 ${toSansBold('Invite link:')} https://chat.whatsapp.com/${code}`);
+        await sendGroupInviteWithPreview(conn, from, mek, `🔗 ${toSansBold('Invite link:')}`);
     } catch (e) { fail(reply, "Failed. " + e.message); }
 });
 
@@ -199,8 +234,7 @@ cmd({
         if (!isAdmins) return fail(reply, "Only group admins can use this.");
         if (!isBotAdmins) return fail(reply, "Bot needs to be admin for this.");
         await conn.groupRevokeInvite(from);
-        const code = await conn.groupInviteCode(from);
-        reply(`✅ ${toSansBold('Link reset.')}\n🔗 https://chat.whatsapp.com/${code}`);
+        await sendGroupInviteWithPreview(conn, from, mek, `✅ ${toSansBold('Link reset.')}\n🔗`);
     } catch (e) { fail(reply, "Failed. " + e.message); }
 });
 
