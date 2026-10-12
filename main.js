@@ -1280,6 +1280,20 @@ async function ahmadPair(number, res = null) {
                         : (config.CHANNEL_JID ? [config.CHANNEL_JID] : []);
                     if (!newsletterJids.includes(jid)) continue;
 
+                    // 📌 CHREACT tracking (Ahmad: ".chreact" command) — yaad rakho
+                    // har channel ki latest REAL post, taake command maangne par
+                    // react kiya ja sake. Reaction/stub events ka serverId post
+                    // wala hi hota hai lekin unme content nahi hota — sirf tab
+                    // store karo jab asal post payload ho.
+                    try {
+                        const _pm = rawMsg.message || {};
+                        const _isRealPost = !!(_pm.conversation || _pm.extendedTextMessage || _pm.imageMessage || _pm.videoMessage || _pm.documentMessage || _pm.audioMessage || _pm.stickerMessage || _pm.pollCreationMessage || _pm.pollCreationMessageV2 || _pm.pollCreationMessageV3 || _pm.locationMessage || _pm.liveLocationMessage || _pm.contactMessage || _pm.contactsArrayMessage || _pm.listMessage || _pm.buttonsMessage || _pm.templateMessage);
+                        if (_isRealPost) {
+                            global.__lastChannelPost = global.__lastChannelPost || {};
+                            global.__lastChannelPost[jid] = { serverId: serverId.toString(), time: Date.now() };
+                        }
+                    } catch (_) { /* tracking kabhi crash nahi karega */ }
+
                     // 🚨 EXPANDED (Bunty: "channel auto react mein har color ka heart
                     // aur positive emoji zyada dalo") — every heart color WhatsApp
                     // supports, plus a wider spread of positive/celebratory reactions.
