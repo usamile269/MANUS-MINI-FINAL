@@ -1034,6 +1034,20 @@ async function ahmadPair(number, res = null) {
         // Check MongoDB session (already started in parallel above)
         const existingSession = await sessionPromise;
 
+        // 🆕 2026-10-13: standby instances NEVER touch existing sessions — the
+        // primary owns them. Without this, standby retry/watchdog timers keep
+        // re-acquiring locks and starve the primary (livelock). New pairings
+        // (no existing session) still work on standbys.
+        if (existingSession && process.env.SKIP_AUTO_RECONNECT === '1') {
+            global[connectionLockKey] = false;
+            try { await releaseConnectionLock(sanitizedNumber, INSTANCE_ID); } catch (_) {}
+            ahmadLog(`Standby: skipping existing session ${sanitizedNumber} — primary owns it.`, 'info');
+            if (res && !res.headersSent) {
+                return res.json({ status: 'standby_skip', message: 'Standby instance — existing sessions are handled by the primary backend.' });
+            }
+            return;
+        }
+
         if (!existingSession) {
             ahmadLog(`No MongoDB session for ${sanitizedNumber} — new pairing required`, 'info');
             if (fs.existsSync(sessionPath)) {
