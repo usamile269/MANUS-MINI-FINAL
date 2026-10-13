@@ -70,6 +70,28 @@ cmd({
 });
 
 // ============================================================
+// SETBADWORDS — .setbadwords word1, word2, word3 (bulk set)
+// ============================================================
+cmd({
+    pattern: "setbadwords",
+    alias: ["setbadword", "bulkbadwords"],
+    desc: "Set multiple banned words at once (comma separated)",
+    category: "group",
+    react: "🚫"
+}, async (conn, mek, m, { from, isGroup, isAdmins, isOwner, q, reply }) => {
+    if (!isGroup) return reply("❌ This command only works in groups.");
+    if (!isAdmins && !isOwner) return reply("❌ Only group admins can use this command.");
+    if (!q) return reply("❌ Usage: .setbadwords word1, word2, word3");
+    const words = q.split(',').map(w => w.trim().toLowerCase()).filter(w => w.length > 0);
+    if (!words.length) return reply("❌ No valid words found.");
+    const settings = await getGroupSettings(from);
+    const badwords = [...new Set([...(settings.badwords || []), ...words])];
+    await setGroupSettings(from, { badwords });
+    groupExtraCache.invalidate(from);
+    reply(`✅ Added ${words.length} words to the banned list (${badwords.length} total).` + FOOTER());
+});
+
+// ============================================================
 // SLOWMODE — .slowmode <seconds|off>
 // ============================================================
 cmd({
