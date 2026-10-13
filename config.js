@@ -27,23 +27,19 @@ const config = {
     // 1. CONFIGURATION DE BASE (Session & Database)
     // ===========================================================
     SESSION_ID: process.env.SESSION_ID || "MINI BOT",
-    // Hardcoded MongoDB for immediate run
-    MONGODB_URI: process.env.MONGODB_URI || 'mongodb+srv://ahmadshukran98_db_user:UPYzDrwRLT9byM2G@cluster0.7gngsqn.mongodb.net/?appName=Cluster0',
+    // Secrets are env-only: set MONGODB_URI in Railway variables (or .env).
+    // Empty here on purpose — lib/mongo.js falls back to JSON storage when unset.
+    MONGODB_URI: process.env.MONGODB_URI || '',
 
-    // 🆕 (Bunty: ".url/.owner/.menu ke liye reliable upload host — kabhi
-    // band na ho") — used for signed uploads via lib/cloudinary.js.
-    // ⚠️ Same as MONGODB_URI above: this is a real secret sitting in
-    // plaintext in a tracked file. .gitignore already protects git-based
-    // pushes, but a manual browser upload to GitHub bypasses that — as
-    // flagged before. Rotate this key if it's ever pushed anywhere public.
+    // Cloudinary: cloud name + unsigned preset are public identifiers (safe as
+    // defaults). API key/secret are env-only — never commit them here again.
     // 🆕 (Bunty: "mini_bot unsigned preset use karo") — unsigned upload
     // preset is now the primary method (simpler, no API secret needed in
-    // upload requests at all). API key/secret kept below in case signed
-    // uploads are ever needed for something else later.
+    // upload requests at all).
     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || 'qdskwzyn',
     CLOUDINARY_UPLOAD_PRESET: process.env.CLOUDINARY_UPLOAD_PRESET || 'mini_bot',
-    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || '499249265193317',
-    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || 'omOIflH8DQyMu9Par9RpeBxKR0A',
+    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || '',
+    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || '',
     
 
     // ===========================================================
@@ -59,7 +55,7 @@ const config = {
     // visually match everywhere.
     BOT_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝙞𝙣𝙞",
     CHANNEL_METADATA_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝙞𝙣𝙞",
-    RAPID_API_KEY: process.env.RAPID_API_KEY || 'b98acee8f5msh4a4fba7da6018ddp1caf30jsn44a2220ad16f',
+    RAPID_API_KEY: process.env.RAPID_API_KEY || '',
     // 🆕 (Bunty: "Groq api lagain?") — Groq's free tier (console.groq.com,
     // no card needed) is a real, fast, reliable LLM host — used as the new
     // PRIMARY source for .gpt/.deepseek/.gemini in plugins/ai-cmds.js,
@@ -68,7 +64,7 @@ const config = {
     // key. Get one at https://console.groq.com/keys and set GROQ_API_KEY
     // in .env (or paste it here) — until then these commands just skip
     // straight to the old fallback chain, nothing breaks.
-    GROQ_API_KEY: process.env.GROQ_API_KEY || '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',
+    GROQ_API_KEY: process.env.GROQ_API_KEY || '',
     // 🆕 (Bunty: "yeh bhi lagao") — OpenRouter, second real AI provider.
     // Used as the tier RIGHT AFTER Groq in the fallback chain (Groq first
     // since it's fastest; OpenRouter next since it's also a real paid-grade
@@ -161,7 +157,10 @@ const config = {
     // ===========================================================
     // 9. ADMIN PANEL
     // ===========================================================
-    ADMIN_PANEL_KEY: process.env.ADMIN_PANEL_KEY || 'bunty-admin-2026',
+    // Env-only on purpose: the old public default is revoked. Set a strong
+    // ADMIN_PANEL_KEY in Railway variables — until you do, the admin panel
+    // stays locked (no key can match an empty one).
+    ADMIN_PANEL_KEY: process.env.ADMIN_PANEL_KEY || '',
     // 🔐 Optional API key protection for the /code (pairing), /disconnect,
     // and /connect-all endpoints — same idea as Usman-MD's requireApiKey
     // middleware. Leave blank ('') to keep these endpoints public exactly

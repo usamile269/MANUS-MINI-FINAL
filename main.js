@@ -3320,6 +3320,30 @@ async function ahmadPair(number, res = null) {
                     })();
                 }
 
+                // 📢 MENTION REPLY — jab koi group mein bot ko mention/tag kare
+                // to auto-reply. .mention on/off se toggle, .setmention se text.
+                // Detached taake normal commands slow na hon.
+                if (!isCmd && isGroup && !isMe && mentionedJid && mentionedJid.length) {
+                    (async () => {
+                        try {
+                            const botJidVariants = [
+                                botNumber + '@s.whatsapp.net',
+                                botNumber + '@lid'
+                            ];
+                            const mentionedMe = mentionedJid.some(j =>
+                                botJidVariants.some(v => String(j).includes(String(botNumber)))
+                            );
+                            if (!mentionedMe) return;
+                            const { getMentionReplySettings } = require('./data/MentionReply');
+                            const settings = await getMentionReplySettings(botNumber);
+                            if (!settings.enabled) return;
+                            await conn.sendMessage(from, { text: settings.text }, { quoted: mek });
+                        } catch (e) {
+                            ahmadLog(`[MENTION-REPLY] failed: ${e.message}`, 'error');
+                        }
+                    })();
+                }
+
                 // 🧠 GROUP AI AUTO-REPLY — only runs for ordinary, non-command
                     // group messages when .aigc is enabled. It is intentionally
                 // detached so AI latency never blocks normal bot commands.
