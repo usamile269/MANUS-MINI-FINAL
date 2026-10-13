@@ -32,6 +32,16 @@ const categories = [
     { pattern: 'aesthetic', query: 'aesthetic wallpaper HD', desc: 'Aesthetic HD pics', emoji: '🌸' },
     { pattern: 'girls', query: 'stylish girl aesthetic HD', desc: 'Girls HD pics', emoji: '👧' },
     { pattern: 'islamic', query: 'islamic mosque beautiful HD', desc: 'Islamic HD pics', emoji: '🕌' },
+    // 🆕 2026-10-13: Girls/Boys DP set (Mazari-MD parity)
+    { pattern: 'girldp', query: 'beautiful girl dp profile picture HD', desc: 'Girl DP HD pics', emoji: '👩' },
+    { pattern: 'boydp', query: 'handsome boy dp profile picture HD', desc: 'Boy DP HD pics', emoji: '👦' },
+    { pattern: 'girlavatar', query: 'girl avatar cute HD', desc: 'Girl avatar HD pics', emoji: '👧' },
+    { pattern: 'girlportrait', query: 'girl portrait photography HD', desc: 'Girl portrait HD pics', emoji: '📸' },
+    { pattern: 'girlaesthetic', query: 'girl aesthetic wallpaper HD', desc: 'Girl aesthetic HD pics', emoji: '🌷' },
+    { pattern: 'boyattitude', query: 'boy attitude dp HD', desc: 'Boy attitude HD pics', emoji: '😈' },
+    { pattern: 'girlwallpaper', query: 'girl wallpaper HD mobile', desc: 'Girl wallpaper HD', emoji: '🖼️' },
+    { pattern: 'boywallpaper', query: 'boy wallpaper HD mobile', desc: 'Boy wallpaper HD', emoji: '🖼️' },
+    { pattern: 'girlfashion', query: 'girl fashion style HD', desc: 'Girl fashion HD pics', emoji: '💃' },
 ];
 
 for (const cat of categories) {
@@ -52,4 +62,4 @@ for (const cat of categories) {
     });
 }
 
-console.log('[HD-PICS] loaded: attitude, aesthetic, girls, islamic');
+console.log('[HD-PICS] loaded: attitude, aesthetic, girls, islamic, girldp, boydp, girlavatar, girlportrait, girlaesthetic, boyattitude, girlwallpaper, boywallpaper, girlfashion');
