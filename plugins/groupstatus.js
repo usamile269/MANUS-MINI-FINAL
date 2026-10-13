@@ -84,6 +84,32 @@ async function buildInvitePreview(conn, inviteUrl, fallbackJid) {
     return ad;
 }
 
+// 🆕 (Ahmad: "Mazari ke gcstatus me pic ati hai, description bhi, hamare q nahi")
+// Builds an ad-reply carrying THIS group's pic + name + description, so
+// .gcstatus media posts show the group card like Mazari's version.
+async function buildGroupAdReply(conn, groupJid) {
+    let title = 'GC STATUS';
+    let body = '';
+    let thumb = null;
+    try {
+        const meta = await conn.groupMetadata(groupJid);
+        if (meta) {
+            if (meta.subject) title = meta.subject;
+            if (meta.desc) body = String(meta.desc).slice(0, 100);
+        }
+    } catch (e) {}
+    try {
+        const picUrl = await conn.profilePictureUrl(groupJid, 'image');
+        if (picUrl) {
+            const res = await fetch(picUrl, { signal: AbortSignal.timeout(8000) });
+            if (res.ok) thumb = Buffer.from(await res.arrayBuffer());
+        }
+    } catch (e) {}
+    const ad = { title, body, mediaType: 1, renderLargerThumbnail: true, showAdAttribution: false };
+    if (thumb) ad.thumbnail = thumb;
+    return ad;
+}
+
 async function relayGroupStatusV2(conn, jid, msgContent) {
     const messageSecret = crypto.randomBytes(32);
     let msg;
@@ -211,15 +237,21 @@ cmd({
             // not our encoding. Real media is still sent right after either
             // way, so nothing is lost if it's still black.
             if (quoted.imageMessage.jpegThumbnail) {
+                // 🐛 FIX: externalAdReplyInfo is NOT a real Baileys field —
+                // correct name is externalAdReply (was silently dropped before).
+                // 🆕 Also attach group pic + description like Mazari's version.
+                const grpAd = await buildGroupAdReply(conn, from);
                 await relayGroupStatusV2(conn, from, {
                     text: imgCaption || ' ',
                     contextInfo: {
-                        externalAdReplyInfo: {
-                            title: 'GC STATUS',
+                        externalAdReply: {
+                            title: grpAd.title || 'GC STATUS',
+                            body: grpAd.body || '',
                             thumbnail: quoted.imageMessage.jpegThumbnail,
                             mediaType: 1,
                             renderLargerThumbnail: true,
-                            showAdAttribution: false
+                            showAdAttribution: false,
+                            sourceUrl: grpAd.sourceUrl
                         }
                     }
                 }).catch(() => {});
@@ -248,15 +280,19 @@ cmd({
             const media = await downloadQuotedMedia(quoted, 'videoMessage');
             const vidCaption = caption || quoted.videoMessage.caption || '';
             if (quoted.videoMessage.jpegThumbnail) {
+                // 🐛 FIX: externalAdReply (not externalAdReplyInfo) + group pic/desc.
+                const grpAdV = await buildGroupAdReply(conn, from);
                 await relayGroupStatusV2(conn, from, {
                     text: vidCaption || ' ',
                     contextInfo: {
-                        externalAdReplyInfo: {
-                            title: 'GC STATUS',
+                        externalAdReply: {
+                            title: grpAdV.title || 'GC STATUS',
+                            body: grpAdV.body || '',
                             thumbnail: quoted.videoMessage.jpegThumbnail,
                             mediaType: 2,
                             renderLargerThumbnail: true,
-                            showAdAttribution: false
+                            showAdAttribution: false,
+                            sourceUrl: grpAdV.sourceUrl
                         }
                     }
                 }).catch(() => {});
