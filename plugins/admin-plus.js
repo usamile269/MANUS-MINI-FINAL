@@ -94,7 +94,7 @@ async (conn, mek, m, { from, isGroup, isAdmins, isOwner, args, reply }) => {
 });
 
 // 4. antiword
-cmd({ pattern: 'antiword', alias: ['badwordfilter', 'wordfilter'], desc: 'Toggle bad word filter', category: 'group', react: '🚫' },
+cmd({ pattern: 'antiword', alias: ['badwordfilter', 'wordfilter', 'antibad'], desc: 'Toggle bad word filter', category: 'group', react: '🚫' },
 async (conn, mek, m, { from, isGroup, isAdmins, args, reply }) => {
     if (!isGroup) return reply('❌ Groups only');
     if (!isAdmins) return reply('❌ Admins only');
