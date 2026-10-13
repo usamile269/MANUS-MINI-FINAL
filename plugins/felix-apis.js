@@ -420,13 +420,16 @@ cmd({
         await conn.sendMessage(from, { react: { text: "🤖", key: m.key } });
 
         const prompt = `Be friendly, helpful, and knowledgeable — answer thoroughly. Always reply in the SAME language and script the user wrote in (English, Roman Urdu, or Urdu script).\n\nUser: ${query}`;
-        try {
-            const answer = await smartAI(prompt);
-            return reply(plainAIResponse(answer));
-        } catch (e) {
-            console.log('[AI] shared race failed, using direct verified Groq fallback:', e.message);
+        // 🆕 2026-10-13: triple-layer fallback (same as .gpt) — smartAI, then
+        // Pollinations, then Pollinations once more. No more "Error found".
+        let answer = null;
+        try { answer = await smartAI(prompt); } catch (e) { console.log('[AI] smartAI failed:', e.message); }
+        if (!answer || looksLikeErrorPayload(answer)) {
+            try { answer = await pollinationsReply(prompt); } catch (e) { console.log('[AI] pollinations 1 failed:', e.message); }
         }
-        const answer = await pollinationsReply(prompt);
+        if (!answer || looksLikeErrorPayload(answer)) {
+            try { answer = await pollinationsReply(`Answer briefly: ${query}`); } catch (e) { console.log('[AI] pollinations 2 failed:', e.message); }
+        }
         if (!answer || looksLikeErrorPayload(answer)) throw new Error('AI failed to respond');
         return reply(plainAIResponse(answer));
     } catch (e) {
