@@ -3888,7 +3888,15 @@ async function autoReconnectFromMongoDB() {
 setTimeout(() => {
     // 🆕 P2 FLEET: WORKER_ID set => claim-only worker mode (connects ONLY
     // sessions assigned to this worker). Unset => legacy mode, unchanged.
+    // 🆕 2026-10-13: SKIP_AUTO_RECONNECT=1 => standby instance. Skips the boot
+    // auto-reconnect so multiple instances on one host don't livelock over
+    // the same sessions via connection locks. Standby instances still serve
+    // /code for NEW pairings (lock is free for new numbers) and the primary
+    // (no flag) owns existing sessions.
     if (process.env.WORKER_ID) { workerBoot(); }
+    else if (process.env.SKIP_AUTO_RECONNECT === '1') {
+        ahmadLog('SKIP_AUTO_RECONNECT=1 — standby mode: skipping boot auto-reconnect.', 'info');
+    }
     else { autoReconnectFromMongoDB(); }
 }, 3000);
 
