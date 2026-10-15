@@ -52,7 +52,7 @@ function saveToHistory(from, q, answer) {
 cmd({ pattern: 'gpt', alias: ['chatgpt'], desc: 'Chat with GPT AI (remembers recent context, replies in your language)', category: 'ai', react: '🤖' },
 async (conn, mek, m, { reply, args, quoted, from }) => {
     const q = args.join(' ') || quoted?.text;
-    if (!q) return reply(`❌ Istemal: .gpt <apna sawal>\n📝 Misal: .gpt AI kya hai?`);
+    if (!q) return reply(`❌ Usage: .gpt <your question>\n📝 Example: .gpt What is AI?`);
 
     // Identity questions ("who is Ahmad/Bunty") are answered directly —
     // guaranteed correct, not dependent on a free AI proxy following
@@ -87,7 +87,7 @@ async (conn, mek, m, { reply, args, quoted, from }) => {
             return reply(aiReply('GPT', answer));
         } catch {}
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-        reply('❌ GPT kaam nahi kar raha, dobara try karo!');
+        reply('❌ GPT failed, try again!');
     }
 });
 
@@ -121,7 +121,7 @@ async (conn, mek, m, { reply, args, quoted, from }) => {
             }
         } catch {}
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-        reply('❌ DeepSeek kaam nahi kar raha, dobara try karo!');
+        reply('❌ DeepSeek failed, try again!');
     }
 });
 
@@ -155,7 +155,7 @@ async (conn, mek, m, { reply, args, quoted, from }) => {
             }
         } catch {}
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-        reply('❌ Gemini kaam nahi kar raha, dobara try karo!');
+        reply('❌ Gemini failed, try again!');
     }
 });
 
