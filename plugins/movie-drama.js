@@ -273,35 +273,6 @@ async function resolveDramaClip(query) {
 }
 
 cmd({
-    pattern: "movie",
-    desc: "Look up a movie — summary, poster (tries multiple sources)",
-    category: "tools",
-    use: ".movie Inception",
-    filename: __filename
-}, async (conn, mek, m, { from, q, reply }) => {
-    if (!q) return reply(renderError('Usage: .movie <movie name>'));
-    try {
-        await conn.sendMessage(from, { react: { text: '🎬', key: mek.key } });
-        const result = await runFallbackChain('MOVIE', [
-            { name: 'Wiki (film)', run: () => wikiSummaryFor(`${q} film`) },
-            { name: 'Wiki (movie)', run: () => wikiSummaryFor(`${q} movie`) },
-            { name: 'Wiki (plain)', run: () => wikiSummaryFor(q) },
-            { name: 'TVMaze (fallback)', run: () => tvmazeSingleFor(q) },
-        ]);
-        if (!result.ok) return reply(renderError(`Couldn't find anything for "${q}" — try a slightly different spelling.`));
-        await sendResult(conn, mek, m, from, reply, result.value, 'Movie');
-    } catch (e) {
-        console.log('[MOVIE] error:', e.message);
-        reply(renderError("Couldn't fetch that movie right now, try again shortly."));
-    }
-});
-
-// 🔁 SWAPPED (Bunty: "drama cmd Aura MD ka lagao, Ahmad MD wala cut karo") —
-// the old TVMaze/Wikipedia series-lookup .drama above is replaced with
-// Aura MD's .drama, which downloads a short drama/story audio clip from
-// jawad-tech's API instead of returning a text/poster summary. Ported to
-// Ahmad's cmd() + renderError conventions.
-cmd({
     pattern: "drama",
     desc: "Download a short drama/story audio clip",
     category: "tools",
