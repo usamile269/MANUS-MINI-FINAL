@@ -98,13 +98,20 @@ async function relayGroupStatusV2(conn, jid, msgContent) {
     const inner = prepared[innerKey] || {};
     inner.contextInfo = { ...(inner.contextInfo || {}), isGroupStatus: true };
     prepared[innerKey] = inner;
+    // Deep-research finding (2026-10-15): the envelope must contain NO inner
+    // messageContextInfo — a random secret there makes WhatsApp silently drop
+    // MEDIA (it tries to verify with it and fails); text is unaffected.
+    // Pre-setting the OUTER secret also makes the Baileys patch skip its own
+    // injection (which would otherwise add the harmful inner secret).
+    delete prepared.messageContextInfo;
+    const mediatype = innerKey === 'imageMessage' ? 'image'
+      : innerKey === 'videoMessage' ? 'video'
+      : innerKey === 'audioMessage' ? 'audio' : 'sticker';
     const relayMsg = {
-      groupStatusMessageV2: {
-        message: prepared,
-        messageContextInfo: { messageSecret }
-      }
+      messageContextInfo: { messageSecret },
+      groupStatusMessageV2: { message: prepared }
     };
-    return conn.relayMessage(jid, relayMsg, { additionalAttributes: { type: 'media' } });
+    return conn.relayMessage(jid, relayMsg, { additionalAttributes: { type: 'media', mediatype } });
   }
 
   // TEXT
