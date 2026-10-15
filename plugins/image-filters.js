@@ -60,7 +60,7 @@ for (const f of FILTERS) {
         } catch (e) {
             console.log(`[${f.pattern.toUpperCase()}] failed:`, e.message);
             await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-            reply('❌ Image process nahi ho saki, dobara try karo.');
+            reply('❌ Image process nahi ho saki, try again.');
         } finally {
             try { fs.unlinkSync(inPath); } catch {}
             try { fs.unlinkSync(outPath); } catch {}

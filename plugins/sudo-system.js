@@ -71,14 +71,14 @@ cmd({
     const metadata = await conn.groupMetadata(from);
     const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
     const admins = metadata.participants.filter((p) => p.admin && p.id !== botJid).map((p) => p.id);
-    if (!admins.length) return reply('ℹ️ Koi aur admin nahi hai demote karne ke liye.');
+    if (!admins.length) return reply('ℹ️ Koi aur admin nahi hai demote karne for.');
 
     try {
         await conn.groupParticipantsUpdate(from, admins, 'demote');
         reply(`✅ ${admins.length} admin(s) demote kar diye.`);
     } catch (e) {
         console.log('[DEMOTEALL] failed:', e.message);
-        reply('❌ Demote fail ho gaya, dobara try karo.');
+        reply('❌ Demote fail done, try again.');
     }
 });
 
