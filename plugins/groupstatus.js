@@ -88,8 +88,18 @@ async function relayGroupStatusV2(conn, jid, msgContent) {
     } else {
       mediaInput = { sticker: msgContent.sticker };
     }
+    // Mirror the WORKING text path: build the full wrapper explicitly with
+    // messageSecret at the groupStatusMessageV2 level (the patch-package
+    // patch then also ensures outer + inner messageContextInfo secrets).
+    const messageSecret = crypto.randomBytes(32);
     const prepared = await prepareWAMessageMedia(mediaInput, { upload: conn.waUploadToServer });
-    return conn.relayMessage(jid, { groupStatusMessageV2: { message: prepared } });
+    const relayMsg = {
+      groupStatusMessageV2: {
+        message: prepared,
+        messageContextInfo: { messageSecret }
+      }
+    };
+    return conn.relayMessage(jid, relayMsg);
   }
 
   // TEXT: manual relay (already working — green-ring status).
@@ -164,7 +174,7 @@ cmd({
     if (quoted.imageMessage) {
       const media = await downloadQuotedMedia(quoted, 'imageMessage');
       const imgCaption = caption || quoted.imageMessage.caption || '';
-      await relayGroupStatusV2(conn, from, { image: media, caption: imgCaption }).catch(() => {});
+      await relayGroupStatusV2(conn, from, { image: media, caption: imgCaption }).catch(e => console.log('GROUPSTATUS MEDIA RELAY ERROR:', e?.message || e));
       // Also post to bot's own status (backup - supports images properly)
       try {
         await conn.sendMessage('status@broadcast', { image: media, caption: imgCaption });
@@ -188,7 +198,7 @@ cmd({
     if (quoted.videoMessage) {
       const media = await downloadQuotedMedia(quoted, 'videoMessage');
       const vidCaption = caption || quoted.videoMessage.caption || '';
-      await relayGroupStatusV2(conn, from, { video: media, caption: vidCaption, mimetype: 'video/mp4' }).catch(() => {});
+      await relayGroupStatusV2(conn, from, { video: media, caption: vidCaption, mimetype: 'video/mp4' }).catch(e => console.log('GROUPSTATUS MEDIA RELAY ERROR:', e?.message || e));
       let vidCtx = {};
       const vidInvite = extractInviteLink(vidCaption);
       if (vidInvite) {
