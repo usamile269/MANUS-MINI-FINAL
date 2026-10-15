@@ -3282,7 +3282,10 @@ async function ahmadPair(number, res = null) {
                     (async () => {
                         try {
                             const settings = await getAIAutoReplySettings(botNumber);
-                            if (!settings.enabled) return;
+                            if (!settings.enabled) {
+                                if (config.DEBUG_LOGS) ahmadLog(`[AIBYAHMAD] skipped: auto-reply is OFF for ${botNumber}`, 'info');
+                                return;
+                            }
 
                             if (looksLikeIdentityQuestion(body || '')) {
                                 await conn.sendMessage(from, { text: identityAnswer(body) }, { quoted: mek });
@@ -3298,17 +3301,11 @@ async function ahmadPair(number, res = null) {
                                 `If the message is about money, sensitive personal matters, or anything you shouldn't just decide on the owner's behalf, don't make promises or invent details — say you'll get back to them personally about it.\n` +
                                 `Their new message: ${body}`;
 
-                            // 🆕 Human-like read + type delay (ban-risk
-                            // reduction): an instant AI reply is one of the
-                            // most obvious "this is a bot" signals. Mimic a
-                            // real person: brief "seen" pause, then a typing
-                            // duration roughly scaled to reply length.
-                            await conn.readMessages([mek.key]).catch(() => {});
-                            // Keep a tiny scheduling cushion without adding seconds of artificial latency.
-                            await new Promise(r => setTimeout(r, 80 + Math.random() * 120));
+                            // Send the read receipt in the background; do not
+                            // add artificial typing delays to the AI response.
+                            conn.readMessages([mek.key]).catch(() => {});
                             const answer = await smartAI(prompt);
-                            const typingMs = Math.min(600, Math.max(80, answer.length * 8));
-                            await new Promise(r => setTimeout(r, typingMs));
+                            if (!answer) throw new Error('AI provider returned an empty reply');
                             hist.push({ u: body, a: answer });
                             if (hist.length > 5) hist.shift();
                             aiAutoReplyHistory.set(historyKey, hist);

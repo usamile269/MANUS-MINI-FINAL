@@ -18,15 +18,16 @@ const settingsCache = new Map(); // botNumber -> { settings, ts }
 const CACHE_TTL_MS = 15000;
 
 async function getAIAutoReplySettings(botNumber) {
+    const cached = settingsCache.get(botNumber);
     try {
-        const cached = settingsCache.get(botNumber);
-        if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS) return cached.settings;
+        if (cached && (!cached.persisted || (Date.now() - cached.ts) < CACHE_TTL_MS)) return cached.settings;
         const doc = await AIAutoReply.findOne({ botNumber });
         const result = { ...DEFAULTS, ...(doc ? doc.toObject() : {}) };
-        settingsCache.set(botNumber, { settings: result, ts: Date.now() });
+        settingsCache.set(botNumber, { settings: result, ts: Date.now(), persisted: true });
         return result;
     } catch (e) {
-        return { ...DEFAULTS };
+        // Keep the last known toggle usable during a transient storage outage.
+        return cached?.settings || { ...DEFAULTS };
     }
 }
 
@@ -34,10 +35,16 @@ async function setAIAutoReplySettings(botNumber, update) {
     try {
         await AIAutoReply.findOneAndUpdate({ botNumber }, update, { upsert: true, new: true });
         const cached = settingsCache.get(botNumber);
-        settingsCache.set(botNumber, { settings: { ...DEFAULTS, ...(cached ? cached.settings : {}), ...update }, ts: Date.now() });
+        settingsCache.set(botNumber, { settings: { ...DEFAULTS, ...(cached ? cached.settings : {}), ...update }, ts: Date.now(), persisted: true });
         return true;
     } catch (e) {
-        console.error('AIAutoReply save error:', e.message);
+        const cached = settingsCache.get(botNumber);
+        settingsCache.set(botNumber, {
+            settings: { ...DEFAULTS, ...(cached ? cached.settings : {}), ...update },
+            ts: Date.now(),
+            persisted: false
+        });
+        console.error('[AIAutoReply] Save failed; using in-memory setting until restart:', e.message);
         return false;
     }
 }

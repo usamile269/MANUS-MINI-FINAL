@@ -25,7 +25,7 @@ async function safeGet(path, params, timeout = 20000) {
 cmd({
     pattern: "gptlogic",
     alias: ["aichat2"],
-    desc: "🤖 AI chat (gptlogic model)",
+    desc: "🤖 AI chat (fast shared provider)",
     category: "ai",
     use: ".gptlogic <question>",
     filename: __filename
@@ -33,8 +33,8 @@ cmd({
     const q = args.join(' ').trim();
     if (!q) return reply(renderError('Give me something to ask. Use: .gptlogic <question>'));
     try {
-        const data = await safeGet('/gptlogic', { q, prompt: 'be friendly' });
-        reply(`${data?.response || 'No response.'}\n\n> ${randomFooter()}`);
+        const answer = await smartAI(q);
+        reply(`${answer || 'No response.'}\n\n> ${randomFooter()}`);
     } catch (e) {
         reply(renderError('AI request failed. Try again later.'));
     }
@@ -42,7 +42,7 @@ cmd({
 
 cmd({
     pattern: "copilot",
-    desc: "🤖 AI chat (Copilot model)",
+    desc: "🤖 AI chat (fast shared provider)",
     category: "ai",
     use: ".copilot <question>",
     filename: __filename
@@ -50,8 +50,8 @@ cmd({
     const q = args.join(' ').trim();
     if (!q) return reply(renderError('Give me something to ask. Use: .copilot <question>'));
     try {
-        const data = await safeGet('/copilot', { text: q });
-        reply(`${data?.results?.text || 'No response.'}\n\n> ${randomFooter()}`);
+        const answer = await smartAI(q);
+        reply(`${answer || 'No response.'}\n\n> ${randomFooter()}`);
     } catch (e) {
         reply(renderError('AI request failed. Try again later.'));
     }
@@ -59,7 +59,7 @@ cmd({
 
 cmd({
     pattern: "qwen",
-    desc: "🤖 AI chat (Qwen model)",
+    desc: "🤖 AI chat (fast shared provider)",
     category: "ai",
     use: ".qwen <question>",
     filename: __filename
@@ -67,12 +67,8 @@ cmd({
     const q = args.join(' ').trim();
     if (!q) return reply(renderError('Give me something to ask. Use: .qwen <question>'));
     try {
-        const data = await safeGet('/qwen', { q });
-        // 🚨 FIX: this model's raw response includes its own internal
-        // <think>...</think> reasoning block before the real answer —
-        // confirmed during testing. Strip it so only the actual reply shows.
-        const cleaned = String(data?.response || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-        reply(`${cleaned || 'No response.'}\n\n> ${randomFooter()}`);
+        const answer = await smartAI(q);
+        reply(`${answer || 'No response.'}\n\n> ${randomFooter()}`);
     } catch (e) {
         reply(renderError('AI request failed. Try again later.'));
     }
@@ -81,7 +77,7 @@ cmd({
 cmd({
     pattern: "llamameta",
     alias: ["llama"],
-    desc: "🤖 AI chat (Llama 3.1 model)",
+    desc: "🤖 AI chat (fast shared provider)",
     category: "ai",
     use: ".llamameta <question>",
     filename: __filename
@@ -89,8 +85,8 @@ cmd({
     const q = args.join(' ').trim();
     if (!q) return reply(renderError('Give me something to ask. Use: .llamameta <question>'));
     try {
-        const data = await safeGet('/llama-meta', { q });
-        reply(`${data?.response || 'No response.'}\n\n> ${randomFooter()}`);
+        const answer = await smartAI(q);
+        reply(`${answer || 'No response.'}\n\n> ${randomFooter()}`);
     } catch (e) {
         reply(renderError('AI request failed. Try again later.'));
     }
@@ -98,7 +94,7 @@ cmd({
 
 cmd({
     pattern: "gpt5",
-    desc: "🤖 AI chat (GPT-5 model)",
+    desc: "🤖 AI chat (fast shared provider)",
     category: "ai",
     use: ".gpt5 <question>",
     filename: __filename

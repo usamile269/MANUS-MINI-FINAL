@@ -45,16 +45,19 @@ cmd({
     const s = await getAIAutoReplySettings(botNumber);
 
     if (sub === 'on') {
-        await setAIAutoReplySettings(botNumber, { enabled: true });
-        reply(box('AIBYAHMAD', ['✅ DM Auto-Reply: ON', '💬 Anyone who DMs you now gets a real AI reply, understood in context.']));
+        const saved = await setAIAutoReplySettings(botNumber, { enabled: true });
+        if (!saved) return reply(box('AIBYAHMAD', ['⚠️ DM Auto-Reply is ON for this running session, but storage failed.', 'It may turn OFF after a restart; check the bot logs/storage.']));
+        return reply(box('AIBYAHMAD', ['✅ DM Auto-Reply: ON', '💬 Replies to incoming personal DMs from other numbers.', 'ℹ️ Self-messages, groups, and commands are intentionally ignored.']));
 
     } else if (sub === 'off') {
-        await setAIAutoReplySettings(botNumber, { enabled: false });
-        reply(box('AIBYAHMAD', ['❌ DM Auto-Reply: OFF']));
+        const saved = await setAIAutoReplySettings(botNumber, { enabled: false });
+        if (!saved) return reply(box('AIBYAHMAD', ['⚠️ DM Auto-Reply is OFF for this running session, but storage failed.', 'The old saved setting may return after a restart.']));
+        return reply(box('AIBYAHMAD', ['❌ DM Auto-Reply: OFF']));
 
     } else {
         reply(box('AIBYAHMAD', [
             `Status: ${s.enabled ? '✅ ON' : '❌ OFF'}`,
+            'Replies only to personal DMs from other numbers (not self-chat/groups).',
             `──────────────`,
             `💡 .aibyahmad on`,
             `💡 .aibyahmad off`
@@ -92,4 +95,3 @@ cmd({
 });
 
 module.exports = {};
-

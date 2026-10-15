@@ -3,7 +3,7 @@ const axios = require('axios');
 const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
 const { looksLikeIdentityQuestion, identityAnswer } = require('../lib/ai-persona');
-const { smartAI, pollinationsReply, looksLikeErrorPayload } = require('../lib/ai-provider');
+const { smartAI } = require('../lib/ai-provider');
 const { plainAIResponse } = require('../lib/plain-ai-response');
 
 const BASE = "https://felix-rdx-unlimited-free-apis.vercel.app/api/v1/api";
@@ -420,17 +420,8 @@ cmd({
         await conn.sendMessage(from, { react: { text: "🤖", key: m.key } });
 
         const prompt = `Be friendly, helpful, and knowledgeable — answer thoroughly. Always reply in the SAME language and script the user wrote in (English, Roman Urdu, or Urdu script).\n\nUser: ${query}`;
-        // 🆕 2026-10-13: triple-layer fallback (same as .gpt) — smartAI, then
-        // Pollinations, then Pollinations once more. No more "Error found".
-        let answer = null;
-        try { answer = await smartAI(prompt); } catch (e) { console.log('[AI] smartAI failed:', e.message); }
-        if (!answer || looksLikeErrorPayload(answer)) {
-            try { answer = await pollinationsReply(prompt); } catch (e) { console.log('[AI] pollinations 1 failed:', e.message); }
-        }
-        if (!answer || looksLikeErrorPayload(answer)) {
-            try { answer = await pollinationsReply(`Answer briefly: ${query}`); } catch (e) { console.log('[AI] pollinations 2 failed:', e.message); }
-        }
-        if (!answer || looksLikeErrorPayload(answer)) throw new Error('AI failed to respond');
+        const answer = await smartAI(prompt);
+        if (!answer) throw new Error('AI provider returned an empty response');
         return reply(plainAIResponse(answer));
     } catch (e) {
         reply("❌ Error found. Please try later.");

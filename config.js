@@ -56,19 +56,10 @@ const config = {
     BOT_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝙞𝙣𝙞",
     CHANNEL_METADATA_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝙞𝙣𝙞",
     RAPID_API_KEY: process.env.RAPID_API_KEY || '',
-    // 🆕 (Bunty: "Groq api lagain?") — Groq's free tier (console.groq.com,
-    // no card needed) is a real, fast, reliable LLM host — used as the new
-    // PRIMARY source for .gpt/.deepseek/.gemini in plugins/ai-cmds.js,
-    // ahead of the old flaky personal workers.dev proxies (kept as
-    // fallback). No default value on purpose: this needs Bunty's own free
-    // key. Get one at https://console.groq.com/keys and set GROQ_API_KEY
-    // in .env (or paste it here) — until then these commands just skip
-    // straight to the old fallback chain, nothing breaks.
+    // Optional Groq acceleration. Text AI falls back to the public keyless
+    // Pollinations endpoint, so GROQ_API_KEY is not required in Railway.
     GROQ_API_KEY: process.env.GROQ_API_KEY || '',
-    // 🆕 (Bunty: "yeh bhi lagao") — OpenRouter, second real AI provider.
-    // Used as the tier RIGHT AFTER Groq in the fallback chain (Groq first
-    // since it's fastest; OpenRouter next since it's also a real paid-grade
-    // provider, ahead of the old flaky workers.dev proxies).
+    // Optional legacy credential; not required by the text AI command path.
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
     CHANNEL_JID: '120363415558267602@newsletter',
 
@@ -177,8 +168,6 @@ const config = {
 (function warnHardcodedSecrets() {
     const checks = [
         ['MONGODB_URI', !!process.env.MONGODB_URI],
-        ['GROQ_API_KEY', !!process.env.GROQ_API_KEY],
-        ['OPENROUTER_API_KEY', !!process.env.OPENROUTER_API_KEY],
         ['CLOUDINARY_API_KEY', !!process.env.CLOUDINARY_API_KEY],
         ['CLOUDINARY_API_SECRET', !!process.env.CLOUDINARY_API_SECRET],
         ['RAPID_API_KEY', !!process.env.RAPID_API_KEY],

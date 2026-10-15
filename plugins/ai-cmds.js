@@ -8,16 +8,7 @@ const { plainAIResponse } = require('../lib/plain-ai-response');
 
 const FOOTER = '> ' + randomFooter();
 
-// 🚨 FIX (2026-10-09): the old "fallback" just re-called groqReply() with the
-// SAME dead Groq key (401 Invalid API Key), so it was never a real fallback —
-// every AI command died here. Now uses the KEYLESS Pollinations fallback from
-// lib/ai-provider.js, which needs no API key at all.
-async function reliableAIFallback(q) {
-    // No fallback — Groq only (per Ahmad 2026-10-15)
-    throw new Error('Groq failed, no fallback');
-}
-// (Groq/OpenRouter chain now lives in lib/ai-provider.js — smartAI() below
-// tries both before anyone falls back to the old proxy chain here.)
+// smartAI() prefers optional Groq and falls back to Pollinations when needed.
 
 // Conversational AI answers stay natural plain text. Decorative layouts
 // remain available to utility/search commands elsewhere in this plugin.
@@ -48,7 +39,7 @@ function saveToHistory(from, q, answer) {
 }
 
 // 1. gpt / ai — flagship AI command
-cmd({ pattern: 'gpt', alias: ['chatgpt'], desc: 'Chat with GPT AI (remembers recent context, replies in your language)', category: 'ai', react: '🤖' },
+cmd({ pattern: 'gpt', alias: ['chatgpt'], desc: 'Fast AI chat (remembers recent context, replies in your language)', category: 'ai', react: '🤖' },
 async (conn, mek, m, { reply, args, quoted, from }) => {
     const q = args.join(' ') || quoted?.text;
     if (!q) return reply(`❌ Usage: .gpt <your question>\n📝 Example: .gpt What is AI?`);
@@ -63,35 +54,19 @@ async (conn, mek, m, { reply, args, quoted, from }) => {
     try {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const prompt = buildPromptWithMemory(from, q);
-        try {
-            const answer = await smartAI(prompt);
-            saveToHistory(from, q, answer);
-            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            return reply(aiReply('GPT', answer));
-        } catch (e) {
-            console.log('[GPT] Groq failed/skipped, trying old chain:', e.message);
-        }
-        // The old workers.dev GPT proxy is dead; use the proven no-key fallback directly.
-        const answer = await reliableAIFallback(prompt);
-        if (!answer) throw new Error('No reply');
+        const answer = await smartAI(prompt);
         saveToHistory(from, q, answer);
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-        reply(aiReply('GPT', answer));
-    } catch {
-        try {
-            const answer = await reliableAIFallback(withLanguageMatch(q));
-            if (!answer) throw new Error('No reply');
-            saveToHistory(from, q, answer);
-            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            return reply(aiReply('GPT', answer));
-        } catch {}
+        return reply(aiReply('GPT', answer));
+    } catch (e) {
+        console.warn('[GPT] AI request failed:', e.message);
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-        reply('❌ GPT failed, try again!');
+        return reply('❌ GPT service is busy; please try again shortly.');
     }
 });
 
 // 2. deepseek
-cmd({ pattern: 'deepseek', alias: ['ds'], desc: 'Chat with DeepSeek AI', category: 'ai', react: '🧠' },
+cmd({ pattern: 'deepseek', alias: ['ds'], desc: 'Fast AI chat', category: 'ai', react: '🧠' },
 async (conn, mek, m, { reply, args, quoted, from }) => {
     const q = args.join(' ') || quoted?.text;
     if (!q) return reply(`❌ Usage: .deepseek <your question>`);
@@ -99,33 +74,17 @@ async (conn, mek, m, { reply, args, quoted, from }) => {
     try {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const prompt = withLanguageMatch(q);
-        try {
-            const answer = await smartAI(prompt);
-            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            return reply(aiReply('DEEPSEEK AI', answer));
-        } catch (e) {
-            console.log('[DEEPSEEK] Groq failed, trying old chain:', e.message);
-        }
-        // The old workers.dev proxy is DNS-dead; use the keyless fallback directly.
-        throw new Error('Groq only');
-        if (!answer || looksLikeErrorPayload(answer)) throw new Error('No reply');
+        const answer = await smartAI(prompt);
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-        reply(aiReply('DEEPSEEK AI', answer));
+        return reply(aiReply('DEEPSEEK AI', answer));
     } catch {
-        try {
-            const answer = await reliableAIFallback(withLanguageMatch(q));
-            if (answer) {
-                await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-                return reply(aiReply('AI (Fallback)', answer));
-            }
-        } catch {}
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-        reply('❌ DeepSeek failed, try again!');
+        return reply('❌ DeepSeek service is busy; please try again shortly.');
     }
 });
 
 // 3. gemini
-cmd({ pattern: 'gemini', alias: ['gem', 'google-ai'], desc: 'Chat with Gemini AI', category: 'ai', react: '💫' },
+cmd({ pattern: 'gemini', alias: ['gem', 'google-ai'], desc: 'Fast AI chat', category: 'ai', react: '💫' },
 async (conn, mek, m, { reply, args, quoted, from }) => {
     const q = args.join(' ') || quoted?.text;
     if (!q) return reply(`❌ Usage: .gemini <your question>`);
@@ -133,28 +92,12 @@ async (conn, mek, m, { reply, args, quoted, from }) => {
     try {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const prompt = withLanguageMatch(q);
-        try {
-            const answer = await smartAI(prompt);
-            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-            return reply(aiReply('GEMINI 1.5', answer));
-        } catch (e) {
-            console.log('[GEMINI] Groq failed, trying old chain:', e.message);
-        }
-        // The old workers.dev Gemini proxy is dead; use the proven fallback directly.
-        const answer = await reliableAIFallback(prompt);
-        if (!answer) throw new Error('No reply');
+        const answer = await smartAI(prompt);
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-        reply(aiReply('GEMINI 1.5', answer));
+        return reply(aiReply('GEMINI 1.5', answer));
     } catch {
-        try {
-            const answer = await reliableAIFallback(withLanguageMatch(q));
-            if (answer) {
-                await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-                return reply(aiReply('AI (Fallback)', answer));
-            }
-        } catch {}
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-        reply('❌ Gemini failed, try again!');
+        return reply('❌ Gemini service is busy; please try again shortly.');
     }
 });
 

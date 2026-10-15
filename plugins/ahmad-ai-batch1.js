@@ -2,7 +2,7 @@ const { cmd } = require('../ahmad-core');
 const axios = require('axios');
 const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
-const { smartAI, pollinationsReply } = require('../lib/ai-provider');
+const { smartAI } = require('../lib/ai-provider');
 const { plainAIResponse } = require('../lib/plain-ai-response');
 
 // Conversational AI answers stay natural plain text.
@@ -10,21 +10,9 @@ function aiReply(_title, response) {
     return plainAIResponse(response);
 }
 
-// Shared AI caller — reuses the SAME endpoints already proven working in
-// ai-cmds.js (.gpt / .deepseek fallback chain), just with a custom prompt
-// template per command. No new/unverified API domains introduced, so this
-// rides on infrastructure that's already live and working for you.
-async function callAI(prompt) {
-    try {
-        return await smartAI(prompt);
-    } catch (e) {
-        console.log('[AI-BATCH1] Groq+OpenRouter failed, trying old chain:', e.message);
-    }
-    // smartAI() already ends with the keyless Pollinations fallback; this is
-    // the last resort if even that threw (kept for a clear error, not the
-    // old dead groqReply chain).
-    return await pollinationsReply(prompt);
-}
+// All batch commands use the shared fast provider path, including its
+// optional Groq and keyless Pollinations fallback behavior.
+async function callAI(prompt) { return smartAI(prompt); }
 
 function aiCmd(pattern, alias, desc, promptBuilder, emptyMsg) {
     cmd({ pattern, alias, desc, category: 'ai', react: '🤖', filename: __filename },
