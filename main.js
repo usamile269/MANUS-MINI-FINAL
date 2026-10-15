@@ -12,6 +12,7 @@ const {
     fetchLatestBaileysVersion,
 } = require('@whiskeysockets/baileys');
 const config = require('./config');
+const { normalizePairingNumber } = require('./lib/phone-number');
 const { recordPresence } = require('./lib/group-presence');
 // 🚀 GLOBAL SPEED BOOST (Bunty: "speed boost like rocket") — axios.defaults
 // is shared by EVERY file that does `require('axios')` across the whole
@@ -822,7 +823,8 @@ function setupAutoRestart(socket, number) {
             releaseConnectionLock(sanitizedNumber, INSTANCE_ID).catch(() => {});
 
             if (statusCode === 401 || (errorMessage && errorMessage.includes('401'))) {
-                ahmadLog(`Manual unlink detected for ${number}, cleaning up...`, 'warning');
+                const wasRegistered = !!socket.authState?.creds?.registered;
+                ahmadLog(`WhatsApp returned 401 for ${number} (creds.registered=${wasRegistered}); clearing this session.`, 'warning');
                 ahmadStores.delete(sanitizedNumber);
                 await deleteSessionFromMongoDB(sanitizedNumber);
                 await removeNumberFromMongoDB(sanitizedNumber);
@@ -956,9 +958,9 @@ function scheduleFullSessionBackup(sanitizedNumber, sessionPath) {
 
 async function ahmadPair(number, res = null) {
     let connectionLockKey;
-    // Accept common international input variants (`+`, spaces, dashes, or
-    // `00` prefix) but always pass Baileys digits-only country-code format.
-    const sanitizedNumber = String(number ?? '').replace(/\D/g, '').replace(/^00/, '');
+    // Canonicalize all pairing/session keys. Pakistan local mobile numbers
+    // (`03XXXXXXXXX`) and `92` + national trunk-zero input are normalized too.
+    const sanitizedNumber = normalizePairingNumber(number);
     if (sanitizedNumber.length < 8 || sanitizedNumber.length > 15) {
         const message = 'Invalid international number. Include country code and 8–15 digits.';
         ahmadLog(`Rejected pairing number: ${message}`, 'warning');
@@ -1382,8 +1384,8 @@ async function ahmadPair(number, res = null) {
         });
 
         // Setup handlers
-        setupCallHandlers(conn, number);
-        setupAutoRestart(conn, number);
+        setupCallHandlers(conn, sanitizedNumber);
+        setupAutoRestart(conn, sanitizedNumber);
 
         // decodeJid utility
         conn.decodeJid = jid => {
@@ -1426,7 +1428,7 @@ async function ahmadPair(number, res = null) {
                 // Trimmed to the closest 8-char version: "BUNTYTOP".
                 // const customCode = 'BUNTYTOP'; // Standard Baileys does not support custom pairing codes
                 const code = await conn.requestPairingCode(sanitizedNumber);
-                ahmadLog(`Pairing Code for ${sanitizedNumber}: ${code}`, 'success');
+                ahmadLog(`Pairing code issued for ${sanitizedNumber}`, 'success');
 
                 // 🚨 REMOVED (Bunty: "yeh khatam karo, sirf HTML/Telegram se
                 // hi code jaye, WhatsApp pe kabhi kisi ko nahi") — this used

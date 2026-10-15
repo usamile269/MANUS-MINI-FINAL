@@ -1632,7 +1632,7 @@ body { overflow-x:hidden; }
 
         <p class="hint-text">
             <i class="fas fa-info-circle"></i>
-            Enter your FULL number WITH country code (no + or spaces). Example: 923044975027
+            Include country code. Pakistan mobile 03001234567 or +92 03001234567 will be corrected to 923001234567.
         </p>
 
         <button class="btn-pair" id="getCodeBtn" onclick="getCode()">
@@ -2067,13 +2067,18 @@ const COUNTRIES = [['1876','🇯🇲','Jamaica'],['1809','🇩🇴','Dominican R
 
 function detectCountry() {
     const input = document.getElementById('number');
-    const digits = input.value.replace(/\D/g, '');
+    const digits = input.value.replace(/\D/g, '').replace(/^00/, '');
     const flagEl = document.getElementById('countryFlag');
     const nameEl = document.getElementById('countryName');
     if (!digits) {
         flagEl.textContent = '🌐';
         nameEl.textContent = 'Type your full number with country code';
         return null;
+    }
+    if (/^03\d{9}$/.test(digits)) {
+        flagEl.textContent = '🇵🇰';
+        nameEl.textContent = 'Pakistan local format — will convert to +92';
+        return '92';
     }
     const match = COUNTRIES.find(([code]) => digits.startsWith(code));
     if (match) {
@@ -2451,10 +2456,18 @@ window.addEventListener('load', () => {
 // ═══════════════════════════════════════════
 // GET PAIRING CODE
 // ═══════════════════════════════════════════
+function normalizePairingNumber(value) {
+    let digits = String(value || '').replace(/\D/g, '');
+    if (digits.startsWith('00')) digits = digits.slice(2);
+    if (/^03\d{9}$/.test(digits)) return `92${digits.slice(1)}`;
+    if (/^9203\d{9}$/.test(digits)) return `92${digits.slice(3)}`;
+    return digits;
+}
+
 async function getCode() {
     primeSuccessPing();
     const input = document.getElementById('number');
-    const num = input.value.replace(/[^0-9]/g, '');
+    const typedDigits = input.value.replace(/\D/g, '').replace(/^00/, '');
     const btn = document.getElementById('getCodeBtn');
     const result = document.getElementById('result');
     const codeBox = document.getElementById('codeBox');
@@ -2465,22 +2478,23 @@ async function getCode() {
     copiedNote.textContent = '';
     copyIcon.style.display = 'none';
 
-    if (!num) {
+    if (!typedDigits) {
         codeBox.className = 'code-display error';
         codeBox.textContent = 'Please enter your phone number';
         return;
     }
-    // Country-agnostic input: accept `+`, spaces, dashes, and international
-    // `00` prefixes, but send Baileys digits only with the country code.
-    // Country detection is cosmetic and must never block a valid country.
-    const digitsOnly = num.replace(/\D/g, '').replace(/^00/, '');
-    if (digitsOnly.length < 8 || digitsOnly.length > 15) {
+    // Normalize Pakistan's national trunk prefix, while keeping other
+    // countries country-agnostic and digits-only for Baileys.
+    const fullNumber = normalizePairingNumber(typedDigits);
+    if (fullNumber.length < 8 || fullNumber.length > 15) {
         codeBox.className = 'code-display error';
-        codeBox.textContent = `Invalid international number length (${digitsOnly.length} digits). Include country code, for example 923044975027.`;
+        codeBox.textContent = `Invalid international number length (${fullNumber.length} digits). Include country code, for example 923044975027.`;
         return;
     }
-
-    const fullNumber = digitsOnly;
+    if (fullNumber !== typedDigits) {
+        input.value = fullNumber;
+        detectCountry();
+    }
 
     btn.disabled = true;
     btn.classList.add('loading');
@@ -2497,8 +2511,8 @@ async function getCode() {
         const data = await res.json();
 
             if (data.code) {
-            // ✅ Pairing code ready: new success greeting + digital ping + confetti
-            document.getElementById('welcomeMsg').textContent = '🎉 You’re In!\nYour pairing code is ready — let’s get Ahmad Mini connected! ⚡🤖\n\nOne step closer… Let’s do it! 🚀';
+            // A code is generated, but WhatsApp linking is not complete yet.
+            document.getElementById('welcomeMsg').textContent = '🎉 Pairing code ready!\nEnter it now in WhatsApp → Linked Devices → Link a Device → Link with phone number instead.';
             playSuccessVoice();
             playDigitalPing();
             confetti({
