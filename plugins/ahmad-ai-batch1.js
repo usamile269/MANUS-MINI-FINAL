@@ -2,7 +2,7 @@ const { cmd } = require('../ahmad-core');
 const axios = require('axios');
 const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
-const { smartAI } = require('../lib/ai-provider');
+const { smartAI, pollinationsReply } = require('../lib/ai-provider');
 const { plainAIResponse } = require('../lib/plain-ai-response');
 
 // Conversational AI answers stay natural plain text.
@@ -10,9 +10,21 @@ function aiReply(_title, response) {
     return plainAIResponse(response);
 }
 
-// All batch commands use the shared fast provider path, including its
-// optional Groq and keyless Pollinations fallback behavior.
-async function callAI(prompt) { return smartAI(prompt); }
+// Shared AI caller — reuses the SAME endpoints already proven working in
+// ai-cmds.js (.gpt / .deepseek fallback chain), just with a custom prompt
+// template per command. No new/unverified API domains introduced, so this
+// rides on infrastructure that's already live and working for you.
+async function callAI(prompt) {
+    try {
+        return await smartAI(prompt);
+    } catch (e) {
+        console.log('[AI-BATCH1] Groq+OpenRouter failed, trying old chain:', e.message);
+    }
+    // smartAI() already ends with the keyless Pollinations fallback; this is
+    // the last resort if even that threw (kept for a clear error, not the
+    // old dead groqReply chain).
+    return await pollinationsReply(prompt);
+}
 
 function aiCmd(pattern, alias, desc, promptBuilder, emptyMsg) {
     cmd({ pattern, alias, desc, category: 'ai', react: '🤖', filename: __filename },
@@ -50,24 +62,24 @@ aiCmd('summarizeai', ['summaryai'], 'Summarize a long text',
 
 aiCmd('emailwriter', ['aiemail'], 'Write a professional email',
     (i) => `Write a short, professional email about: ${i}`,
-    '❌ Kis baare mein email chahiye batao.\nExample: .emailwriter requesting leave for 3 days');
+    '❌ Kis baare mein email chahiye specify.\nExample: .emailwriter requesting leave for 3 days');
 
 aiCmd('coverletterai', ['coverletter'], 'Generate a cover letter',
     (i) => `Write a short, professional cover letter for this job: ${i}`,
-    '❌ Job/role batao.\nExample: .coverletterai Frontend Developer at a tech startup');
+    '❌ Job/role specify.\nExample: .coverletterai Frontend Developer at a tech startup');
 
 aiCmd('resumetips', ['cvhelp'], 'Get resume/CV improvement tips',
     (i) => `Give 5 short, practical resume tips for someone applying as: ${i}`,
-    '❌ Job role batao.\nExample: .resumetips Digital Marketer');
+    '❌ Job role specify.\nExample: .resumetips Digital Marketer');
 
 aiCmd('captionai', ['igcaption'], 'Generate an Instagram caption',
     (i) => `Write a short, catchy Instagram caption with 2-3 emojis for a photo about: ${i}`,
-    '❌ Photo kis baare mein hai batao.\nExample: .captionai sunset at the beach');
+    '❌ Photo kis baare mein hai specify.\nExample: .captionai sunset at the beach');
 
 // ==================== CODE ====================
 aiCmd('codegenai', ['gencode'], 'Generate code from a description',
     (i) => `Write clean, working code for this request. Include the code in a code block: ${i}`,
-    '❌ Kya code chahiye batao.\nExample: .codegenai a function to reverse a string in JavaScript');
+    '❌ Kya code chahiye specify.\nExample: .codegenai a function to reverse a string in JavaScript');
 
 aiCmd('debugcodeai', ['fixcode'], 'Find and fix bugs in code',
     (i) => `Find the bug(s) in this code and give the corrected version:\n${i}`,
@@ -84,11 +96,11 @@ aiCmd('codeconvertai', ['convertcode'], 'Convert code between languages',
 // ==================== KNOWLEDGE / EXPLAINERS ====================
 aiCmd('explainai', ['explainthis'], 'Explain any topic simply',
     (i) => `Explain this in simple, easy words like explaining to a beginner: ${i}`,
-    '❌ Topic batao.\nExample: .explainai how does WiFi work');
+    '❌ Topic specify.\nExample: .explainai how does WiFi work');
 
 aiCmd('factcheckai', ['isittrue'], 'Fact-check a claim',
     (i) => `Is this claim true or false? Give a short factual explanation: "${i}"`,
-    '❌ Claim batao check karne ke liye.\nExample: .factcheckai the earth is flat');
+    '❌ Claim specify check karne for.\nExample: .factcheckai the earth is flat');
 
 aiCmd('mathsolverai', ['solvemath'], 'Solve a math problem step by step',
     (i) => `Solve this math problem step by step, show the working: ${i}`,
@@ -105,19 +117,19 @@ aiCmd('antonymai', ['antonymfor'], 'Get antonyms for a word',
 // ==================== CREATIVE ====================
 aiCmd('essayai', ['writeessay'], 'Write a short essay on a topic',
     (i) => `Write a short essay (150-200 words) about: ${i}`,
-    '❌ Topic batao.\nExample: .essayai importance of education');
+    '❌ Topic specify.\nExample: .essayai importance of education');
 
 aiCmd('poemai', ['writepoem'], 'Write a poem on a topic',
     (i) => `Write a short, beautiful poem about: ${i}`,
-    '❌ Topic batao.\nExample: .poemai friendship');
+    '❌ Topic specify.\nExample: .poemai friendship');
 
 aiCmd('storyai', ['writestory'], 'Write a short story on a topic',
     (i) => `Write a short, creative story (under 150 words) about: ${i}`,
-    '❌ Topic batao.\nExample: .storyai a robot who wants to be human');
+    '❌ Topic specify.\nExample: .storyai a robot who wants to be human');
 
 aiCmd('quoteaigen', ['aiquote'], 'Generate an inspirational quote about a topic',
     (i) => `Write one short, original, inspirational quote about ${i}. Reply with ONLY the quote.`,
-    '❌ Topic batao.\nExample: .quoteaigen success');
+    '❌ Topic specify.\nExample: .quoteaigen success');
 
 aiCmd('pickuplineai', ['aipickup'], 'Generate a fun pickup line',
     (i) => `Write one short, funny, cheesy pickup line about: ${i || 'general'}`,
@@ -133,36 +145,36 @@ aiCmd('complimentai', ['complimentme'], 'Get a nice compliment',
 
 aiCmd('nameideasai', ['bizname'], 'Get business/brand name ideas',
     (i) => `Suggest 5 creative business/brand name ideas for: ${i}. List them, nothing else.`,
-    '❌ Business type batao.\nExample: .nameideasai a coffee shop');
+    '❌ Business type specify.\nExample: .nameideasai a coffee shop');
 
 // ==================== PLANNING / ADVICE ====================
 aiCmd('adviceai', ['getadvice'], 'Get advice on a situation',
     (i) => `Give short, practical, kind advice for this situation: ${i}`,
-    '❌ Situation batao.\nExample: .adviceai I have an exam tomorrow and haven\'t studied');
+    '❌ Situation specify.\nExample: .adviceai I have an exam tomorrow and haven\'t studied');
 
 aiCmd('debateai', ['bothsides'], 'See both sides of a debate topic',
     (i) => `Give a short, balanced summary of BOTH sides of this debate topic: ${i}`,
-    '❌ Topic batao.\nExample: .debateai should students have homework');
+    '❌ Topic specify.\nExample: .debateai should students have homework');
 
 aiCmd('studyplanai', ['studyplan'], 'Generate a study plan',
     (i) => `Create a short, practical 7-day study plan for: ${i}`,
-    '❌ Subject/exam batao.\nExample: .studyplanai final exams in mathematics');
+    '❌ Subject/exam specify.\nExample: .studyplanai final exams in mathematics');
 
 aiCmd('tripplannerai', ['planmytrip'], 'Plan a short trip itinerary',
     (i) => `Create a short 3-day trip itinerary for: ${i}`,
-    '❌ Destination batao.\nExample: .tripplannerai Lahore');
+    '❌ Destination specify.\nExample: .tripplannerai Lahore');
 
 aiCmd('interviewprepai', ['interviewtips'], 'Get interview prep tips',
     (i) => `Give 5 short interview preparation tips for this role: ${i}`,
-    '❌ Job role batao.\nExample: .interviewprepai Software Engineer');
+    '❌ Job role specify.\nExample: .interviewprepai Software Engineer');
 
 aiCmd('businessideaai', ['bizidea'], 'Get a business idea in a niche',
     (i) => `Suggest one practical, low-investment business idea for this niche: ${i}`,
-    '❌ Niche batao.\nExample: .businessideaai student side hustle');
+    '❌ Niche specify.\nExample: .businessideaai student side hustle');
 
 aiCmd('recipeai', ['whatcancook'], 'Get a recipe idea from ingredients',
     (i) => `Suggest a simple recipe I can make using these ingredients: ${i}`,
-    '❌ Ingredients batao (comma separated).\nExample: .recipeai eggs, tomato, onion');
+    '❌ Ingredients specify (comma separated).\nExample: .recipeai eggs, tomato, onion');
 
 aiCmd('dreaminterpretai', ['dreammeaning'], 'Get a fun dream interpretation',
     (i) => `Give a short, fun, non-serious interpretation of this dream (entertainment only): ${i}`,
