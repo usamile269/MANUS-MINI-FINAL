@@ -55,14 +55,23 @@ cmd({
     pattern: "gali",
     desc: "Send a random desi gali",
     category: "fun",
-    use: ".gali @user",
+    use: ".gali @user (or reply to someone's message)",
     filename: __filename
-}, async (conn, mek, m, { from, mentionedJid, reply }) => {
-    const target = mentionedJid?.[0];
+}, async (conn, mek, m, { from, mentionedJid }) => {
+    // Get target: @mentioned user OR the person whose message was replied to
+    let target = mentionedJid?.[0];
+    if (!target) {
+        const quotedParticipant = mek.message?.extendedTextMessage?.contextInfo?.participant
+            || m.quoted?.sender;
+        if (quotedParticipant) target = quotedParticipant;
+    }
     const galis = getGalis();
     const gali = galis[Math.floor(Math.random() * galis.length)];
-    const mention = target ? `@${target.split('@')[0]}` : "Oye";
-    reply(`${mention} ${gali}`);
+    const mentionText = target ? `@${target.split('@')[0]}` : "Oye";
+    await conn.sendMessage(from, {
+        text: `${mentionText} ${gali}`,
+        mentions: target ? [target] : []
+    });
 });
 
 cmd({
