@@ -25,6 +25,18 @@ const defaultGalis = [
     "Chutiyaap na kar, bhosdike 🤡🖕",
     "Teri gaand ki seal tod dun 🔨🍑",
     "Maa chod dunga teri 👩🍆",
+    "Teri shakal pe thook dun 💦, bhosdike",
+    "Gaand main danda de dun 🍑🪵, madarchod",
+    "Chutiye teri maa randi hai 💃🖕",
+    "Lund khara karke maar dun 🍆💥, behenchod",
+    "Teri behen ki chut ka bhosda 🌸💩",
+    "Gaandu saala, hijda hai kya? 🏳️‍🌈",
+    "Chut ke pasine, garmi main sad raha hai 💦☀️",
+    "Lund ki topi pehen le 🎩🍆, chutiye",
+    "Teri maa ko red light pe bitha dun 🚦👩",
+    "Bhosdike teri naslein yaad rakhein gi 🧬🖕",
+    "Gaand ka keeda, bahar nikal 🐛🍑",
+    "Chutiya number 1, award lele 🏆🤡",
 ];
 
 function getGalis() {
@@ -58,7 +70,6 @@ cmd({
     use: ".gali @user (or reply to someone's message)",
     filename: __filename
 }, async (conn, mek, m, { from, mentionedJid }) => {
-    // Get target: @mentioned user OR the person whose message was replied to
     let target = mentionedJid?.[0];
     if (!target) {
         const quotedParticipant = mek.message?.extendedTextMessage?.contextInfo?.participant
