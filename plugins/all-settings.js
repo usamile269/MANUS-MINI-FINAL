@@ -326,7 +326,7 @@ cmd({
     const modeKey = botNumber;
     const userConfig = await getUserConfigFromMongoDB(modeKey);
     if (!isOwner && !isMe) return reply(`╭━━━⛔ 𝗢𝗪𝗡𝗘𝗥 𝗭𝗢𝗡𝗘 ⛔━━━╮
-┃😎 Yeh command sirf owner ke liye hai.
+┃😎 Yeh command sirf owner for hai.
 ┃🔒 Kisi aur ka mode change karna allowed nahi.
 ╰━━━━━━━━━━━━━━━━━━━━╯`);
     const mode = args[0]?.toLowerCase();
@@ -354,7 +354,7 @@ cmd({
     react: '🛡️'
 }, async (conn, mek, m, { args, isOwner, reply }) => {
     if (!isOwner) return reply(`╭━━━⛔ 𝗢𝗪𝗡𝗘𝗥 𝗭𝗢𝗡𝗘 ⛔━━━╮
-┃😎 Yeh command sirf owner ke liye hai.
+┃😎 Yeh command sirf owner for hai.
 ┃🔒 Kisi aur ka mode change karna allowed nahi.
 ╰━━━━━━━━━━━━━━━━━━━━╯`);
     const mode = args[0]?.toLowerCase();
@@ -516,7 +516,7 @@ cmd({
     // OLD name because nothing was actually persisted. Now checks the
     // real save result and tells the truth.
     const saved = await setUserBotSettings(sender, { BOT_NAME: name });
-    if (!saved) return reply('❌ Save fail hui (Mongo issue) — dobara try karo, .menu abhi bhi purana naam dikhayega.');
+    if (!saved) return reply('❌ Save fail hui (Mongo issue) — try again, .menu abhi bhi purana naam dikhayega.');
     reply(`✅ Bot name updated to: ${name}`);
     // 🚨 Note carried forward: this never touches the real WhatsApp profile
     // name/pic — only the .menu branding text/image, exactly as before.
@@ -571,7 +571,7 @@ cmd({
         const buffer = await m.quoted.download();
         console.log(`[SETBOTDP] sender=${sender}`);
         const saved = await setUserBotSettings(sender, { MENU_IMAGE: buffer.toString('base64') });
-        if (!saved) return reply('❌ Save fail hui (Mongo issue) — dobara try karo.');
+        if (!saved) return reply('❌ Save fail hui (Mongo issue) — try again.');
         reply('✅ Your bot DP updated.');
         // Only the .menu image is touched — real WhatsApp profile picture
         // is never called/changed here.
@@ -642,7 +642,7 @@ cmd({
 
         const botJid = await conn.decodeJid(conn.user.id);
         await conn.updateProfilePicture(botJid, buffer);
-        reply('✅ Bot ki real WhatsApp DP update ho gayi!');
+        reply('✅ Bot ki real WhatsApp DP update done!');
     } catch (e) {
         reply('❌ Failed: ' + e.message);
     }
@@ -669,7 +669,7 @@ cmd({
             return reply('❌ This audio is too large. Send one under 5MB.');
         }
         const saved = await setUserBotSettings(sender, { MENU_AUDIO: buffer.toString('base64') });
-        if (!saved) return reply('❌ Save fail hui (Mongo issue) — dobara try karo.');
+        if (!saved) return reply('❌ Save fail hui (Mongo issue) — try again.');
         reply('✅ Your .menu song updated.');
     } catch (e) {
         reply('❌ Failed: ' + e.message);
@@ -722,7 +722,7 @@ cmd({
     if (!isOwner && !isMe) return reply(ownerOnlyDenied());
     if (!isSelfOwned(conn, mek, sender)) return reply('❌ Identity mismatch — safety block, try again.');
     const saved = await deleteUserBotSettings(sender);
-    if (!saved) return reply('❌ Clear fail hua (Mongo save issue) — dobara try karo, purani settings abhi bhi active hain.');
+    if (!saved) return reply('❌ Clear fail hua (Mongo save issue) — try again, purani settings abhi bhi active hain.');
     reply('✅ Aapka bot name/DP/audio clear ho gaye — ab owner ka latest default use hoga.');
 });
 
@@ -772,7 +772,7 @@ cmd({
     if ((args[0] || '').toLowerCase() !== 'confirm') {
         return reply(
             `⚠️ *Yeh IRREVERSIBLE hai* — is bot session ki har chat ki antidelete/antiviewonce/antiedit/prefix settings, bot-wide name/dp/audio, aur teri apni personal customization sab wipe ho jayengi.\n\n` +
-            `Confirm karne ke liye likho:\n*.cleardb confirm*`
+            `Confirm karne for likho:\n*.cleardb confirm*`
         );
     }
 
@@ -797,7 +797,7 @@ cmd({
         ]));
     } catch (e) {
         console.error('[CLEARDB] failed:', e.message);
-        reply('❌ Kuch wipe fail ho gaya beech mein — console log check karo, kuch data purana reh gaya ho sakta hai.');
+        reply('❌ Kuch wipe fail done beech mein — console log check, kuch data purana reh gaya ho sakta hai.');
     }
 });
 
@@ -822,7 +822,7 @@ cmd({
     if (!target) return reply('❌ Mention, reply to, ya number do: .resetusersettings 923001234567');
 
     const ok = await deleteUserBotSettings(target);
-    if (!ok) return reply('❌ Reset fail ho gaya, dobara try karo.');
+    if (!ok) return reply('❌ Reset fail done, try again.');
     await conn.sendMessage(from, {
         text: `✅ @${target.split('@')[0]} ki personal settings (name/dp/audio) clear kar di gayi.`,
         mentions: [target]

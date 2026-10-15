@@ -419,7 +419,7 @@ async (conn, mek, m, { args, reply }) => {
         if (!data || data.rate === undefined) return fail(reply, `${from} → ${to} rate not found. Check the currency code (ISO code like USD, PKR, EUR).`);
         const result = (amount * data.rate).toFixed(2);
         reply(renderQuotedCard('CURRENCY CONVERTER', [`💰 Amount: ${amount} ${from}`, `💱 Result: ${result} ${to}`, `📈 Live rate: ${data.rate}`], undefined, '💱'));
-    } catch (e) { fail(reply, "Conversion failed — is currency pair ke liye data available nahi hai."); }
+    } catch (e) { fail(reply, "Conversion failed — is currency pair for data available nahi hai."); }
 });
 
 cmd({ pattern: "dictionary", alias: ["define"], desc: "Word meaning/definition", category: "tools", filename: __filename },
