@@ -3,7 +3,7 @@ const axios = require('axios');
 const config = require('../config');
 const { randomFooter } = require('../lib/menu-styles');
 const { looksLikeIdentityQuestion, identityAnswer, withLanguageMatch } = require('../lib/ai-persona');
-const { smartAI, pollinationsReply, looksLikeErrorPayload } = require('../lib/ai-provider');
+const { smartAI } = require('../lib/ai-provider');
 const { plainAIResponse } = require('../lib/plain-ai-response');
 
 const FOOTER = '> ' + randomFooter();
@@ -13,9 +13,8 @@ const FOOTER = '> ' + randomFooter();
 // every AI command died here. Now uses the KEYLESS Pollinations fallback from
 // lib/ai-provider.js, which needs no API key at all.
 async function reliableAIFallback(q) {
-    const answer = await pollinationsReply(q);
-    if (!answer || looksLikeErrorPayload(answer)) throw new Error('Pollinations fallback returned no usable answer');
-    return answer;
+    // No fallback — Groq only (per Ahmad 2026-10-15)
+    throw new Error('Groq failed, no fallback');
 }
 // (Groq/OpenRouter chain now lives in lib/ai-provider.js — smartAI() below
 // tries both before anyone falls back to the old proxy chain here.)
@@ -108,7 +107,7 @@ async (conn, mek, m, { reply, args, quoted, from }) => {
             console.log('[DEEPSEEK] Groq failed, trying old chain:', e.message);
         }
         // The old workers.dev proxy is DNS-dead; use the keyless fallback directly.
-        const answer = await pollinationsReply(prompt);
+        throw new Error('Groq only');
         if (!answer || looksLikeErrorPayload(answer)) throw new Error('No reply');
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
         reply(aiReply('DEEPSEEK AI', answer));
