@@ -133,7 +133,8 @@ cmd({
     await conn.sendMessage(from, { react: { text: "📡", key: m.key } });
     const caption = body.split(" ").slice(1).join(" ");
     const quoted = m.quoted?.message;
-    const done = (label) => `╭═══ ✅ STATUS ═══⊷\n┃❃╭──────────────\n┃❃│ ✅ ${label}\n┃❃│ 🟢 Posted as this group's Status\n┃❃╰───────────────\n╰═════════════════⊷\n\n> ${randomFooter()}`;
+    // Short + mature confirmation (Ahmad, 2026-10-15) — same line for every type.
+    const done = () => `✅ 𝘚𝘵𝘢𝘵𝘶𝘴 𝘱𝘰𝘴𝘵𝘦𝘥.`;
 
     if (!quoted && caption) {
       // Invite-link preview card in the status itself (Ahmad's
