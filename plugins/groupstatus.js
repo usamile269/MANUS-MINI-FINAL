@@ -6,14 +6,20 @@ const crypto = require('crypto');
 // ============================================================================
 // .gcstatus — Group Status (groupStatusMessageV2)
 // ============================================================================
-// 2026-10-15: switched the Baileys dependency to the vkazee/baileys fork
-// (package.json: "@whiskeysockets/baileys": "npm:@vkazee/baileys@7.0.0-rc.9-patch.4").
-// That fork adds NATIVE media support inside groupStatusMessageV2, so
-// image/video/audio/sticker now post as REAL group statuses via sendMessage
-// (the fork injects messageSecret automatically). This replaces the old
-// text+thumbnail (externalAdReply) workaround, which rendered BLACK in
-// WhatsApp's Status viewer, and the manual upload+relayMessage hack.
-// Text statuses keep the previous working manual-relay path.
+// 2026-10-15: official Baileys 7.0.0-rc14 + a small patch
+// (patches/@whiskeysockets+baileys+7.0.0-rc14.patch, applied automatically by
+// patch-package on `npm install`). The patch mirrors the vkazee/baileys
+// fork's proven group-status implementation inside relayMessage:
+//   1. messageSecret is injected at BOTH the outer messageContextInfo level
+//      and the inner groupStatusMessageV2.message.messageContextInfo level.
+//   2. getMessageType() returns 'text' for groupStatusMessageV2 BEFORE
+//      normalizeMessageContent unwraps it (otherwise the stanza type logic
+//      misfires and WhatsApp silently drops the media).
+// With that in place, image/video/audio/sticker post as REAL group statuses.
+// (An earlier attempt switched package.json to the vkazee fork itself, but
+// the fork is ESM-only with top-level await — it can't be require()'d from
+// this CommonJS bot on Node 24 — and its git-based libsignal dependency
+// broke the Railway build. So: official lib + patch instead.)
 // ============================================================================
 
 // Invite-link preview for .gcstatus.
@@ -68,9 +74,9 @@ async function buildInvitePreview(conn, inviteUrl, fallbackJid) {
 }
 
 async function relayGroupStatusV2(conn, jid, msgContent) {
-  // MEDIA: native group-status via the vkazee fork. prepareWAMessageMedia
-  // uploads + builds the media node, sendMessage wraps it in
-  // groupStatusMessageV2 (messageSecret auto-injected by the fork).
+  // MEDIA: prepare via official Baileys, then relay wrapped in
+  // groupStatusMessageV2. The patch-package patch makes relayMessage inject
+  // messageSecret at both levels and send the stanza as the fork does.
   if (msgContent.image || msgContent.video || msgContent.audio || msgContent.sticker) {
     let mediaInput;
     if (msgContent.image) {
@@ -83,7 +89,7 @@ async function relayGroupStatusV2(conn, jid, msgContent) {
       mediaInput = { sticker: msgContent.sticker };
     }
     const prepared = await prepareWAMessageMedia(mediaInput, { upload: conn.waUploadToServer });
-    return conn.sendMessage(jid, { groupStatusMessageV2: { message: prepared } });
+    return conn.relayMessage(jid, { groupStatusMessageV2: { message: prepared } });
   }
 
   // TEXT: manual relay (already working — green-ring status).
