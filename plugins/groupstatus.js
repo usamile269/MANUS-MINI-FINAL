@@ -99,7 +99,7 @@ async function relayGroupStatusV2(conn, jid, msgContent) {
         messageContextInfo: { messageSecret }
       }
     };
-    return conn.relayMessage(jid, relayMsg);
+    return conn.relayMessage(jid, relayMsg, {});
   }
 
   // TEXT: manual relay (already working — green-ring status).
