@@ -111,7 +111,8 @@ cmd({
             mode,
             grouped,
             categoryDisplay,
-            senderJid: m.sender
+            senderJid: m.sender,
+            senderName: m.pushName || null
         });
 
         // ✅ Send menu with image + channel forward style
