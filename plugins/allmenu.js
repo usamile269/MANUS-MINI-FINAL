@@ -102,7 +102,7 @@ cmd({
         // 🆕 REMOVED (Bunty: "menustyle system remove, only ek menu rahe") —
         // was previously myConfig.MENU_STYLE || userConfig.MENU_STYLE || 1;
         // now always style 1, no per-user/global override.
-        const menu = renderMenu(1, {
+        const menu = renderMenu(61, { // Mazari style
             botName,
             ownerName,
             total: totalCommands,
