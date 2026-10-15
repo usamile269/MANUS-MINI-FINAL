@@ -725,7 +725,7 @@ async (conn, mek, m, { reply, args, from, q }) => {
 cmd({ pattern: 'tiktok', alias: ['tt', 'tik', 'ttdl', 'tiktokdl'], desc: 'Download TikTok (no watermark)', category: 'download', react: '🎵' },
 async (conn, mek, m, { reply, args, from, q }) => {
     const url = q || args[0];
-    if (!url || !url.includes('tiktok')) return reply(dlBox('TIKTOK', ['❌ TikTok link do!', '📝 .tiktok <link>'], '🎵'));
+    if (!url || !url.includes('tiktok')) return reply(dlBox('TIKTOK', ['❌ Please provide a TikTok link!', '📝 .tiktok <link>'], '🎵'));
     try {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } }).catch(e => console.log('[TT] start reaction failed:', e.message));
         // TikWM rejects requests without a browser-like User-Agent/Referer.
