@@ -69,7 +69,7 @@ for (const effect of EFFECTS) {
         } catch (e) {
             console.log(`[${effect.pattern.toUpperCase()}] failed:`, e.message);
             await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-            reply('❌ Effect generate nahi ho saka, dobara try karo.');
+            reply('❌ Effect generate nahi ho saka, try again.');
         }
     });
 }

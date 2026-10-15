@@ -89,7 +89,7 @@ for (const cat of categories) {
     }, async (conn, mek, m, { reply }) => {
         await reply(`⏳ ${cat.emoji} HD pic la raha hun...`);
         const img = await getPinterestPic(cat.query);
-        if (!img) return reply('❌ Pic nahi mili, dobara try karo!');
+        if (!img) return reply('❌ No pic found, try again!');
         const jid = mek.key.remoteJid || m.key.remoteJid;
         await conn.sendMessage(jid, {
             image: img,
