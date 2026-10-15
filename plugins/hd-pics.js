@@ -3,67 +3,51 @@ const axios = require('axios');
 
 // Multiple sources for HD pics with fallbacks
 async function getPinterestPic(query) {
-    // Try Pinterest with different approaches
-    const attempts = [
-        // Attempt 1: Standard Pinterest search
-        async () => {
-            const searchUrl = `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(query)}`;
-            const { data } = await axios.get(searchUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                },
-                timeout: 15000,
-            });
-            return data;
+    // Pinterest Resource API (JSON) — more reliable than HTML scraping
+    const resourceUrl = 'https://www.pinterest.com/resource/BaseSearchResource/get/';
+    const data = {
+        options: { query: query, scope: 'pins', page_size: 25 },
+        context: {}
+    };
+    const params = new URLSearchParams({
+        source_url: `/search/pins/?q=${encodeURIComponent(query)}`,
+        data: JSON.stringify(data),
+        _: Date.now().toString()
+    });
+
+    const { data: res } = await axios.get(`${resourceUrl}?${params}`, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Referer': `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(query)}`,
         },
-        // Attempt 2: Pinterest with mobile UA
-        async () => {
-            const searchUrl = `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(query)}`;
-            const { data } = await axios.get(searchUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
-                    'Accept': 'text/html',
-                },
-                timeout: 15000,
-            });
-            return data;
-        }
-    ];
+        timeout: 20000,
+    });
 
-    for (const attempt of attempts) {
-        try {
-            const data = await attempt();
-            // Extract all pinimg URLs
-            const allUrls = data.match(/https:\/\/i\.pinimg\.com\/[a-z0-9]+\/[a-f0-9\/]+\.(jpg|jpeg|png|webp)/gi) || [];
-            // Prefer originals, then 736x
-            let hdUrls = allUrls.filter(u => u.includes('/originals/'));
-            if (!hdUrls.length) {
-                hdUrls = allUrls.filter(u => u.includes('/736x/')).map(u => u.replace('/736x/', '/originals/'));
-            }
-            if (!hdUrls.length && allUrls.length) {
-                hdUrls = allUrls.map(u => u.replace(/\/i\.pinimg\.com\/[a-z0-9]+\//, '/i.pinimg.com/originals/'));
-            }
-            const unique = [...new Set(hdUrls)];
-            if (unique.length) {
-                const picUrl = unique[Math.floor(Math.random() * unique.length)];
-                const res = await axios.get(picUrl, { 
-                    responseType: 'arraybuffer', 
-                    timeout: 30000,
-                    headers: { 'Referer': 'https://www.pinterest.com/' }
-                });
-                const buf = Buffer.from(res.data);
-                if (buf.length > 30000) return buf; // At least 30KB
-            }
-        } catch (e) {
-            console.log(`[HD-PICS] attempt failed: ${e.message}`);
-            continue;
-        }
+    const pins = res?.resource_response?.data?.results || [];
+    const urls = [];
+    for (const pin of pins) {
+        const img = pin?.images?.orig || pin?.images?.['736x'];
+        if (img?.url) urls.push(img.url);
     }
-    return null;
-}
+    if (!urls.length) throw new Error('No Pinterest results');
 
+    // Pick random, download, validate size
+    const shuffled = urls.sort(() => Math.random() - 0.5);
+    for (const picUrl of shuffled.slice(0, 5)) {
+        try {
+            const imgRes = await axios.get(picUrl, {
+                responseType: 'arraybuffer',
+                timeout: 30000,
+                headers: { 'Referer': 'https://www.pinterest.com/' }
+            });
+            const buf = Buffer.from(imgRes.data);
+            if (buf.length > 50000) return buf; // At least 50KB = real photo
+        } catch (e) { continue; }
+    }
+    throw new Error('No valid image downloaded');
+}
 const categories = [
     { pattern: 'attitude', query: 'attitude boy style HD', desc: 'Attitude HD pics', emoji: '😎' },
     { pattern: 'aesthetic', query: 'aesthetic wallpaper HD', desc: 'Aesthetic HD pics', emoji: '🌸' },
