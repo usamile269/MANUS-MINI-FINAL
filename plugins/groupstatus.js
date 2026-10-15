@@ -74,47 +74,56 @@ async function buildInvitePreview(conn, inviteUrl, fallbackJid) {
 }
 
 async function relayGroupStatusV2(conn, jid, msgContent) {
-  // MEDIA: prepare via official Baileys, then relay wrapped in
-  // groupStatusMessageV2. The patch-package patch makes relayMessage inject
-  // messageSecret at both levels and send the stanza as the fork does.
+  // WhatsApp clients recognize a group status via
+  // contextInfo.isGroupStatus=true on the INNER message, and the stanza
+  // type must match the content (media for image/video/audio/sticker).
+  const messageSecret = crypto.randomBytes(32);
+
   if (msgContent.image || msgContent.video || msgContent.audio || msgContent.sticker) {
-    let mediaInput;
+    let mediaInput, innerKey;
     if (msgContent.image) {
       mediaInput = { image: msgContent.image, caption: msgContent.caption || '' };
+      innerKey = 'imageMessage';
     } else if (msgContent.video) {
       mediaInput = { video: msgContent.video, caption: msgContent.caption || '', mimetype: 'video/mp4' };
+      innerKey = 'videoMessage';
     } else if (msgContent.audio) {
       mediaInput = { audio: msgContent.audio, mimetype: msgContent.mimetype || 'audio/mp4', ptt: !!msgContent.ptt };
+      innerKey = 'audioMessage';
     } else {
       mediaInput = { sticker: msgContent.sticker };
+      innerKey = 'stickerMessage';
     }
-    // Mirror the WORKING text path: build the full wrapper explicitly with
-    // messageSecret at the groupStatusMessageV2 level (the patch-package
-    // patch then also ensures outer + inner messageContextInfo secrets).
-    const messageSecret = crypto.randomBytes(32);
     const prepared = await prepareWAMessageMedia(mediaInput, { upload: conn.waUploadToServer });
+    const inner = prepared[innerKey] || {};
+    inner.contextInfo = { ...(inner.contextInfo || {}), isGroupStatus: true };
+    prepared[innerKey] = inner;
     const relayMsg = {
       groupStatusMessageV2: {
         message: prepared,
         messageContextInfo: { messageSecret }
       }
     };
-    return conn.relayMessage(jid, relayMsg, {});
+    return conn.relayMessage(jid, relayMsg, { additionalAttributes: { type: 'media' } });
   }
 
-  // TEXT: manual relay (already working — green-ring status).
-  const messageSecret = crypto.randomBytes(32);
+  // TEXT
   const msg = await generateWAMessage(jid, msgContent, {
     userJid: conn.user.id,
     upload: conn.waUploadToServer
   });
+  const innerMsg = msg.message || {};
+  const textKey = Object.keys(innerMsg).find(k => k !== 'messageContextInfo' && innerMsg[k] && typeof innerMsg[k] === 'object');
+  if (textKey) {
+    innerMsg[textKey].contextInfo = { ...(innerMsg[textKey].contextInfo || {}), isGroupStatus: true };
+  }
   const relayMsg = {
     groupStatusMessageV2: {
-      message: msg.message,
+      message: innerMsg,
       messageContextInfo: { messageSecret }
     }
   };
-  await conn.relayMessage(jid, relayMsg, { messageId: msg.key.id });
+  await conn.relayMessage(jid, relayMsg, { messageId: msg.key.id, additionalAttributes: { type: 'text' } });
   return msg;
 }
 
