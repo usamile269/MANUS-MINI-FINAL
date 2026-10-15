@@ -165,6 +165,12 @@ cmd({
     await conn.sendMessage(from, { react: { text: "📡", key: m.key } });
     const caption = body.split(" ").slice(1).join(" ");
     const quoted = m.quoted?.message;
+    // Ahmad (2026-10-15): pic ke caption main .gcstatus likhne par bhi kaam
+    // kare — sirf reply par depend na ho. Direct media (command wale message
+    // main hi image/video) ko bhi pakdo.
+    const directMsg = mek?.message || m?.message;
+    const directType = directMsg ? Object.keys(directMsg).find(k => /^(image|video|audio|sticker)Message$/.test(k)) : null;
+    const directMedia = directType ? directMsg[directType] : null;
     // Short + mature confirmation (Ahmad, 2026-10-15) — same line for every type.
     const done = () => `✅ 𝘚𝘵𝘢𝘵𝘶𝘴 𝘱𝘰𝘴𝘵𝘦𝘥.`;
 
@@ -187,8 +193,11 @@ cmd({
       return reply(`❌ No message or media!\n💡 Use: .gcstatus Hello\n💡 Or reply to media with .gcstatus`);
     }
 
-    if (quoted.imageMessage) {
-      const media = await downloadQuotedMedia(quoted, 'imageMessage');
+    const imgSrc = quoted?.imageMessage ? { msg: quoted, dl: () => downloadQuotedMedia(quoted, 'imageMessage') }
+      : directType === 'imageMessage' ? { msg: { imageMessage: directMedia }, dl: async () => { const { downloadContentFromMessage } = require('@whiskeysockets/baileys'); const s = await downloadContentFromMessage(directMedia, 'image'); let b = Buffer.from([]); for await (const c of s) b = Buffer.concat([b, c]); return b; } }
+      : null;
+    if (imgSrc) {
+      const media = await imgSrc.dl();
       const imgCaption = caption || quoted.imageMessage.caption || '';
       await relayGroupStatusV2(conn, from, { image: media, caption: imgCaption }).catch(e => console.log('GROUPSTATUS MEDIA RELAY ERROR:', e?.message || e));
       // Also post to bot's own status (backup - supports images properly)
@@ -211,9 +220,12 @@ cmd({
       return reply(done('Image status posted!'));
     }
 
-    if (quoted.videoMessage) {
-      const media = await downloadQuotedMedia(quoted, 'videoMessage');
-      const vidCaption = caption || quoted.videoMessage.caption || '';
+    const vidSrc = quoted?.videoMessage ? { cap: quoted.videoMessage.caption, dl: () => downloadQuotedMedia(quoted, 'videoMessage') }
+      : directType === 'videoMessage' ? { cap: directMedia.caption, dl: async () => { const { downloadContentFromMessage } = require('@whiskeysockets/baileys'); const s = await downloadContentFromMessage(directMedia, 'video'); let b = Buffer.from([]); for await (const c of s) b = Buffer.concat([b, c]); return b; } }
+      : null;
+    if (vidSrc) {
+      const media = await vidSrc.dl();
+      const vidCaption = caption || vidSrc.cap || '';
       await relayGroupStatusV2(conn, from, { video: media, caption: vidCaption, mimetype: 'video/mp4' }).catch(e => console.log('GROUPSTATUS MEDIA RELAY ERROR:', e?.message || e));
       let vidCtx = {};
       const vidInvite = extractInviteLink(vidCaption);
