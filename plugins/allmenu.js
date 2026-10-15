@@ -110,7 +110,8 @@ cmd({
             prefix: config.PREFIX || '.',
             mode,
             grouped,
-            categoryDisplay
+            categoryDisplay,
+            senderJid: m.sender
         });
 
         // ✅ Send menu with image + channel forward style
