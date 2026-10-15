@@ -669,7 +669,7 @@ cmd({ pattern: 'dl', alias: ['download', 'save', 'get'], desc: 'Download from Ti
 async (conn, mek, m, { reply, args, from, q }) => {
     const url = q || args[0];
     if (!url || !url.startsWith('http')) return reply(dlBox('DOWNLOADER', [
-        '❌ Social media link do!',
+        '❌ Please provide a social media link!',
         '📝 Usage: .dl <link>',
         '✅ Supports: TikTok, Instagram,',
         '   Facebook, Twitter, YouTube'
@@ -1135,7 +1135,7 @@ async (conn, mek, m, { reply, args, from, quoted, sender, mentionedJid }) => {
 cmd({ pattern: 'soundcloud', alias: ['sc', 'scdl'], desc: 'Download SoundCloud track', category: 'download', react: '🎧' },
 async (conn, mek, m, { reply, args, from, q }) => {
     const url = q || args[0];
-    if (!url || !url.includes('soundcloud.com')) return reply(dlBox('SOUNDCLOUD', ['❌ SoundCloud link do!', '📝 .soundcloud <link>'], '🎧'));
+    if (!url || !url.includes('soundcloud.com')) return reply(dlBox('SOUNDCLOUD', ['❌ Please provide a SoundCloud link!', '📝 .soundcloud <link>'], '🎧'));
     try {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const cobalt = await axios.post('https://api.cobalt.tools/',
@@ -1164,7 +1164,7 @@ async (conn, mek, m, { reply, args, from, q }) => {
 cmd({ pattern: 'spotify', alias: ['spotifydl'], desc: 'Download a Spotify track (via YouTube match)', category: 'download', react: '🟢' },
 async (conn, mek, m, { reply, args, from, q }) => {
     const url = q || args[0];
-    if (!url || !url.includes('spotify.com')) return reply(dlBox('SPOTIFY', ['❌ Spotify track link do!', '📝 .spotify <link>'], '🟢'));
+    if (!url || !url.includes('spotify.com')) return reply(dlBox('SPOTIFY', ['❌ Please provide a Spotify track link!', '📝 .spotify <link>'], '🟢'));
     if (!YTDlpWrapLib) return reply('❌ Run npm install on the server: yt-dlp-wrap');
     let outPath, opusPath;
     try {
