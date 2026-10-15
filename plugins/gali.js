@@ -57,15 +57,12 @@ cmd({
     category: "fun",
     use: ".gali @user",
     filename: __filename
-}, async (conn, mek, m, { from, mentionedJid }) => {
+}, async (conn, mek, m, { from, mentionedJid, reply }) => {
     const target = mentionedJid?.[0];
     const galis = getGalis();
     const gali = galis[Math.floor(Math.random() * galis.length)];
     const mention = target ? `@${target.split('@')[0]}` : "Oye";
-    await conn.sendMessage(from, {
-        text: `${mention} ${gali}`,
-        mentions: target ? [target] : []
-    }, { quoted: mek });
+    reply(`${mention} ${gali}`);
 });
 
 cmd({
@@ -75,10 +72,10 @@ cmd({
     use: ".addgali <your gali text>",
     filename: __filename
 }, async (conn, mek, m, { from, q, reply }) => {
-    if (!q) return reply("Usage: .addgali <your gali text>\nExample: .addgali Teri to...");
+    if (!q) return reply("Usage: .addgali <your gali text>");
     if (saveCustomGali(q)) {
-        reply(`✅ Gali added! Total: ${getGalis().length}`);
+        reply(`Gali added! Total: ${getGalis().length}`);
     } else {
-        reply("❌ Failed to save gali.");
+        reply("Failed to save gali.");
     }
 });
