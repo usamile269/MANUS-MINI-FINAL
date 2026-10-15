@@ -52,7 +52,7 @@ cmd({
         const lastPosts = global.__lastChannelPost || {};
         const targets = newsletterJids.filter(j => lastPosts[j] && lastPosts[j].serverId);
         if (!targets.length) {
-            return reply('⏳ Abhi tak koi post track nahi hui.\n_Channel me nayi post aate hi dobara try karo!_');
+            return reply('⏳ Abhi tak koi post track failed.\n_Channel me nayi post aate hi try again!_');
         }
 
         // ---------- genuinely connected sessions ----------
@@ -71,7 +71,7 @@ cmd({
         const want = amount > 0 ? Math.min(amount, conns.length) : conns.length;
         const use = conns.slice(0, want);
 
-        // ---------- DRY RUN (test): kuch mat bhejo, sirf plan batao ----------
+        // ---------- DRY RUN (test): kuch mat bhejo, sirf plan specify ----------
         if (dryRun) {
             const plan = use.map((s, i) => `• ${s.num}: ${emojis[i % emojis.length]}`).join('\n');
             const capped = amount > conns.length ? `\n⚠️ Amount ${amount} → cap ${conns.length} (1 account = 1 react)` : '';

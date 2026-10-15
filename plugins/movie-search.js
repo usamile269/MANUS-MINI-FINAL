@@ -120,7 +120,7 @@ cmd({
         }
     } catch (error) {
         console.log('[MOVIE] TMDB error:', error.response?.status || error.message);
-        await reply('❌ Movie search temporarily unavailable hai. Thori dair baad dobara try karein.');
+        await reply('❌ Movie search temporarily unavailable hai. Thori dair baad try again.');
     }
 });
 
