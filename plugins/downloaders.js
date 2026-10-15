@@ -1314,3 +1314,34 @@ async (conn, mek, m, { reply, args, from }) => {
         reply('❌ Pinterest search failed! Try again later or change your keyword.');
     }
 });
+
+// Movie download via YouTube — sends as document (no compression)
+cmd({ pattern: 'movie', alias: ['moviedl', 'film'], desc: 'Download full movie from YouTube as document', category: 'download', react: '🎬' },
+async (conn, mek, m, { reply, args, from }) => {
+    const query = args.join(' ').trim();
+    if (!query) return reply(dlBox('MOVIE', ['❌ Please provide a movie name!', '📝 Example: .movie avengers endgame'], '🎬'));
+    try {
+        await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
+        await reply(`🔍 Searching for "${query}"...`);
+        const video = await ytSearch(query + ' full movie');
+        await heavyQueue.run(async () => {
+            const media = await getAdeelVideoFile(video.url);
+            try {
+                await sendWithRetry(conn, from, {
+                    document: fs.createReadStream(media.filePath),
+                    mimetype: 'video/mp4',
+                    fileName: `${video.title?.slice(0, 50) || 'movie'}.mp4`,
+                    caption: dlBox('MOVIE', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded as document'], '🎬'),
+                    contextInfo: chanCtx()
+                }, { quoted: mek });
+            } finally {
+                try { if (fs.existsSync(media.filePath)) fs.unlinkSync(media.filePath); } catch {}
+            }
+            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
+        });
+    } catch (e) {
+        console.log('[MOVIE] error:', e.message);
+        await reply(dlBox('MOVIE', ['❌ Movie not found or download failed!', '📝 Try a different name'], '🎬'));
+        await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
+    }
+});
