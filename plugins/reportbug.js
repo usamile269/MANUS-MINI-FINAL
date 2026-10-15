@@ -31,6 +31,6 @@ cmd({
         reply('✅ Bug report bhej diya gaya — jald hi dekha jayega. Shukriya! 🙏');
     } catch (e) {
         console.log('[REPORTBUG] failed to send:', e.message);
-        reply('❌ Report bhejne mein masla hua, dobara try karo.');
+        reply('❌ Report bhejne mein masla hua, try again.');
     }
 });

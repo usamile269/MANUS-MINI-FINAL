@@ -23,7 +23,7 @@ cmd({
         );
     } catch (e) {
         console.log('[PRAYERTIME] failed:', e.message);
-        reply('❌ Prayer times fetch nahi ho sake, dobara try karo.\n💡 Use: .prayertime Lahore');
+        reply('❌ Prayer times fetch nahi ho sake, try again.\n💡 Use: .prayertime Lahore');
     }
 });
 
