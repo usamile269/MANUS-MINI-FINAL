@@ -1,44 +1,36 @@
-diff --git a/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js b/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js
-index d61e064..54ff6a1 100644
---- a/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js
-+++ b/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js
-@@ -441,6 +441,27 @@ export const makeMessagesSocket = (config) => {
-         msgId = msgId || generateMessageIDV2(meId);
-         useUserDevicesCache = useUserDevicesCache !== false;
-         useCachedGroupMetadata = useCachedGroupMetadata !== false && !isStatus;
-+        // Ensure groupStatusMessageV2 always has messageContextInfo.messageSecret
-+        if (message?.groupStatusMessageV2 && !message?.messageContextInfo?.messageSecret) {
-+            const { randomBytes } = await import('node:crypto');
-+            message = {
-+                ...message,
-+                messageContextInfo: {
-+                    ...(message.messageContextInfo || {}),
-+                    messageSecret: randomBytes(32)
-+                },
-+                groupStatusMessageV2: {
-+                    ...message.groupStatusMessageV2,
-+                    message: {
-+                        ...(message.groupStatusMessageV2.message || {}),
-+                        messageContextInfo: {
-+                            ...(message.groupStatusMessageV2.message?.messageContextInfo || {}),
-+                            messageSecret: message.messageContextInfo?.messageSecret || randomBytes(32)
-+                        }
-+                    }
-+                }
+--- a/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js	2026-10-15 12:17:50.376219742 +0500
++++ b/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js	2026-10-15 12:17:50.515953560 +0500
+@@ -540,6 +540,22 @@
+             }
+         };
+     }
++    // Group Status (innovatorssoft/Baileys proven): set isGroupStatus on inner
++    // message and wrap into groupStatusMessageV2 envelope
++    if (message && typeof message === 'object' && 'groupStatus' in message && !!message.groupStatus) {
++        const messageType = Object.keys(m)[0];
++        const key = m[messageType];
++        if (key && 'contextInfo' in key && !!key.contextInfo) {
++            key.contextInfo.isGroupStatus = message.groupStatus;
++        }
++        else if (key) {
++            key.contextInfo = {
++                isGroupStatus: message.groupStatus
 +            };
 +        }
-         const participants = [];
-         const destinationJid = !isStatus ? finalJid : statusJid;
-         const binaryNodeContent = [];
-@@ -883,6 +904,11 @@ export const makeMessagesSocket = (config) => {
-         return msgId;
-     };
-     const getMessageType = (message) => {
-+        // groupStatusMessageV2 must be checked BEFORE normalizeMessageContent
-+        // because normalizeMessageContent will unwrap it into the inner message
-+        if (message?.groupStatusMessageV2 || message?.groupStatusMessage) {
-+            return 'text';
-+        }
-         const normalizedMessage = normalizeMessageContent(message);
-         if (!normalizedMessage)
-             return 'text';
++        m = { groupStatusMessageV2: { message: m } };
++        delete message.groupStatus;
++    }
+     if (shouldIncludeReportingToken(m)) {
+         m.messageContextInfo = m.messageContextInfo || {};
+         if (!m.messageContextInfo.messageSecret) {
+--- a/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js	2026-10-15 12:17:50.380219255 +0500
++++ b/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js	2026-10-15 12:17:50.516708028 +0500
+@@ -466,7 +466,7 @@
+             });
+         }
+         await authState.keys.transaction(async () => {
+-            const mediaType = getMediaType(message);
++            const mediaType = getMediaType(normalizeMessageContent(message) || message);
+             if (mediaType) {
+                 extraAttrs['mediatype'] = mediaType;
+             }
