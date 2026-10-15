@@ -1,344 +1,230 @@
 const { cmd } = require('../ahmad-core');
-const { downloadContentFromMessage, generateWAMessage } = require('@whiskeysockets/baileys');
+const { downloadContentFromMessage, generateWAMessage, prepareWAMessageMedia } = require('@whiskeysockets/baileys');
 const { randomFooter } = require('../lib/menu-styles');
 const crypto = require('crypto');
 
-// 🚨 TRIED AND REVERTED (Bunty: wanted media attached to the real working
-// text status): attempted sending image/video as a text status carrying a
-// link-preview-style thumbnail (externalAdReplyInfo). Even after two
-// separate encoding fixes (pixel format, frame-timing), it still rendered
-// black in WhatsApp's Status viewer — confirmed this is a rendering
-// limitation of that mechanism inside Status specifically, not an encoding
-// bug on our side. Bunty's priority is the exact image/video showing with
-// no black, over having the green status-ring on it — so image/video now
-// go out as real media again (see below), same as before that experiment.
+// ============================================================================
+// .gcstatus — Group Status (groupStatusMessageV2)
+// ============================================================================
+// 2026-10-15: switched the Baileys dependency to the vkazee/baileys fork
+// (package.json: "@whiskeysockets/baileys": "npm:@vkazee/baileys@7.0.0-rc.9-patch.4").
+// That fork adds NATIVE media support inside groupStatusMessageV2, so
+// image/video/audio/sticker now post as REAL group statuses via sendMessage
+// (the fork injects messageSecret automatically). This replaces the old
+// text+thumbnail (externalAdReply) workaround, which rendered BLACK in
+// WhatsApp's Status viewer, and the manual upload+relayMessage hack.
+// Text statuses keep the previous working manual-relay path.
+// ============================================================================
 
-// 🆕 (Bunty: "AURA-MD wali file mein .gcstatus sahi hai, yeh lagao" then
-// "fallback koi na, AURA wala hi lagao") — posts the content directly INTO
-// the group via conn.relayMessage using groupStatusMessageV2, instead of
-// the bot's own personal WhatsApp Status.
-// 🚨 KNOWN LIMITATION, CONFIRMED VIA SCREENSHOTS (Bunty: real group status
-// shows a green ring on the group photo for TEXT, but not for image/video):
-// mainline @whiskeysockets/baileys doesn't implement groupStatusMessageV2
-// for media, only for text — and the text+thumbnail-preview workaround
-// (see comment above) also failed (rendered black). Bunty declined
-// switching to the unofficial fork that adds real media support. Final
-// state: text status is a real group status; image/video/audio/sticker
-// still attempt the real relay (harmless no-op if it fails) but are then
-// also sent as a normal group message so the actual content is always
-// visible, even without the green ring.
-// ---------------------------------------------------------------------------
 // Invite-link preview for .gcstatus.
 // Ahmad's screenshot: other bots' .gcstatus shows the group invite CARD
 // (pic + name + "Group chat invite") in the status, ours shows plain text.
 // Root cause: link previews are sender-embedded; bots must attach them.
-// NOTE: earlier attempts used `externalAdReplyInfo` inside contextInfo —
-// that is NOT a real Baileys field (correct name is `externalAdReply`),
-// so Baileys silently dropped it and the "black render" tests were invalid.
-// This uses the correct field.
-// ---------------------------------------------------------------------------
 function extractInviteLink(text) {
-    if (!text) return null;
-    const m = text.match(/https?:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/i);
-    return m ? m[0] : null;
+  if (!text) return null;
+  const m = text.match(/https?:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/i);
+  return m ? m[0] : null;
 }
 
 async function buildInvitePreview(conn, inviteUrl, fallbackJid) {
-    const code = inviteUrl.split('/').pop();
-    let groupName = 'WhatsApp Group';
-    let groupJid = fallbackJid || null;
-    try {
-        if (typeof conn.groupGetInviteInfo === 'function') {
-            const info = await conn.groupGetInviteInfo(code);
-            if (info) {
-                if (info.subject) groupName = info.subject;
-                if (info.id) groupJid = info.id;
-            }
-        }
-    } catch (e) {}
-    if (groupName === 'WhatsApp Group' && fallbackJid) {
-        try {
-            const meta = await conn.groupMetadata(fallbackJid);
-            if (meta && meta.subject) groupName = meta.subject;
-        } catch (e) {}
+  const code = inviteUrl.split('/').pop();
+  let groupName = 'WhatsApp Group';
+  let groupJid = fallbackJid || null;
+  try {
+    if (typeof conn.groupGetInviteInfo === 'function') {
+      const info = await conn.groupGetInviteInfo(code);
+      if (info) {
+        if (info.subject) groupName = info.subject;
+        if (info.id) groupJid = info.id;
+      }
     }
-    let thumb = null;
-    if (groupJid) {
-        try {
-            const picUrl = await conn.profilePictureUrl(groupJid, 'image');
-            if (picUrl) {
-                const res = await fetch(picUrl, { signal: AbortSignal.timeout(8000) });
-                if (res.ok) thumb = Buffer.from(await res.arrayBuffer());
-            }
-        } catch (e) {}
-    }
-    const ad = {
-        title: groupName,
-        body: 'Group chat invite',
-        sourceUrl: inviteUrl,
-        mediaType: 1,
-        renderLargerThumbnail: true,
-        showAdAttribution: false
-    };
-    if (thumb) ad.thumbnail = thumb;
-    return ad;
-}
-
-// 🆕 (Ahmad: "Mazari ke gcstatus me pic ati hai, description bhi, hamare q nahi")
-// Builds an ad-reply carrying THIS group's pic + name + description, so
-// .gcstatus media posts show the group card like Mazari's version.
-async function buildGroupAdReply(conn, groupJid) {
-    let title = 'GC STATUS';
-    let body = '';
-    let thumb = null;
+  } catch (e) {}
+  if (groupName === 'WhatsApp Group' && fallbackJid) {
     try {
-        const meta = await conn.groupMetadata(groupJid);
-        if (meta) {
-            if (meta.subject) title = meta.subject;
-            if (meta.desc) body = String(meta.desc).slice(0, 100);
-        }
+      const meta = await conn.groupMetadata(fallbackJid);
+      if (meta && meta.subject) groupName = meta.subject;
     } catch (e) {}
+  }
+  let thumb = null;
+  if (groupJid) {
     try {
-        const picUrl = await conn.profilePictureUrl(groupJid, 'image');
-        if (picUrl) {
-            const res = await fetch(picUrl, { signal: AbortSignal.timeout(8000) });
-            if (res.ok) thumb = Buffer.from(await res.arrayBuffer());
-        }
+      const picUrl = await conn.profilePictureUrl(groupJid, 'image');
+      if (picUrl) {
+        const res = await fetch(picUrl, { signal: AbortSignal.timeout(8000) });
+        if (res.ok) thumb = Buffer.from(await res.arrayBuffer());
+      }
     } catch (e) {}
-    const ad = { title, body, mediaType: 1, renderLargerThumbnail: true, showAdAttribution: false };
-    if (thumb) ad.thumbnail = thumb;
-    return ad;
+  }
+  const ad = {
+    title: groupName,
+    body: 'Group chat invite',
+    sourceUrl: inviteUrl,
+    mediaType: 1,
+    renderLargerThumbnail: true,
+    showAdAttribution: false,
+  };
+  if (thumb) ad.thumbnail = thumb;
+  return ad;
 }
 
 async function relayGroupStatusV2(conn, jid, msgContent) {
-    const messageSecret = crypto.randomBytes(32);
-    let msg;
-    // For media: upload first, then build message manually (JawadMD-style)
-    if (msgContent.image || msgContent.video) {
-        const isImg = !!msgContent.image;
-        const buffer = msgContent.image || msgContent.video;
-        const caption = msgContent.caption || '';
-        // Upload to WhatsApp servers
-        const { upload } = require('@whiskeysockets/baileys');
-        const uploaded = await conn.waUploadToServer(buffer, { mediaType: isImg ? 'image' : 'video' });
-        const crypto = require('crypto');
-        const sha256 = crypto.createHash('sha256').update(buffer).digest();
-        // Get image dimensions (fallback to defaults)
-        let w = 1080, h = 1080;
-        try {
-            if (isImg) {
-                // Simple JPEG/PNG dimension parse
-                if (buffer[0]===0xFF && buffer[1]===0xD8) { w=1080; h=1080; }
-                else if (buffer[0]===0x89 && buffer[1]===0x50) {
-                    w = buffer.readUInt32BE(16); h = buffer.readUInt32BE(20);
-                }
-            }
-        } catch(e) {}
-        const mediaMsg = isImg ? {
-            imageMessage: {
-                url: uploaded.url, mimetype: 'image/jpeg',
-                caption, fileSha256: sha256, fileLength: buffer.length,
-                width: w, height: h, mediaKey: uploaded.mediaKey,
-                fileEncSha256: uploaded.fileEncSha256 || sha256,
-                directPath: uploaded.directPath || ''
-            }
-        } : {
-            videoMessage: {
-                url: uploaded.url, mimetype: 'video/mp4',
-                caption, fileSha256: sha256, fileLength: buffer.length,
-                width: 720, height: 1280, mediaKey: uploaded.mediaKey,
-                fileEncSha256: uploaded.fileEncSha256 || sha256,
-                directPath: uploaded.directPath || '', seconds: 10
-            }
-        };
-        msg = await generateWAMessage(jid, mediaMsg, { userJid: conn.user.id });
+  // MEDIA: native group-status via the vkazee fork. prepareWAMessageMedia
+  // uploads + builds the media node, sendMessage wraps it in
+  // groupStatusMessageV2 (messageSecret auto-injected by the fork).
+  if (msgContent.image || msgContent.video || msgContent.audio || msgContent.sticker) {
+    let mediaInput;
+    if (msgContent.image) {
+      mediaInput = { image: msgContent.image, caption: msgContent.caption || '' };
+    } else if (msgContent.video) {
+      mediaInput = { video: msgContent.video, caption: msgContent.caption || '', mimetype: 'video/mp4' };
+    } else if (msgContent.audio) {
+      mediaInput = { audio: msgContent.audio, mimetype: msgContent.mimetype || 'audio/mp4', ptt: !!msgContent.ptt };
     } else {
-        msg = await generateWAMessage(jid, msgContent, {
-            userJid: conn.user.id,
-            upload: conn.waUploadToServer
-        });
+      mediaInput = { sticker: msgContent.sticker };
     }
-    const relayMsg = {
-        groupStatusMessageV2: {
-            message: msg.message,
-            messageContextInfo: { messageSecret }
-        }
-    };
-    await conn.relayMessage(jid, relayMsg, { messageId: msg.key.id });
-    return msg;
+    const prepared = await prepareWAMessageMedia(mediaInput, { upload: conn.waUploadToServer });
+    return conn.sendMessage(jid, { groupStatusMessageV2: { message: prepared } });
+  }
+
+  // TEXT: manual relay (already working — green-ring status).
+  const messageSecret = crypto.randomBytes(32);
+  const msg = await generateWAMessage(jid, msgContent, {
+    userJid: conn.user.id,
+    upload: conn.waUploadToServer
+  });
+  const relayMsg = {
+    groupStatusMessageV2: {
+      message: msg.message,
+      messageContextInfo: { messageSecret }
+    }
+  };
+  await conn.relayMessage(jid, relayMsg, { messageId: msg.key.id });
+  return msg;
 }
 
 // ============================================================================
 // .gcstatus / .gstatus / .poststatus / .statuspost
 // ----------------------------------------------------------------------------
 // Posts directly into the group as a native Group Status (groupStatusMessageV2)
-// — NOT the bot's personal WhatsApp Status. Unlike the old status@broadcast
+// — NOT the bot's own personal WhatsApp Status. Unlike the old status@broadcast
 // approach, this isn't subject to "only people who've saved the bot's number
 // as a contact can see it" — it's genuinely a group-scoped post.
 // ============================================================================
 
 async function downloadQuotedMedia(quotedMsg, type) {
-    const mediaTypeMap = { imageMessage: 'image', videoMessage: 'video', audioMessage: 'audio', stickerMessage: 'sticker' };
-    const mediaType = mediaTypeMap[type];
-    const stream = await downloadContentFromMessage(quotedMsg[type], mediaType);
-    let buffer = Buffer.from([]);
-    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-    return buffer;
+  const mediaTypeMap = { imageMessage: 'image', videoMessage: 'video', audioMessage: 'audio', stickerMessage: 'sticker' };
+  const mediaType = mediaTypeMap[type];
+  const stream = await downloadContentFromMessage(quotedMsg[type], mediaType);
+  let buffer = Buffer.from([]);
+  for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+  return buffer;
 }
 
 cmd({
-    pattern: "groupstatus",
-    alias: ["gstatus", "poststatus", "statuspost", "gcstatus"],
-    desc: "Post text/image/video/audio/sticker as a native Group Status, visible to everyone in this group",
-    category: "group",
-    react: "📡",
-    filename: __filename
+  pattern: "groupstatus",
+  alias: ["gstatus", "poststatus", "statuspost", "gcstatus"],
+  desc: "Post text/image/video/audio/sticker as a native Group Status, visible to everyone in this group",
+  category: "group",
+  react: "📡",
+  filename: __filename
 }, async (conn, mek, m, { body, reply, from, isGroup }) => {
-    try {
-        if (!isGroup) return reply("❌ This command only works in groups.");
-        await conn.sendMessage(from, { react: { text: "📡", key: m.key } });
+  try {
+    if (!isGroup) return reply("❌ This command only works in groups.");
+    await conn.sendMessage(from, { react: { text: "📡", key: m.key } });
+    const caption = body.split(" ").slice(1).join(" ");
+    const quoted = m.quoted?.message;
+    const done = (label) => `╭═══ ✅ STATUS ═══⊷\n┃❃╭──────────────\n┃❃│ ✅ ${label}\n┃❃│ 🟢 Posted as this group's Status\n┃❃╰───────────────\n╰═════════════════⊷\n\n> ${randomFooter()}`;
 
-        const caption = body.split(" ").slice(1).join(" ");
-        const quoted = m.quoted?.message;
-
-        const done = (label) => `╭═══ ✅ STATUS ═══⊷\n┃❃╭──────────────\n┃❃│ ✅ ${label}\n┃❃│ 🟢 Posted as this group's Status\n┃❃╰───────────────\n╰═════════════════⊷\n\n> ${randomFooter()}`;
-
-        if (!quoted && caption) {
-            // 🆕 Invite-link preview card in the status itself (Ahmad's
-            // screenshot: other bots show pic+name card, ours was plain).
-            const inviteUrl = extractInviteLink(caption);
-            if (inviteUrl) {
-                const adReply = await buildInvitePreview(conn, inviteUrl, from);
-                await relayGroupStatusV2(conn, from, { text: caption, contextInfo: { externalAdReply: adReply } });
-            } else {
-                await relayGroupStatusV2(conn, from, { text: caption });
-            }
-            await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
-            return reply(done('Text status posted!'));
-        }
-        if (!quoted) {
-            await conn.sendMessage(from, { react: { text: "❌", key: m.key } });
-            return reply(`❌ No message or media!\n💡 Use: .gcstatus Hello\n💡 Or reply to media with .gcstatus`);
-        }
-
-        if (quoted.imageMessage) {
-            const media = await downloadQuotedMedia(quoted, 'imageMessage');
-            const imgCaption = caption || quoted.imageMessage.caption || '';
-            // 🚨 THIRD ATTEMPT (Bunty: the text+thumbnail approach DID get
-            // the real green-ring status-attach working, only the picture
-            // itself came out black — wants that mechanism back, fixed).
-            // Previous two attempts re-encoded the thumbnail ourselves via
-            // ffmpeg, which could itself have been the bug. This time: use
-            // the jpegThumbnail WhatsApp itself already generated for this
-            // exact image (every image message carries one) — it's
-            // guaranteed to be a valid, correctly-formatted small JPEG
-            // since WhatsApp made it, so if THIS still comes out black,
-            // that conclusively proves it's the Status viewer's rendering,
-            // not our encoding. Real media is still sent right after either
-            // way, so nothing is lost if it's still black.
-            if (quoted.imageMessage.jpegThumbnail) {
-                // 🐛 FIX: externalAdReplyInfo is NOT a real Baileys field —
-                // correct name is externalAdReply (was silently dropped before).
-                // 🆕 Also attach group pic + description like Mazari's version.
-                const grpAd = await buildGroupAdReply(conn, from);
-                await relayGroupStatusV2(conn, from, {
-                    text: imgCaption || ' ',
-                    contextInfo: {
-                        externalAdReply: {
-                            title: grpAd.title || 'GC STATUS',
-                            body: grpAd.body || '',
-                            thumbnail: quoted.imageMessage.jpegThumbnail,
-                            mediaType: 1,
-                            renderLargerThumbnail: true,
-                            showAdAttribution: false,
-                            sourceUrl: grpAd.sourceUrl
-                        }
-                    }
-                }).catch(() => {});
-            }
-            await relayGroupStatusV2(conn, from, { image: media, caption: imgCaption }).catch(() => {});
-            // Also post to bot's own status (backup - supports images properly)
-            try {
-                await conn.sendMessage('status@broadcast', { image: media, caption: imgCaption });
-            } catch(e) {}
-            // 🆕 Invite-link preview card on the visible group message too
-            // (Ahmad: ".gcstatus may pic atii, link [ka preview] nii").
-            let imgCtx = {};
-            const imgInvite = extractInviteLink(imgCaption);
-            if (imgInvite) {
-                imgCtx = { externalAdReply: await buildInvitePreview(conn, imgInvite, from) };
-            }
-            await conn.sendMessage(from, {
-                image: media,
-                caption: `╭═══ 📡 GC STATUS ═══⊷\n┃❃│ ${imgCaption || 'Image status'}\n╰═════════════════⊷`,
-                contextInfo: imgCtx
-            }, { quoted: mek });
-            await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
-            return reply(done('Image status posted!'));
-        }
-        if (quoted.videoMessage) {
-            const media = await downloadQuotedMedia(quoted, 'videoMessage');
-            const vidCaption = caption || quoted.videoMessage.caption || '';
-            if (quoted.videoMessage.jpegThumbnail) {
-                // 🐛 FIX: externalAdReply (not externalAdReplyInfo) + group pic/desc.
-                const grpAdV = await buildGroupAdReply(conn, from);
-                await relayGroupStatusV2(conn, from, {
-                    text: vidCaption || ' ',
-                    contextInfo: {
-                        externalAdReply: {
-                            title: grpAdV.title || 'GC STATUS',
-                            body: grpAdV.body || '',
-                            thumbnail: quoted.videoMessage.jpegThumbnail,
-                            mediaType: 2,
-                            renderLargerThumbnail: true,
-                            showAdAttribution: false,
-                            sourceUrl: grpAdV.sourceUrl
-                        }
-                    }
-                }).catch(() => {});
-            }
-            await relayGroupStatusV2(conn, from, { video: media, caption: vidCaption, mimetype: 'video/mp4' }).catch(() => {});
-            let vidCtx = {};
-            const vidInvite = extractInviteLink(vidCaption);
-            if (vidInvite) {
-                vidCtx = { externalAdReply: await buildInvitePreview(conn, vidInvite, from) };
-            }
-            await conn.sendMessage(from, {
-                video: media,
-                mimetype: 'video/mp4',
-                caption: `╭═══ 📡 GC STATUS ═══⊷\n┃❃│ ${vidCaption || 'Video status'}\n╰═════════════════⊷`,
-                contextInfo: vidCtx
-            }, { quoted: mek });
-            await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
-            return reply(done('Video status posted!'));
-        }
-        if (quoted.audioMessage) {
-            const media = await downloadQuotedMedia(quoted, 'audioMessage');
-            await relayGroupStatusV2(conn, from, { audio: media, mimetype: "audio/mp4", ptt: false }).catch(() => {});
-            await conn.sendMessage(from, { audio: media, mimetype: "audio/mp4", ptt: false }, { quoted: mek });
-            await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
-            return reply(done('Audio status posted!'));
-        }
-        if (quoted.stickerMessage) {
-            const media = await downloadQuotedMedia(quoted, 'stickerMessage');
-            await relayGroupStatusV2(conn, from, { sticker: media }).catch(() => {});
-            await conn.sendMessage(from, { sticker: media }, { quoted: mek });
-            await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
-            return reply(done('Sticker status posted!'));
-        }
-        if (quoted.documentMessage || quoted.conversation || quoted.extendedTextMessage) {
-            const text = caption || quoted.extendedTextMessage?.text || quoted.conversation || 'No text';
-            await relayGroupStatusV2(conn, from, { text });
-            await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
-            return reply(done('Text/Doc status posted!'));
-        }
-
-        await conn.sendMessage(from, { react: { text: "❌", key: m.key } });
-        return reply(`❌ Unsupported media type — reply to image/video/audio/sticker/text.`);
-
-    } catch (err) {
-        console.log("GROUPSTATUS ERROR:", err);
-        await conn.sendMessage(from, { react: { text: "❌", key: m.key } });
-        reply(`❌ Error: ${err.message}\n📌 Ensure bot's account allows Status posting.`);
+    if (!quoted && caption) {
+      // Invite-link preview card in the status itself (Ahmad's
+      // screenshot: other bots show pic+name card, ours was plain).
+      const inviteUrl = extractInviteLink(caption);
+      if (inviteUrl) {
+        const adReply = await buildInvitePreview(conn, inviteUrl, from);
+        await relayGroupStatusV2(conn, from, { text: caption, contextInfo: { externalAdReply: adReply } });
+      } else {
+        await relayGroupStatusV2(conn, from, { text: caption });
+      }
+      await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
+      return reply(done('Text status posted!'));
     }
+
+    if (!quoted) {
+      await conn.sendMessage(from, { react: { text: "❌", key: m.key } });
+      return reply(`❌ No message or media!\n💡 Use: .gcstatus Hello\n💡 Or reply to media with .gcstatus`);
+    }
+
+    if (quoted.imageMessage) {
+      const media = await downloadQuotedMedia(quoted, 'imageMessage');
+      const imgCaption = caption || quoted.imageMessage.caption || '';
+      await relayGroupStatusV2(conn, from, { image: media, caption: imgCaption }).catch(() => {});
+      // Also post to bot's own status (backup - supports images properly)
+      try {
+        await conn.sendMessage('status@broadcast', { image: media, caption: imgCaption });
+      } catch (e) {}
+      // Invite-link preview card on the visible group message too
+      // (Ahmad: ".gcstatus may pic atii, link [ka preview] nii").
+      let imgCtx = {};
+      const imgInvite = extractInviteLink(imgCaption);
+      if (imgInvite) {
+        imgCtx = { externalAdReply: await buildInvitePreview(conn, imgInvite, from) };
+      }
+      await conn.sendMessage(from, {
+        image: media,
+        caption: `╭═══ 📡 GC STATUS ═══⊷\n┃❃│ ${imgCaption || 'Image status'}\n╰═════════════════⊷`,
+        contextInfo: imgCtx
+      }, { quoted: mek });
+      await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
+      return reply(done('Image status posted!'));
+    }
+
+    if (quoted.videoMessage) {
+      const media = await downloadQuotedMedia(quoted, 'videoMessage');
+      const vidCaption = caption || quoted.videoMessage.caption || '';
+      await relayGroupStatusV2(conn, from, { video: media, caption: vidCaption, mimetype: 'video/mp4' }).catch(() => {});
+      let vidCtx = {};
+      const vidInvite = extractInviteLink(vidCaption);
+      if (vidInvite) {
+        vidCtx = { externalAdReply: await buildInvitePreview(conn, vidInvite, from) };
+      }
+      await conn.sendMessage(from, {
+        video: media,
+        mimetype: 'video/mp4',
+        caption: `╭═══ 📡 GC STATUS ═══⊷\n┃❃│ ${vidCaption || 'Video status'}\n╰═════════════════⊷`,
+        contextInfo: vidCtx
+      }, { quoted: mek });
+      await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
+      return reply(done('Video status posted!'));
+    }
+
+    if (quoted.audioMessage) {
+      const media = await downloadQuotedMedia(quoted, 'audioMessage');
+      await relayGroupStatusV2(conn, from, { audio: media, mimetype: "audio/mp4", ptt: false }).catch(() => {});
+      await conn.sendMessage(from, { audio: media, mimetype: "audio/mp4", ptt: false }, { quoted: mek });
+      await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
+      return reply(done('Audio status posted!'));
+    }
+
+    if (quoted.stickerMessage) {
+      const media = await downloadQuotedMedia(quoted, 'stickerMessage');
+      await relayGroupStatusV2(conn, from, { sticker: media }).catch(() => {});
+      await conn.sendMessage(from, { sticker: media }, { quoted: mek });
+      await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
+      return reply(done('Sticker status posted!'));
+    }
+
+    if (quoted.documentMessage || quoted.conversation || quoted.extendedTextMessage) {
+      const text = caption || quoted.extendedTextMessage?.text || quoted.conversation || 'No text';
+      await relayGroupStatusV2(conn, from, { text });
+      await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
+      return reply(done('Text/Doc status posted!'));
+    }
+
+    await conn.sendMessage(from, { react: { text: "❌", key: m.key } });
+    return reply(`❌ Unsupported media type — reply to image/video/audio/sticker/text.`);
+  } catch (err) {
+    console.log("GROUPSTATUS ERROR:", err);
+    await conn.sendMessage(from, { react: { text: "❌", key: m.key } });
+    reply(`❌ Error: ${err.message}\n📌 Ensure bot's account allows Status posting.`);
+  }
 });
