@@ -77,53 +77,6 @@ function movieText(movie, trailerUrl) {
     ].join('\n');
 }
 
-cmd({
-    pattern: 'movie',
-    desc: 'Search movie info, rating, plot and legal links',
-    category: 'search',
-    filename: __filename,
-    react: '🎬'
-}, async (conn, mek, m, { q, reply, from }) => {
-    const query = String(q || '').trim();
-    if (!query) return reply('📝 Usage: .movie <movie name>\nExample: .movie Lover');
-    if (!tmdbRequired(reply)) return;
-
-    try {
-        const params = {
-            api_key: process.env.TMDB_API_KEY,
-            query,
-            include_adult: false,
-            language: 'en-US',
-            page: 1,
-            region: MOVIE_REGION
-        };
-        const searchResponse = await axios.get(`${TMDB_API}/search/movie`, { params, timeout: REQUEST_TIMEOUT });
-        const movie = searchResponse.data?.results?.[0];
-        if (!movie) return reply(`❌ Movie nahi mili: ${query}`);
-
-        const year = yearOf(movie.release_date);
-        const [detailsResponse, trailerUrl] = await Promise.all([
-            axios.get(`${TMDB_API}/movie/${movie.id}`, {
-                params: { api_key: process.env.TMDB_API_KEY, language: 'en-US' },
-                timeout: REQUEST_TIMEOUT
-            }).catch(() => ({ data: movie })),
-            searchTrailer(movie.title || movie.original_title, year)
-        ]);
-        const details = { ...movie, ...(detailsResponse.data || {}) };
-        const text = movieText(details, trailerUrl);
-        const poster = details.poster_path ? `${TMDB_IMAGE}${details.poster_path}` : null;
-
-        if (poster) {
-            await conn.sendMessage(from, { image: { url: poster }, caption: text }, { quoted: mek });
-        } else {
-            await conn.sendMessage(from, { text }, { quoted: mek });
-        }
-    } catch (error) {
-        console.log('[MOVIE] TMDB error:', error.response?.status || error.message);
-        await reply('❌ Movie search temporarily unavailable hai. Thori dair baad try again.');
-    }
-});
-
 // Curated titles whose public-domain status is well established. Metadata and
 // watch pages are resolved from Internet Archive; no third-party download host
 // or torrent link is exposed.
