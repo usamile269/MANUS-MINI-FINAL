@@ -860,6 +860,21 @@ async (conn, mek, m, { reply, args, from, q }) => {
                 if (!video?.url) throw new Error('RapidAPI: no url');
                 return { url: video.url, isVid: (video.ext === 'mp4' || video.type === 'video') };
             },
+            // Method 7: yt-dlp (most reliable — handles Instagram directly, bypasses dead APIs)
+            async () => {
+                const wrap = await ensureYtDlp();
+                const raw = await wrap.execPromise([url, '--dump-json', '--no-playlist', '--skip-download', ...cookieArgs()]);
+                const info = JSON.parse(raw.trim().split('\n')[0]);
+                // For videos: get best mp4 URL; for images: get thumbnail
+                if (info.ext === 'mp4' || info._type === 'video' || (info.formats && info.formats.length)) {
+                    const fmts = (info.formats || []).filter(f => f.url && f.ext === 'mp4');
+                    const best = fmts.sort((a, b) => (b.height || 0) - (a.height || 0))[0] || { url: info.url };
+                    if (!best.url) throw new Error('yt-dlp: no video url');
+                    return { url: best.url, isVid: true };
+                }
+                if (info.thumbnail) return { url: info.thumbnail, isVid: false };
+                throw new Error('yt-dlp: no media found');
+            },
         ];
 
         try {
@@ -867,10 +882,10 @@ async (conn, mek, m, { reply, args, from, q }) => {
             mediaUrl = winner.url;
             isVid = winner.isVid;
         } catch (e) {
-            console.log(`[IGDL] All 6 parallel methods failed for url: ${url}`);
+            console.log(`[IGDL] All 7 parallel methods failed for url: ${url}`);
         }
 
-        if (!mediaUrl) { console.log(`[IGDL] All 6 methods failed for url: ${url}`); throw new Error('No media'); }
+        if (!mediaUrl) { console.log(`[IGDL] All 7 methods failed for url: ${url}`); throw new Error('No media'); }
         if (isVid) {
             await conn.sendMessage(from, { video: { url: mediaUrl }, caption: dlBox('INSTAGRAM', ['✅ Downloaded!'], '📸'), contextInfo: chanCtx() }, { quoted: fakevCard });
         } else {
