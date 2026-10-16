@@ -886,10 +886,23 @@ async (conn, mek, m, { reply, args, from, q }) => {
         }
 
         if (!mediaUrl) { console.log(`[IGDL] All 7 methods failed for url: ${url}`); throw new Error('No media'); }
+        // Download to server first (Instagram CDN URLs often expire or need headers)
+        const dlRes = await axios.get(mediaUrl, {
+            responseType: 'arraybuffer',
+            timeout: 60000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': 'https://www.instagram.com/',
+                'Accept': '*/*'
+            },
+            maxContentLength: 100 * 1024 * 1024, // 100MB max
+        });
+        const mediaBuf = Buffer.from(dlRes.data);
+        if (mediaBuf.length < 1024) throw new Error('Downloaded file too small/corrupt');
         if (isVid) {
-            await conn.sendMessage(from, { video: { url: mediaUrl }, caption: dlBox('INSTAGRAM', ['✅ Downloaded!'], '📸'), contextInfo: chanCtx() }, { quoted: fakevCard });
+            await conn.sendMessage(from, { video: mediaBuf, caption: dlBox('INSTAGRAM', ['✅ Downloaded!'], '📸'), contextInfo: chanCtx() }, { quoted: fakevCard });
         } else {
-            await conn.sendMessage(from, { image: { url: mediaUrl }, caption: dlBox('INSTAGRAM', ['✅ Downloaded!'], '📸'), contextInfo: chanCtx() }, { quoted: fakevCard });
+            await conn.sendMessage(from, { image: mediaBuf, caption: dlBox('INSTAGRAM', ['✅ Downloaded!'], '📸'), contextInfo: chanCtx() }, { quoted: fakevCard });
         }
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
     } catch (e) {
