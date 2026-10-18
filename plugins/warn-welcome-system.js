@@ -319,6 +319,7 @@ cmd({
 
 cmd({
     pattern: "ggoodbyevideo",
+    alias: ["setgoodbyevideo"],
     desc: "🎬 Set a video for the goodbye message (in a group = that group; from your own DM = all groups you admin; owner's DM = every group)",
     category: "settings",
     react: "🎬",
