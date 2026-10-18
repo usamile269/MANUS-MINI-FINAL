@@ -137,6 +137,7 @@ cmd({
 // remove it and go back to text-only.
 cmd({
     pattern: "gwelcomevideo",
+    alias: ["setwelcomevideo"],
     desc: "🎬 Set a video for the welcome message (in a group = that group; from your own DM = all groups you admin; owner's DM = every group)",
     category: "settings",
     react: "🎬",
