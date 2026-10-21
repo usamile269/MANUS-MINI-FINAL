@@ -12,6 +12,22 @@ const {
     fetchLatestBaileysVersion,
 } = require('@whiskeysockets/baileys');
 const config = require('./config');
+// 🔒 ADDJID PERSISTENCE FIX: .addjid/.removejid (plugins/owner.js) save the
+// effective channel JID lists to the jsondb 'ChannelJids' collection (on the
+// persistent /data volume). Restore them here at boot so owner-added JIDs
+// survive restarts/redeploys — config.js alone only holds the built-in
+// defaults, which is why runtime-added JIDs used to vanish (auto-follow /
+// auto-react silently stopped for them after every restart).
+try {
+    const __jidStore = require('./lib/jsondb').model('ChannelJids');
+    const __savedJids = (__jidStore.docs || []).find((d) => d && d.key === 'lists');
+    if (__savedJids) {
+        if (Array.isArray(__savedJids.follow)) config.AUTO_FOLLOW_JIDS = __savedJids.follow.slice();
+        if (Array.isArray(__savedJids.post)) config.CHANNEL_POST_JIDS = __savedJids.post.slice();
+    }
+} catch (e) {
+    console.log('[ADDJID] saved channel JID restore failed:', e.message);
+}
 const { normalizePairingNumber } = require('./lib/phone-number');
 const { recordPresence } = require('./lib/group-presence');
 // 🚀 GLOBAL SPEED BOOST (Bunty: "speed boost like rocket") — axios.defaults

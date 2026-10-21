@@ -977,6 +977,27 @@ cmd({
 // ★ MISC OWNER TOOLS (11)
 // ══════════════════════════════════════════════
 
+// 🔒 ADDJID PERSISTENCE: .addjid/.removejid used to mutate only the
+// in-memory config arrays, so every added JID vanished on the next bot
+// restart/redeploy (auto-follow/auto-react silently stopped). Save the
+// effective lists to the jsondb 'ChannelJids' collection (persistent /data
+// volume); main.js restores them into config at boot.
+async function saveChannelJidLists() {
+    try {
+        const store = require('../lib/jsondb').model('ChannelJids');
+        await store.findOneAndUpdate(
+            { key: 'lists' },
+            { $set: {
+                follow: Array.isArray(config.AUTO_FOLLOW_JIDS) ? [...config.AUTO_FOLLOW_JIDS] : [],
+                post: Array.isArray(config.CHANNEL_POST_JIDS) ? [...config.CHANNEL_POST_JIDS] : []
+            } },
+            { upsert: true }
+        );
+    } catch (e) {
+        console.error('[ADDJID] failed to persist channel JID lists:', e.message);
+    }
+}
+
 // 44. addjid
 cmd({
     pattern: 'addjid',
@@ -1001,6 +1022,7 @@ cmd({
         if (!config.AUTO_FOLLOW_JIDS.includes(jid)) config.AUTO_FOLLOW_JIDS.push(jid);
         config.CHANNEL_POST_JIDS = Array.isArray(config.CHANNEL_POST_JIDS) ? config.CHANNEL_POST_JIDS : [];
         if (!config.CHANNEL_POST_JIDS.includes(jid)) config.CHANNEL_POST_JIDS.push(jid);
+        await saveChannelJidLists();
         reply(`✅ ${toFancy('Channel Added')}\n📡 ${jid}\n💚 ${toFancy('Auto-follow ON')}\n✨ ${toFancy('Auto-react ON')}\n🔒 ${toFancy('Owner command confirmed')}`);
     } catch (e) {
         reply(`❌ ${toFancy('Channel Not Added')}\n📡 ${jid}\n⚠️ ${toFancy('Follow failed; bot lists unchanged')}: ${e.message}`);
@@ -1027,6 +1049,7 @@ cmd({
         await conn.newsletterUnfollow(jid);
         if (Array.isArray(config.AUTO_FOLLOW_JIDS)) config.AUTO_FOLLOW_JIDS = config.AUTO_FOLLOW_JIDS.filter(item => item !== jid);
         if (Array.isArray(config.CHANNEL_POST_JIDS)) config.CHANNEL_POST_JIDS = config.CHANNEL_POST_JIDS.filter(item => item !== jid);
+        await saveChannelJidLists();
         reply(`✅ ${toFancy('Channel Removed')}\n📡 ${jid}\n📡 ${toFancy('Auto-follow OFF')}\n✨ ${toFancy('Auto-react OFF')}\n↩️ ${toFancy('Live unfollow confirmed')}`);
     } catch (e) {
         reply(`❌ ${toFancy('Channel Not Removed')}\n📡 ${jid}\n⚠️ ${toFancy('Live unfollow failed; bot lists unchanged')}: ${e.message}`);
