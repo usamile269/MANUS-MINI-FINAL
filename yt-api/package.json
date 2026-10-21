@@ -1,0 +1,1 @@
+{"description":"Ahmad's own YouTube downloader API (yt-dlp based) for the Ahmad Mini WhatsApp bot","engines":{"node":">=18"},"main":"server.js","name":"bunty-yt-api","private":true,"scripts":{"start":"node server.js"},"version":"1.0.0"}
