@@ -93,6 +93,28 @@ app.listen(port, () => {
     console.log(`🚀 Server running on port ${port}`);
 });
 
+// BUNTY YT API sidecar: Ahmad's own YouTube downloader API (yt-api/ folder)
+// runs as a child process on localhost:3001, so .play/.video no longer depend
+// on dead third-party APIs. The child env overrides PORT (the bot keeps its
+// own port) and puts the container bin/ first on PATH so it finds yt-dlp.
+// It restarts itself if it exits.
+const { spawn } = require('child_process');
+let ytApiChild = null;
+function startYtApi() {
+    try {
+        ytApiChild = spawn(process.execPath, ['yt-api/server.js'], {
+            env: { ...process.env, PORT: '3001', PATH: process.cwd() + '/bin:' + (process.env.PATH || '') },
+            stdio: 'inherit'
+        });
+        ytApiChild.on('exit', (code) => {
+            console.log(`[YT-API] exited (${code}), restarting in 5s...`);
+            setTimeout(startYtApi, 5000);
+        });
+        ytApiChild.on('error', (e) => console.log('[YT-API] spawn error:', e.message));
+    } catch (e) { console.log('[YT-API] failed to start:', e.message); }
+}
+startYtApi();
+
 let pairRouter;
 try {
     pairRouter = require('./main');

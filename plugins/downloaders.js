@@ -465,7 +465,12 @@ async function raceVideoMedia(videoUrl) {
     return downloadYtDlpBuffer(videoUrl);
 }
 
-// Adeel-XTech currently returns working direct media URLs. Fetch the bytes
+// Own API (BUNTY YT API): Ahmad's own YouTube downloader API — replaces the
+// dead third-party Adeel API. After deploying the yt-api/ folder, set
+// YT_API_BASE to its domain. Response shape is identical to Adeel's.
+const YT_API_BASE = process.env.YT_API_BASE || 'https://REPLACE-WITH-OWN-API-DOMAIN';
+
+// The provider returns working direct media URLs. Fetch the bytes
 // here before handing them to Baileys: sending the provider URL directly makes
 // WhatsApp fetch an expiring/unstable CDN URL and is the reason .video was
 // intermittently failing even when the API itself succeeded.
@@ -476,9 +481,9 @@ async function getAdeelMedia(videoUrl, type) {
     let lastError;
     for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-            ({ data } = await axios.get(`https://adeel-xtech-apis.vercel.app/api/${route}`, {
+            ({ data } = await axios.get(`${YT_API_BASE}/api/${route}`, {
                 ...AXIOS_DEFAULTS,
-                timeout: 20000,
+                timeout: 75000,
                 family: 4,
                 params: { url: videoUrl }
             }));
@@ -529,9 +534,9 @@ async function getAdeelVideoFile(videoUrl) {
     let lastError;
     for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-            ({ data } = await axios.get('https://adeel-xtech-apis.vercel.app/api/ytmp4v2', {
+            ({ data } = await axios.get(`${YT_API_BASE}/api/ytmp4v2`, {
                 ...AXIOS_DEFAULTS,
-                timeout: 20000,
+                timeout: 75000,
                 family: 4,
                 params: { url: videoUrl }
             }));
@@ -575,8 +580,8 @@ async function getAdeelVideoLink(videoUrl) {
     let lastError;
     for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-            const { data } = await axios.get('https://adeel-xtech-apis.vercel.app/api/ytmp4v2', {
-                ...AXIOS_DEFAULTS, timeout: 20000, family: 4, params: { url: videoUrl }
+            const { data } = await axios.get(`${YT_API_BASE}/api/ytmp4v2`, {
+                ...AXIOS_DEFAULTS, timeout: 75000, family: 4, params: { url: videoUrl }
             });
             const mediaUrl = data?.status && data?.result?.video_download;
             if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) throw new Error('no video URL');
@@ -908,7 +913,7 @@ async (conn, mek, m, { reply, args, from, q }) => {
     } catch (e) {
         console.log('[IGDL] final failure:', e.message);
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-        reply('❌ Instagram download failed! Post public honi chahiye.');
+        reply('❌ Instagram download failed! The post must be public.');
     }
 });
 
@@ -949,7 +954,7 @@ async (conn, mek, m, { reply, args, from, q }) => {
     } catch (e) {
         console.log('[FB] both sources failed:', e.message);
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-        reply('❌ FB download failed! Public video honi chahiye.');
+        reply('❌ FB download failed! The video must be public.');
     }
 });
 
@@ -1120,7 +1125,7 @@ async (conn, mek, m, { reply, args, from }) => {
         await conn.sendMessage(from, { react: { text: '❌', key: mek.key } }).catch(() => {});
         console.log('[YTMP4 FINAL ERROR]', e.message);
         if (String(e.message).startsWith('YTSEARCH_FAILED')) return replyWithRetry(conn, from, mek, '❌ YouTube search failed. Paste a direct YouTube link and try again.');
-        return replyWithRetry(conn, from, mek, '❌ Download failed. Provider/source ne media return nahi ki. Direct YouTube link try karein.');
+        return replyWithRetry(conn, from, mek, '❌ Download failed. The provider did not return any media. Try a direct YouTube link.');
     }
 });
 
