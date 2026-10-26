@@ -10,9 +10,10 @@ FROM node:20-slim
 #          standalone yt-dlp_linux binary bundles its own runtime.
 # ca-certificates: needed for HTTPS calls (Mongo, download APIs, yt-dlp
 #          binary fetch) to work correctly on a minimal slim image.
+# git: required by patch-package (postinstall script) to apply patches/.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ffmpeg python3 ca-certificates curl && \
+        ffmpeg python3 ca-certificates curl git && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
