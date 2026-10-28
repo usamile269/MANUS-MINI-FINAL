@@ -76,7 +76,7 @@ const config = {
     ],
 
     CHANNEL_POST_JIDS: ['120363415558267602@newsletter'],
-    BOT_FOOTER: '© ᴘᴏᴡᴇʀᴇᴅ ʙʏ 𝒂𝒉𝒎𝒂𝒅',
+    BOT_FOOTER: '𝘼𝙃𝙈𝘼𝘿 𝙈𝘿 ᥫ᭡',
     
     WORK_TYPE: process.env.WORK_TYPE || "private", 
 
