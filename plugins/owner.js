@@ -2,7 +2,7 @@ const { cmd } = require('../ahmad-core');
 const config = require('../config');
 const fs = require('fs');
 const path = require('path');
-const { ownerOnlyDenied } = require('../lib/menu-styles');
+const { ownerOnlyDenied, randomFooter } = require('../lib/menu-styles');
 const { getAllNumbersFromMongoDB } = require('../lib/database');
 
 // ====================================================
@@ -23,7 +23,7 @@ function toFancy(text) {
 }
 
 const BOT = config.BOT_NAME || '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ';
-const FOOTER = config.BOT_FOOTER || randomFooter();
+const FOOTER = randomFooter();
 
 // In-memory stores (persist across commands in same session)
 const banList    = new Set();
