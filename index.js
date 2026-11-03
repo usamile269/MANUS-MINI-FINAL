@@ -166,6 +166,38 @@ async function startNgrok() {
 // that require, NGROK_AUTHTOKEN/NGROK_DOMAIN are not in process.env yet
 // and an early call would silently do nothing.
 
+
+// PUBLIC BUNTY YT API (Ahmad: same static domain, no second tunnel):
+// /yt/* on the bot port proxies to the sidecar on localhost:3001, so the
+// YT API is public at <ngrok-domain>/yt/... without touching the pairing
+// routes (/code, /status, ...) and without any paid upgrade. The bot's own
+// .play/.video keep using localhost:3001 directly (no change, no slowdown).
+// Sidecar endpoints are GET-only, so this forwards method + query + headers
+// and streams the sidecar response back. Sidecar down -> 502 JSON, never a crash.
+const http = require('http');
+const YT_API_PORT = 3001;
+app.use('/yt', (req, res) => {
+    const proxyReq = http.request({
+        host: '127.0.0.1',
+        port: YT_API_PORT,
+        path: req.url,
+        method: req.method,
+        headers: { ...req.headers, host: '127.0.0.1:' + YT_API_PORT },
+        timeout: 90000,
+    }, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        proxyRes.pipe(res);
+    });
+    proxyReq.on('timeout', () => {
+        proxyReq.destroy();
+        if (!res.headersSent) res.status(504).json({ error: 'YT API timed out' });
+    });
+    proxyReq.on('error', (e) => {
+        if (!res.headersSent) res.status(502).json({ error: 'YT API sidecar unavailable', detail: e.message });
+    });
+    req.pipe(proxyReq);
+});
+
 let pairRouter;
 try {
     pairRouter = require('./main');
