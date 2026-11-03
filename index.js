@@ -129,7 +129,7 @@ let ngrokChild = null;
 async function startNgrok() {
     const token = process.env.NGROK_AUTHTOKEN;
     const domain = process.env.NGROK_DOMAIN;
-    if (!token || !domain) return;
+    if (!token || !domain) { console.log('[NGROK] disabled: NGROK_AUTHTOKEN or NGROK_DOMAIN not set in environment'); return; }
     try {
         const ngrokDir = ngrokPath.join(process.cwd(), '.ngrok');
         const ngrokBin = ngrokPath.join(ngrokDir, 'ngrok');
@@ -161,7 +161,10 @@ async function startNgrok() {
         ngrokChild.on('error', (e) => console.log('[NGROK] spawn error:', e.message));
     } catch (e) { console.log('[NGROK] failed to start:', e.message); }
 }
-startNgrok();
+// NOTE: startNgrok() is called AFTER require('./main') below, NOT here.
+// .env is loaded by config.js (dotenv), which main.js requires — so before
+// that require, NGROK_AUTHTOKEN/NGROK_DOMAIN are not in process.env yet
+// and an early call would silently do nothing.
 
 let pairRouter;
 try {
@@ -175,6 +178,10 @@ try {
         );
     });
 }
+
+// .env is loaded by now (main.js -> config.js -> dotenv), so the ngrok
+// env vars are visible to startNgrok().
+startNgrok();
 
 // 🚨 STABILITY FIX (Ahmad: "bot lagate hi auto disconnect ho jata" on
 // Katabump): many free/low-tier hosts put a service to sleep — or kill and
