@@ -10,3 +10,4 @@ logs/
 bin/
 .cache/
 .DS_Store
+.ngrok/

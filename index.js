@@ -115,6 +115,54 @@ function startYtApi() {
 }
 startYtApi();
 
+// NGROK PUBLIC TUNNEL (Ahmad: pair site + public API need ONE stable URL
+// that survives restarts). Env-gated: completely inert unless BOTH
+// NGROK_AUTHTOKEN and NGROK_DOMAIN are set in .env. When set, this
+// downloads the ngrok agent once into .ngrok/ (if missing), then runs
+// `ngrok http --url=<NGROK_DOMAIN> <bot port>` as a child process, so the
+// bot's HTTP server is public at https://<NGROK_DOMAIN>. It restarts
+// itself if it exits. Never crashes the bot: every failure is logged only.
+const ngrokFs = require('fs');
+const ngrokPath = require('path');
+const { execFile: ngrokExecFile } = require('child_process');
+let ngrokChild = null;
+async function startNgrok() {
+    const token = process.env.NGROK_AUTHTOKEN;
+    const domain = process.env.NGROK_DOMAIN;
+    if (!token || !domain) return;
+    try {
+        const ngrokDir = ngrokPath.join(process.cwd(), '.ngrok');
+        const ngrokBin = ngrokPath.join(ngrokDir, 'ngrok');
+        if (!ngrokFs.existsSync(ngrokBin)) {
+            const arch = process.arch === 'arm64' ? 'arm64' : 'amd64';
+            const url = `https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-${arch}.tgz`;
+            console.log(`[NGROK] downloading agent (${arch})...`);
+            ngrokFs.mkdirSync(ngrokDir, { recursive: true });
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`download failed: HTTP ${res.status}`);
+            const tgz = ngrokPath.join(ngrokDir, 'ngrok.tgz');
+            ngrokFs.writeFileSync(tgz, Buffer.from(await res.arrayBuffer()));
+            await new Promise((resolve, reject) => {
+                ngrokExecFile('tar', ['-xzf', tgz, '-C', ngrokDir], (err) => (err ? reject(err) : resolve()));
+            });
+            ngrokFs.chmodSync(ngrokBin, 0o755);
+            ngrokFs.unlinkSync(tgz);
+            console.log('[NGROK] agent downloaded.');
+        }
+        ngrokChild = spawn(ngrokBin, ['http', `--url=${domain}`, String(port), '--log=stdout'], {
+            env: { ...process.env, NGROK_AUTHTOKEN: token },
+            stdio: 'inherit'
+        });
+        console.log(`[NGROK] tunnel starting: https://${domain} -> http://localhost:${port}`);
+        ngrokChild.on('exit', (code) => {
+            console.log(`[NGROK] exited (${code}), restarting in 5s...`);
+            setTimeout(startNgrok, 5000);
+        });
+        ngrokChild.on('error', (e) => console.log('[NGROK] spawn error:', e.message));
+    } catch (e) { console.log('[NGROK] failed to start:', e.message); }
+}
+startNgrok();
+
 let pairRouter;
 try {
     pairRouter = require('./main');
