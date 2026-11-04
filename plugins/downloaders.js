@@ -593,6 +593,123 @@ async function getAdeelVideoLink(videoUrl) {
     }
     throw new Error(`Adeel video link failed: ${lastError?.message || 'no response'}`);
 }
+// Eliteprotech fallback (verified third-party API, 2026-11-04): tried when
+// the own-API primary fails, before local yt-dlp — so an IP-blocked yt-dlp
+// does not waste a full extraction attempt. Response shapes differ from
+// Adeel's: audio -> download.downloadUrl, video -> result.url.
+const ELITE_BASE = 'https://eliteprotech-apis.zone.id/download';
+
+async function getEliteMedia(videoUrl, type) {
+    const endpoint = type === 'audio' ? `${ELITE_BASE}/ytmp3?url=` : `${ELITE_BASE}/ytmp4?url=`;
+    let data;
+    let lastError;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            ({ data } = await axios.get(endpoint + encodeURIComponent(videoUrl), {
+                ...AXIOS_DEFAULTS,
+                timeout: 75000,
+                family: 4
+            }));
+            break;
+        } catch (e) {
+            lastError = e;
+            if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 800));
+        }
+    }
+    if (!data) throw new Error(`Elite ${type} API failed: ${lastError?.message || 'no response'}`);
+    if (data.status === false || data.success === false) throw new Error(`Elite ${type}: API returned an error`);
+    const mediaUrl = type === 'audio' ? data?.download?.downloadUrl : data?.result?.url;
+    const title = type === 'audio' ? data?.download?.title : data?.result?.title;
+    if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) throw new Error(`Elite ${type}: no media URL`);
+    let media;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            media = await axios.get(mediaUrl, {
+                responseType: 'arraybuffer',
+                timeout: 180000,
+                family: 4,
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
+                headers: { 'User-Agent': 'Mozilla/5.0', Range: 'bytes=0-' }
+            });
+            break;
+        } catch (e) {
+            lastError = e;
+            if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 800));
+        }
+    }
+    if (!media) throw new Error(`Elite ${type} media failed: ${lastError?.message || 'no response'}`);
+    const buffer = Buffer.from(media.data);
+    if (buffer.length < 15000) throw new Error(`Elite ${type}: media is empty or too small`);
+    const head = buffer.slice(0, 32).toString('utf8').trim().toLowerCase();
+    if (head.startsWith('<') || head.startsWith('{') || head.startsWith('<!doctype')) {
+        throw new Error(`Elite ${type}: provider returned an error body`);
+    }
+    if (type === 'audio' && !isLikelyAudio(buffer)) throw new Error('Elite audio: invalid media');
+    return { buffer, url: mediaUrl, title: title || null };
+}
+
+async function getEliteVideoLink(videoUrl) {
+    let lastError;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            const { data } = await axios.get(`${ELITE_BASE}/ytmp4?url=` + encodeURIComponent(videoUrl), {
+                ...AXIOS_DEFAULTS, timeout: 75000, family: 4
+            });
+            const mediaUrl = data?.status && data?.result?.url;
+            if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) throw new Error('no video URL');
+            return mediaUrl;
+        } catch (e) {
+            lastError = e;
+            if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 800));
+        }
+    }
+    throw new Error(`Elite video link failed: ${lastError?.message || 'no response'}`);
+}
+
+async function getEliteVideoFile(videoUrl) {
+    let data;
+    let lastError;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            ({ data } = await axios.get(`${ELITE_BASE}/ytmp4?url=` + encodeURIComponent(videoUrl), {
+                ...AXIOS_DEFAULTS, timeout: 75000, family: 4
+            }));
+            break;
+        } catch (e) {
+            lastError = e;
+            if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 800));
+        }
+    }
+    const mediaUrl = data?.status && data?.result?.url;
+    if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) {
+        throw new Error(`Elite video API failed: ${lastError?.message || 'no media URL'}`);
+    }
+    const filePath = path.join('/tmp', `ytvideo_elite_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
+    try {
+        const response = await axios.get(mediaUrl, {
+            responseType: 'stream',
+            timeout: 180000,
+            family: 4,
+            headers: { 'User-Agent': 'Mozilla/5.0', Range: 'bytes=0-' }
+        });
+        await new Promise((resolve, reject) => {
+            const writer = fs.createWriteStream(filePath);
+            response.data.pipe(writer);
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+            response.data.on('error', reject);
+        });
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).size < 15000) {
+            throw new Error('Elite video stream was empty or incomplete');
+        }
+        return { filePath, url: mediaUrl, title: data.result?.title || null };
+    } catch (e) {
+        try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+        throw e;
+    }
+}
+
 
 async function dlAudio(videoUrl, outPath) {
     const wrap = await ensureYtDlp();
@@ -1026,6 +1143,26 @@ async (conn, mek, m, { reply, args, from }) => {
             return;
         } catch (e) { console.log('[YTMP3] Adeel primary failed, using yt-dlp fallback:', e.message); }
 
+        // Eliteprotech fallback (verified 2026-11-04): third-party API with
+        // its own backend IP, so it works even when Railway's IP is blocked.
+        try {
+            await heavyQueue.run(async () => {
+                const media = await getEliteMedia(video.url, 'audio');
+                const audioFormat = detectAudioFormat(media.buffer);
+                await sendWithRetry(conn, from, {
+                    audio: media.buffer,
+                    mimetype: audioFormat.mimetype,
+                    fileName: `${video.title?.slice(0, 35) || 'audio'}.${audioFormat.ext}`,
+                    ptt: false
+                }, { quoted: fakevCard });
+                await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
+                console.log(`[YTMP3] Elite fallback completed in ${Date.now() - started}ms`);
+            }, async position => {
+                await replyWithRetry(conn, from, mek, `⏳ Download queue position: #${position}`);
+            });
+            return;
+        } catch (e) { console.log('[YTMP3] Elite fallback failed, using yt-dlp fallback:', e.message); }
+
         // Fallback: preserve the existing validated buffered path.
         if (!YTDlpWrapLib) throw new Error('yt-dlp is unavailable on this server.');
         outPath = path.join('/tmp', `ytaudio_${Date.now()}_${Math.random().toString(36).slice(2)}.m4a`);
@@ -1094,6 +1231,43 @@ async (conn, mek, m, { reply, args, from }) => {
             });
             return;
         } catch (e) { console.log('[YTMP4] Adeel primary failed, using yt-dlp fallback:', e.message); }
+
+        // Eliteprotech fallback (verified 2026-11-04): mirrors the Adeel
+        // primary (direct URL first, streamed file second).
+        try {
+            await heavyQueue.run(async () => {
+                const videoCaption = dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬');
+                try {
+                    const mediaUrl = await getEliteVideoLink(video.url);
+                    await sendWithRetry(conn, from, {
+                        video: { url: mediaUrl },
+                        mimetype: 'video/mp4',
+                        caption: videoCaption,
+                        contextInfo: chanCtx()
+                    }, { quoted: fakevCard });
+                } catch (directError) {
+                    console.log('[YTMP4] Elite direct URL failed, using streamed upload:', directError.message);
+                    const media = await getEliteVideoFile(video.url);
+                    try {
+                        await sendWithRetry(conn, from, {
+                            video: fs.createReadStream(media.filePath),
+                            mimetype: 'video/mp4',
+                            fileName: `${video.title?.slice(0, 45) || 'video'}.mp4`,
+                            caption: videoCaption,
+                            contextInfo: chanCtx()
+                        }, { quoted: fakevCard });
+                    } finally {
+                        try { if (fs.existsSync(media.filePath)) fs.unlinkSync(media.filePath); } catch {}
+                    }
+                }
+                await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
+                console.log(`[YTMP4] Elite fallback completed in ${Date.now() - started}ms`);
+            }, async position => {
+                await replyWithRetry(conn, from, mek, `⏳ Download queue position: #${position}`);
+            });
+            return;
+        } catch (e) { console.log('[YTMP4] Elite fallback failed:', e.message); }
+
         // Restored from the previously fast, working implementation: resolve
         // and fetch the provider media once inside the bounded queue, then send
         // the bytes directly. This avoids WhatsApp performing a slow/unstable
