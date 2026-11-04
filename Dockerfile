@@ -2,7 +2,7 @@
 # Zero-config: every setting already has a working default in config.js,
 # nothing needs to be set as an environment variable to boot.
 
-FROM node:20-slim
+FROM node:24-slim
 
 # ffmpeg: needed by fluent-ffmpeg (opus voice-note conversion) as a system
 #         fallback and by yt-dlp's own internal -x audio extraction step.
@@ -20,6 +20,10 @@ WORKDIR /app
 
 # Install deps first (better layer caching on rebuilds)
 COPY package.json ./
+# postinstall (package.json) runs scripts/apply-baileys-patch.js DURING install,
+# so the script must be in the image BEFORE npm install runs — otherwise the
+# install fails (Railway build diagnosis, 2026-11-04).
+COPY scripts/apply-baileys-patch.js ./scripts/
 RUN npm install --omit=dev --no-audit --no-fund
 
 # Now copy the rest of the bot
