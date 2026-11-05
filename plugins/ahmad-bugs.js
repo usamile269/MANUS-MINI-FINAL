@@ -84,35 +84,6 @@ async function sendAhmadEmailReport(targetPhone, type = 'ban') {
     return { ok: true, success };
 }
 
-/**
- * 💀 AHMAD BUG MENU
- */
-cmd({
-    pattern: "bug",
-    alias: ["bugmenu", "banmenu"],
-    category: "main",
-    react: "💀"
-}, async (conn, mek, m, { from, sender, reply, botNumber }) => {
-    try {
-        const [myConfig, userConfig] = await Promise.all([getUserBotSettings(sender), getUserConfigFromMongoDB(botNumber)]);
-        // The owner’s overall name applies to every user-facing menu/help view.
-        const botName = userConfig.BOT_NAME || myConfig.BOT_NAME || config.BOT_NAME || '™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝐍𝑰 ᥫᩣ';
-        const bugCommands = require('../ahmad-core').commands.filter(c => c.category === 'bug' && c.pattern);
-        let grouped = { 'bug': bugCommands.map(c => c.pattern) };
-        const categoryDisplay = { 'bug': { emoji: '💀', name: 'Ahmad Bug & Ban' } };
-        const ownerName = userConfig.OWNER_NAME || config.OWNER_NAME || 'Bunty Ahmad';
-        const menuText = renderMenu(1, { botName, ownerName, total: bugCommands.length, uptime: runtime(process.uptime()), prefix: config.PREFIX || '.', mode: config.WORK_TYPE || 'public', grouped, categoryDisplay });
-
-        let menuImage;
-        try { const imgRes = await axios.get(BUG_MENU_IMAGE, { responseType: 'arraybuffer', timeout: 10000 }); menuImage = Buffer.from(imgRes.data); } catch (e) { menuImage = null; }
-
-        await conn.sendMessage(from, {
-            image: menuImage || { url: BUG_MENU_IMAGE },
-            caption: menuText,
-            contextInfo: { mentionedJid: [sender], isForwarded: true, forwardingScore: 999 }
-        }, { quoted: mek });
-    } catch (e) { reply("❌ Error: " + e.message); }
-});
 
 /**
  * 🚫 AHMAD FUCKNUM (Bahirava V12 Logic)
