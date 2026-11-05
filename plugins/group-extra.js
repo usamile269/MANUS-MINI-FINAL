@@ -92,6 +92,55 @@ cmd({
 });
 
 // ============================================================
+// DELBADWORDS — .delbadwords word1, word2, word3 (bulk remove)
+// ============================================================
+cmd({
+    pattern: "delbadwords",
+    alias: ["bulkdelbadwords", "removebadwords"],
+    desc: "Remove multiple banned words at once (comma separated)",
+    category: "group",
+    react: "✅"
+}, async (conn, mek, m, { from, isGroup, isAdmins, isOwner, q, reply }) => {
+    if (!isGroup) return reply("❌ This command only works in groups.");
+    if (!isAdmins && !isOwner) return reply("❌ Only group admins can use this command.");
+    if (!q) return reply("❌ Usage: .delbadwords word1, word2, word3");
+    const words = q.split(',').map(w => w.trim().toLowerCase()).filter(w => w.length > 0);
+    if (!words.length) return reply("❌ No valid words found.");
+    const settings = await getGroupSettings(from);
+    const before = settings.badwords || [];
+    const remove = new Set(words);
+    const badwords = before.filter(w => !remove.has(w));
+    const removed = before.length - badwords.length;
+    await setGroupSettings(from, { badwords });
+    groupExtraCache.invalidate(from);
+    reply(`✅ Removed ${removed} word${removed === 1 ? '' : 's'} from the banned list (${badwords.length} remaining).` + FOOTER());
+});
+
+// ============================================================
+// ANTIBAD — .antibad delete|warn|both (action mode)
+// ============================================================
+cmd({
+    pattern: "antibad",
+    alias: ["antibadmode", "badwordaction"],
+    desc: "Set what happens on a banned word: delete, warn, or both",
+    category: "group",
+    react: "🚫"
+}, async (conn, mek, m, { from, isGroup, isAdmins, isOwner, q, reply }) => {
+    if (!isGroup) return reply("❌ This command only works in groups.");
+    if (!isAdmins && !isOwner) return reply("❌ Only group admins can use this command.");
+    const settings = await getGroupSettings(from);
+    const current = settings.antibadAction || 'both';
+    const mode = (q || '').trim().toLowerCase();
+    if (!mode) {
+        return reply(`🚫 *ANTIBAD ACTION*\n\nCurrent: *${current}*\n\n*.antibad delete* — delete only\n*.antibad warn* — warn only\n*.antibad both* — delete + warn (default)` + FOOTER());
+    }
+    if (!['delete', 'warn', 'both'].includes(mode)) return reply("❌ Usage: .antibad delete|warn|both");
+    await setGroupSettings(from, { antibadAction: mode });
+    groupExtraCache.invalidate(from);
+    reply(`✅ Antibad action set to *${mode}*.` + FOOTER());
+});
+
+// ============================================================
 // SLOWMODE — .slowmode <seconds|off>
 // ============================================================
 cmd({

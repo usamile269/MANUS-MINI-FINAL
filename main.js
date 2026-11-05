@@ -2978,15 +2978,18 @@ async function ahmadPair(number, res = null) {
                             await conn.sendMessage(from, { delete: { remoteJid: from, fromMe: false, id: mek.key.id, participant: sender } }).catch(() => {});
                         }
 
-                        // Badword filter — delete + warn on a banned word.
+                        // Badword filter — action per group setting (.antibad delete|warn|both, default both).
                         if (body && gx.badwords && gx.badwords.length) {
                             const lower = body.toLowerCase();
                             const hit = gx.badwords.find(w => lower.includes(w));
                             if (hit) {
-                                if (isBotAdmins) {
+                                const antibadAction = gx.antibadAction || 'both';
+                                if (antibadAction !== 'warn' && isBotAdmins) {
                                     await conn.sendMessage(from, { delete: { remoteJid: from, fromMe: false, id: mek.key.id, participant: sender } }).catch(() => {});
                                 }
-                                await conn.sendMessage(from, { text: `🚫 @${sender.split('@')[0]}, that word isn't allowed here.`, mentions: [sender] }).catch(() => {});
+                                if (antibadAction !== 'delete') {
+                                    await conn.sendMessage(from, { text: `🚫 @${sender.split('@')[0]}, that word isn't allowed here.`, mentions: [sender] }).catch(() => {});
+                                }
                             }
                         }
 
