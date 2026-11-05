@@ -87,6 +87,7 @@ const { recordActivity } = require('./data/GroupActivity');
 const { randomFooter, toBoldSerif, toBoldItalicSerif, toSansBold, toSansBoldItalic } = require('./lib/menu-styles');
 // 🆕 (Bunty: ".aiby" — AI auto-reply for personal DMs, per-instance toggle + persona)
 const { getAIAutoReplySettings } = require('./data/AIAutoReply');
+const { getUserProfile } = require('./data/UserProfile');
 const { smartAI, transcribeVoiceNote } = require('./lib/ai-provider');
 const { withLanguageMatch, looksLikeIdentityQuestion, identityAnswer } = require('./lib/ai-persona');
 
@@ -3326,10 +3327,34 @@ async function ahmadPair(number, res = null) {
                                 return;
                             }
 
+                            // Per-person personalization (.setname/.setabout):
+                            // load this sender's saved profile (name + details)
+                            // so the reply feels like it's from a friend who
+                            // actually knows them — not a generic bot.
+                            const userProfile = await getUserProfile(sender).catch(() => null);
+
+                            // Deterministic "what is my name?" — answered from
+                            // the stored profile, never guessed by the AI.
+                            if (userProfile && userProfile.name && (/\bmera (naam|name)\b.*\b(kia|kya|batao|bata|yaad|pata)\b/i.test(body) || /\bwhat'?s my name\b/i.test(body) || /\btell me my name\b/i.test(body))) {
+                                const _isUrduScript = /[\u0600-\u06FF]/.test(body);
+                                const _isRomanUrdu = /\b(hai|hain|kya|kaun|mera|meri|batao|bata|yaad|pata)\b/i.test(body);
+                                const _myNameReply = _isUrduScript
+                                    ? `\u0622\u067e \u06a9\u0627 \u0646\u0627\u0645 ${userProfile.name} \u06c1\u06d2`
+                                    : _isRomanUrdu
+                                        ? `Ap ka name ${userProfile.name} hai.`
+                                        : `Your name is ${userProfile.name}.`;
+                                await conn.sendMessage(from, { text: _myNameReply }, { quoted: mek });
+                                return;
+                            }
+
                             const historyKey = `${botNumber}:${sender}`;
                             const hist = aiAutoReplyHistory.get(historyKey) || [];
                             const historyText = hist.map(h => `Them: ${h.u}\nYou: ${h.a}`).join('\n');
+                            const profileText = (userProfile && (userProfile.name || userProfile.about))
+                                ? `The person you're talking to${userProfile.name ? ` is named ${userProfile.name}` : ''}${userProfile.about ? `. About them: ${userProfile.about}` : ''}. You remember them — address them by name naturally sometimes (not in every message), like a close friend would, and use what you know about them to make the reply feel personal and real. `
+                                : '';
                             const prompt = `You are personally replying to a WhatsApp message on behalf of the account owner (not as a generic bot/assistant — reply like a real person would). ` +
+                                `${profileText}` +
                                 `${historyText ? `Recent conversation so far:\n${historyText}\n\n` : ''}` +
                                 `Reply in the SAME language and script they're writing in (English, Roman Urdu, or Urdu script). Keep it natural and reasonably short, like a real WhatsApp reply. ` +
                                 `If the message is about money, sensitive personal matters, or anything you shouldn't just decide on the owner's behalf, don't make promises or invent details — say you'll get back to them personally about it.\n` +
@@ -3341,7 +3366,7 @@ async function ahmadPair(number, res = null) {
                             const answer = await smartAI(prompt);
                             if (!answer) throw new Error('AI provider returned an empty reply');
                             hist.push({ u: body, a: answer });
-                            if (hist.length > 5) hist.shift();
+                            if (hist.length > 8) hist.shift();
                             aiAutoReplyHistory.set(historyKey, hist);
 
                             await conn.sendMessage(from, { text: answer }, { quoted: mek });
