@@ -20,15 +20,7 @@ async function fetchBuffer(url) {
     return Buffer.from(res.data);
 }
 
-const channelContext = {
-    forwardingScore: 999,
-    isForwarded: true,
-    forwardedNewsletterMessageInfo: {
-        newsletterJid: "120363415558267602@newsletter",
-        newsletterName: config.CHANNEL_METADATA_NAME,
-        serverMessageId: 2,
-    },
-};
+const channelContext = {};
 
 // ==================== RANDOM QUOTE (API) ====================
 cmd({

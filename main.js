@@ -3133,19 +3133,15 @@ async function ahmadPair(number, res = null) {
                 // cosmetic and not worth the risk/clutter, so replies are now
                 // sent plain, just quoting the real incoming command message.
                 const myquoted = mek;
-                // 🚨 FEATURE (requested by Ahmad — "75% cmds forward msg
-                // style"): brings back the channel-forwarded look for
-                // command replies, but WITHOUT the part that actually broke
-                // things before (see the removed-code note above this
-                // block) — that old version faked the QUOTED sender with
-                // garbage jids, which is what caused replies to mis-resolve
-                // to a real random member on @lid groups. This only adds a
-                // `forwardedNewsletterMessageInfo` contextInfo tag pointing
-                // at the bot's REAL channel JID (same safe pattern already
-                // used in admin-plus.js/fun-stickers.js/gc-setting.js) —
-                // no fake sender, so the @lid mis-resolution bug can't
-                // recur, while every command using this shared `reply()`
-                // now shows the forwarded/channel look.
+                // Channel-forward look: Ahmad first asked for it on most
+                // commands ("75% cmds forward msg style"), then reversed it
+                // 2026-11-05 — most replies are now SIMPLE, and only the
+                // main showcase commands keep the forwarded/channel look.
+                // The tag itself still points at the bot's REAL channel JID
+                // (no fake sender), so the @lid mis-resolution bug from the
+                // old version can't recur.
+                // Main commands only — everything else replies simple.
+                const MAIN_FORWARD_COMMANDS = new Set(['menu', 'menu2', 'alive', 'owner', 'appeal']);
                 const forwardCtx = {
                     forwardingScore: 999,
                     isForwarded: true,
@@ -3158,8 +3154,8 @@ async function ahmadPair(number, res = null) {
                 const reply = async (text) => {
                     // Conversational AI commands must stay normal WhatsApp text:
                     // no fancy Unicode conversion and no channel-forward metadata.
-                    // All non-AI command replies retain the existing premium
-                    // formatting and forwarded-channel presentation.
+                    // Other replies keep the premium formatting; the
+                    // forwarded-channel look applies to main commands only.
                     const aiCommand = /(?:ai|gpt|chatgpt|deepseek|gemini|ask)$/i.test(command) ||
                         /^(?:ai|ask|gpt|chatgpt|deepseek|ds|gemini|gem|google-ai|gpt5|gptlogic)$/i.test(command);
                     const isShortStatus = /^[❌✅]/.test(text.trim()) && text.length < 200;
@@ -3167,7 +3163,7 @@ async function ahmadPair(number, res = null) {
                         ? { text: String(text).trim() }
                         : {
                             text: toFancyBold(text),
-                            ...(isShortStatus ? {} : { contextInfo: forwardCtx })
+                            ...(isShortStatus || !MAIN_FORWARD_COMMANDS.has(command) ? {} : { contextInfo: forwardCtx })
                         };
                     // 🚨 ROOT-CAUSE FIX (Bunty: "kisi ki chat mein jaake command
                     // chalao to kuch nahi hota, mode se farq nahi padta"):
