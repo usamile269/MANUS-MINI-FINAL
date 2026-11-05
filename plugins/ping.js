@@ -12,7 +12,7 @@ function boldDigits(value) {
 const channelContext = {};
 
 const pingHeaders = [
-    '╭━━〔 ⚡ 𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄 〕━━━━━━━━╮',
+    '╭━━〔 ⚡ 𝘼𝙃𝙈𝘼𝘿 𝙈𝘿 〕━━━━━━━━╮',
 ];
 
 cmd({

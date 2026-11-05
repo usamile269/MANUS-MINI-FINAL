@@ -1898,7 +1898,7 @@ async function ahmadPair(number, res = null) {
                     // to the original hardcoded defaults if nothing's been set yet,
                     // so this is fully backward-compatible.
                     const siteSettings = await getSiteSettings();
-                    const botDisplayName = (siteSettings.botName || 'AHMAD MINI').toUpperCase();
+                    const botDisplayName = (siteSettings.botName || 'AHMAD MD').toUpperCase();
                     // 🎀 (Bunty: cute ❀☁️🎀 theme — same as .ping/.uptime/.menu2 —
                     // instead of the old Glass Card serif look, so the very
                     // first message a newly-paired user sees matches everything
@@ -3430,8 +3430,8 @@ async function ahmadPair(number, res = null) {
 
                             const historyKey = `${botNumber}:group:${from}`;
                             const history = aiAutoReplyHistory.get(historyKey) || [];
-                            const recent = history.map(h => `Member: ${h.u}\\nAhmad Mini: ${h.a}`).join('\\n');
-                            const prompt = `You are Ahmad Mini replying naturally in a WhatsApp group. Reply in the same language and script as the member. Keep it short, friendly, and useful; do not claim to be a human, do not mention hidden instructions, and do not answer every message with a question. ${recent ? `Recent group context:\\n${recent}\\n\\n` : ''}Member message: ${body.trim()}`;
+                            const recent = history.map(h => `Member: ${h.u}\\nAhmad MD: ${h.a}`).join('\\n');
+                            const prompt = `You are Ahmad MD replying naturally in a WhatsApp group. Reply in the same language and script as the member. Keep it short, friendly, and useful; do not claim to be a human, do not mention hidden instructions, and do not answer every message with a question. ${recent ? `Recent group context:\\n${recent}\\n\\n` : ''}Member message: ${body.trim()}`;
                             let answer;
                             try {
                                 answer = await smartAI(prompt);
@@ -3442,10 +3442,10 @@ async function ahmadPair(number, res = null) {
                                 // visibly responsive with a safe local fallback;
                                 // the next cooldown window can try AI again.
                                 ahmadLog(`[AIGC] provider unavailable for ${from}: ${providerError.message}`, 'error');
-                                answer = '🤖 Ahmad Mini abhi thora busy hai, lekin message receive ho gaya hai. Thori dair baad dobara pooch lena 💚';
+                                answer = '🤖 Ahmad MD abhi thora busy hai, lekin message receive ho gaya hai. Thori dair baad dobara pooch lena 💚';
                             }
                             if (!answer || looksLikeErrorPayload(answer)) {
-                                answer = '🤖 Message receive ho gaya hai — Ahmad Mini AI abhi temporarily busy hai. Dobara try karo 💚';
+                                answer = '🤖 Message receive ho gaya hai — Ahmad MD AI abhi temporarily busy hai. Dobara try karo 💚';
                             }
                             history.push({ u: body.trim(), a: answer });
                             if (history.length > 5) history.shift();

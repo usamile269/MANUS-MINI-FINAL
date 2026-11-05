@@ -268,7 +268,7 @@ cmd({
         const presence = getOnlineIds(from, participants.map(p => p.id));
         const onlineIds = new Set(presence.ids);
         const requester = numberOf(sender);
-        const botName = 'Ahmad Mini ✦';
+        const botName = 'Ahmad MD ✦';
         const created = g.creation
             ? new Intl.DateTimeFormat('en-PK', { dateStyle: 'medium', timeZone: 'Asia/Karachi' }).format(new Date(g.creation * 1000))
             : 'Not available';

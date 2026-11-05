@@ -5,7 +5,7 @@ const SiteSettings = jsondb.model('SiteSettings');
 const KEY = 'site';
 
 const DEFAULTS = {
-    botName: 'AHMAD-MINI',
+    botName: 'AHMAD-MD',
     welcomeMsg: "Connected Successfully — you're all set!",
     welcomeVideo: '',
     channelLink: '',

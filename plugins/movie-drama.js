@@ -163,13 +163,13 @@ async function dramaProviderMedia(url) {
             const { data } = await axios.get('https://jawad-tech.vercel.app/download/ytdl', { params: { url }, timeout: 20000 });
             const mediaUrl = data?.result?.mp4;
             if (!data?.status || !mediaUrl) throw new Error('JawadTech returned no mp4');
-            return { mediaUrl, title: data.result.title || 'Ahmad Mini Drama' };
+            return { mediaUrl, title: data.result.title || 'Ahmad MD Drama' };
         },
         async () => {
             const { data } = await axios.get('https://adeel-xtech-apis.vercel.app/api/ytmp4', { params: { url }, timeout: 20000 });
             const mediaUrl = data?.result?.video_download;
             if (!data?.status || !mediaUrl) throw new Error('AdeelXTech returned no mp4');
-            return { mediaUrl, title: data.result.title || 'Ahmad Mini Drama' };
+            return { mediaUrl, title: data.result.title || 'Ahmad MD Drama' };
         }
     ];
     let lastError;
@@ -286,12 +286,12 @@ cmd({
         await conn.sendMessage(from, { react: { text: '🎭', key: mek.key } });
         await fsp.mkdir(dir, { recursive: true });
         const media = await downloadDramaFromYouTube(query, dir);
-        const title = String(media.title || query).replace(/[\\/:*?"<>|\u0000-\u001F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Ahmad Mini Drama';
+        const title = String(media.title || query).replace(/[\\/:*?"<>|\u0000-\u001F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Ahmad MD Drama';
         await conn.sendMessage(from, {
             document: fs.createReadStream(media.file),
             fileName: `${title}.mp4`,
             mimetype: 'video/mp4',
-            caption: `🎬 *${title}*\n\n© AHMAD MINI`
+            caption: `🎬 *${title}*\n\n© AHMAD MD`
         }, { quoted: mek });
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
     } catch (e) {

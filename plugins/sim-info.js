@@ -74,7 +74,7 @@ function simCard(record, searchedNumber) {
 ┃ 📡 ${B('Network')}: ${network}
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━╯
-> ${B('AHMAD MINI')} ⚡ ${B('Verified information')}`;
+> ${B('AHMAD MD')} ⚡ ${B('Verified information')}`;
 }
 
 cmd({

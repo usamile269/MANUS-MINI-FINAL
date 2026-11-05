@@ -151,7 +151,7 @@ cmd({
 
         const ownerNumber = config.OWNER_NUMBER || "923044975027";
         const userConfig = await getUserConfigFromMongoDB(botNumber);
-        const ownerDisplayName = userConfig.OWNER_NAME || 'Ahmad-Mini (Owner)';
+        const ownerDisplayName = userConfig.OWNER_NAME || 'Ahmad-MD (Owner)';
         const configuredVideoPool = Array.isArray(userConfig.OWNER_VIDEO_POOL)
             ? userConfig.OWNER_VIDEO_POOL.filter(v => typeof v === 'string' && /^https?:\/\//i.test(v))
             : [];
@@ -209,7 +209,7 @@ cmd({
         const vcard = 'BEGIN:VCARD\n' +
                       'VERSION:3.0\n' +
                       `FN:${ownerDisplayName}\n` +
-                      'ORG:Ahmad-Mini Corp;\n' +
+                      'ORG:Ahmad-MD Corp;\n' +
                       `TEL;type=CELL;type=VOICE;waid=${ownerNumber}:${ownerNumber}\n` +
                       'END:VCARD';
 

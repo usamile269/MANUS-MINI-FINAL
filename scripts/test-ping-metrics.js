@@ -7,7 +7,7 @@ assert.match(source, /const BOLD_DIGITS = Array\.from\('𝟬𝟭𝟮𝟯𝟰𝟱
 assert.doesNotMatch(source, /�/);
 assert.doesNotMatch(source, /\*𝘼𝙃𝙈𝘼𝘿|\*\$\{|quoteLines/);
 assert.match(source, /const pingHeaders = \[/);
-assert.match(source, /⚡ 𝘼𝙃𝙈𝘼𝘿 𝙈𝙄𝙉𝙄 〕━━━━━━━━╮/);
+assert.match(source, /⚡ 𝘼𝙃𝙈𝘼𝘿 𝙈𝘿 〕━━━━━━━━╮/);
 assert.match(source, /𝙊𝙉𝙇𝙄𝙉𝙀  •  ⚡ 𝙎𝙋𝙀𝙀𝘿/);
 assert.match(source, /𝙐𝙋𝙏𝙄𝙈𝙀  •/);
 assert.match(source, /const body = `\$\{header\}\\n/);
@@ -23,7 +23,7 @@ assert.match(source, /forwardingScore: 999/);
 assert.match(source, /isForwarded: true/);
 assert.match(source, /newsletterName: config\.CHANNEL_METADATA_NAME/);
 const configSource = fs.readFileSync(path.join(__dirname, '..', 'config.js'), 'utf8');
-assert.match(configSource, /CHANNEL_METADATA_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝙞𝙣𝙞"/);
+assert.match(configSource, /CHANNEL_METADATA_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝘿"/);
 assert.match(source, /await conn\.sendMessage\(from, \{ text, contextInfo: channelContext \}\);/);
 assert.equal((source.match(/await conn\.sendMessage\(from, \{ text, contextInfo: channelContext \}\);/g) || []).length, 1);
 assert.doesNotMatch(source, /react:/);

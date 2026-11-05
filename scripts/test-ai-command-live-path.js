@@ -11,7 +11,7 @@ Module._load = function(request, parent, isMain) {
     if (request === '../lib/menu-styles') return { randomFooter: () => 'SHOULD NOT APPEAR' };
     if (request === '../lib/ai-persona') return {
         looksLikeIdentityQuestion: value => value === 'who are you',
-        identityAnswer: () => 'I am Ahmad Mini.',
+        identityAnswer: () => 'I am Ahmad MD.',
     };
     if (request === '../lib/ai-provider') return {
         smartAI: async () => {
@@ -42,7 +42,7 @@ async function invoke(query) {
 
 (async () => {
     const identity = await invoke('who are you');
-    assert.deepEqual(identity.replies, ['I am Ahmad Mini.']);
+    assert.deepEqual(identity.replies, ['I am Ahmad MD.']);
     assert.deepEqual(identity.reactions, []);
 
     const primary = await invoke('hello');

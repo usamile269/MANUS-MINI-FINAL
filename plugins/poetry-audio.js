@@ -234,7 +234,7 @@ async (conn, mek, m, { from, args, q, reply }) => {
                 audio,
                 mimetype: 'audio/mpeg',
                 ptt: false,
-                fileName: 'ahmad-mini-poetry.mp3',
+                fileName: 'ahmad-md-poetry.mp3',
                 caption: `🎙️ ${B('REAL POETRY AUDIO')}\n⏱️ ${B(`Natural edit length (up to ${POETRY_MAX_SECONDS}s)`)}\n📝 ${cleanName(sourceTitle)}\n🔗 ${sourceUrl}\n\n> ${randomFooter()}`
             }, { quoted: mek });
         }, async () => {

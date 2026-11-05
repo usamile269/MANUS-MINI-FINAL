@@ -47,14 +47,14 @@ const config = {
     // ===========================================================
     PREFIX: process.env.PREFIX || '.',
     OWNER_NUMBER: '923044975027', // Hardcoded as requested
-    // 🆕 (Bunty: "bot name > Ahmad mini karo is style may, footer obsidian
-    // jo hai etc bold, or yeh fonts") — renamed to "Ahmad Mini" and styled
+    // 🆕 (Bunty: "bot name > Ahmad MD karo is style may, footer obsidian
+    // jo hai etc bold, or yeh fonts") — renamed to "Ahmad MD" and styled
     // with the same bold-italic-serif Unicode font already used in the
     // footer branding ("𝙊𝘽𝙎𝙄𝘿𝙄𝘼𝙉 𝙇𝙐𝙓𝙀 • ™ 𝑨𝑯𝑴𝑨𝑫 𝑴𝑰𝑵𝑰 ᥫᩣ" — see
     // lib/menu-styles.js FOOTERS), so the bot name and the footer now
     // visually match everywhere.
-    BOT_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝙞𝙣𝙞",
-    CHANNEL_METADATA_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝙞𝙣𝙞",
+    BOT_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝘿",
+    CHANNEL_METADATA_NAME: "𝘼𝙝𝙢𝙖𝙙 𝙈𝘿",
     RAPID_API_KEY: process.env.RAPID_API_KEY || '',
     // Optional Groq acceleration. Text AI falls back to the public keyless
     // Pollinations endpoint, so GROQ_API_KEY is not required in Railway.
@@ -134,7 +134,7 @@ const config = {
     MENU_AUDIO: 'https://res.cloudinary.com/qdskwzyn/video/upload/v1785497379/AhmadHosting_ms8v1ejbw6v6z0.mp3',
     WELCOME_VIDEO_PATH: 'https://files.catbox.moe/rs1u1s.mp4',
     CHANNEL_LINK: '',
-    PAIRING_LINK: 'https://ahmadminipair.vercel.app/',
+    PAIRING_LINK: 'https://ahmadmdpair.vercel.app/',
     
     // ===========================================================
     // 8. EXTERNAL API

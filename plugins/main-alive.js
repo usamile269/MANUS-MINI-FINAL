@@ -4,7 +4,7 @@ const config = require('../config');
 const { randomFooter, toSansBoldItalic } = require('../lib/menu-styles');
 
 // 🎨 REDESIGN (Bunty: final .alive layout — locked-in exact template):
-// ✦ AHMAD MINI 👻 is alive and online ✅
+// ✦ AHMAD MD 👻 is alive and online ✅
 // 💚 41ms · ⏱️ 3h 5m
 // <random helpful quote>
 // ✦﹒footer
@@ -47,7 +47,7 @@ function buildAliveCaption(speedMs, uptime, quote) {
     const B = toSansBoldItalic;
     const cleanQuote = String(quote || '').replace(/^>\s*/, '').trim();
     const cleanFooter = String(randomFooter() || '').replace(/^>\s*/, '').trim();
-    return `✦ ${B('AHMAD MINI')} 👻 ${B('is alive and online')} ✅\n` +
+    return `✦ ${B('AHMAD MD')} 👻 ${B('is alive and online')} ✅\n` +
         `💚 ${B(String(speedMs))}${B('ms')} · ⏱️ ${B(uptime)}\n\n` +
         `${B(cleanQuote)}\n\n` +
         `> ${cleanFooter}`;
