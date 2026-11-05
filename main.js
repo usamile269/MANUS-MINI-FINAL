@@ -84,7 +84,8 @@ const { handleAntiedit, handleAntieditUpsert } = require('./lib/antiedit');
 const { handleAntiViewOnce, autoRecoverOnReply } = require('./lib/viewonce-capture');
 const { getSiteSettings, setSiteSettings } = require('./data/SiteSettings');
 const { recordActivity } = require('./data/GroupActivity');
-const { randomFooter, toBoldSerif, toBoldItalicSerif, toSansBold, toSansBoldItalic } = require('./lib/menu-styles');
+const { randomFooter, toBoldSerif, toBoldItalicSerif, toSansBold, toSansBoldItalic, toSmallCaps } = require('./lib/menu-styles');
+const { suggestCommand } = require('./lib/did-you-mean');
 // 🆕 (Bunty: ".aiby" — AI auto-reply for personal DMs, per-instance toggle + persona)
 const { getAIAutoReplySettings } = require('./data/AIAutoReply');
 const { getUserProfile } = require('./data/UserProfile');
@@ -3301,6 +3302,21 @@ async function ahmadPair(number, res = null) {
                                 cmdResult.catch(e => ahmadLog(`PLUGIN ERROR [${command}]: ${e.message}`, 'error'));
                             }
                         } catch (e) { ahmadLog(`PLUGIN ERROR [${command}]: ${e.message}`, 'error'); }
+                    } else {
+                        // 🆕 "Did you mean?" (Ahmad: ".mmenu likho to bot bataye
+                        // sahi command .menu hai") — an unknown .command with a
+                        // close match (1-2 typos) gets one correction reply;
+                        // anything else stays silent like before. Private mode
+                        // stays silent for non-owners, same as real commands.
+                        try {
+                            const effectiveWorkType = userConfig?.WORK_TYPE || 'private';
+                            if (effectiveWorkType !== 'private' || isOwner || isMe) {
+                                const suggestion = suggestCommand(command, events.commands, sender);
+                                if (suggestion) {
+                                    reply(`❌ Wrong command!\n\nDid you mean *${activePrefix}${toSmallCaps(suggestion)}*?\n\n> ${randomFooter()}`).catch(() => {});
+                                }
+                            }
+                        } catch (_) { /* a suggestion must never break command flow */ }
                     }
                 }
 
