@@ -186,7 +186,14 @@ const RAPID_API_KEY = config.RAPID_API_KEY || '';
 const RAPID_API_URL = 'https://social-download-all-in-one.p.rapidapi.com/v1/social/autolink';
 
 function chanCtx() {
-    return {};
+    return {
+        forwardingScore: 999, isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+            newsletterJid: config.CHANNEL_JID || '120363415558267602@newsletter',
+            newsletterName: config.CHANNEL_METADATA_NAME,
+            serverMessageId: 2
+        }
+    };
 }
 
 function dlBox(title, lines, emoji = '⬇️') {

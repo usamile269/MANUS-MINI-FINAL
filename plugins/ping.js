@@ -9,7 +9,15 @@ function boldDigits(value) {
 // One user-visible send with the requested WhatsApp channel/forward envelope.
 // No media, database lookup, network probe, presence update, or reaction is
 // performed on the ping path.
-const channelContext = {};
+const channelContext = {
+    forwardingScore: 999,
+    isForwarded: true,
+    forwardedNewsletterMessageInfo: {
+        newsletterJid: config.CHANNEL_JID || '120363415558267602@newsletter',
+        newsletterName: config.CHANNEL_METADATA_NAME,
+        serverMessageId: 2,
+    },
+};
 
 const pingHeaders = [
     '╭━━〔 ⚡ 𝘼𝙃𝙈𝘼𝘿 𝙈𝘿 〕━━━━━━━━╮',

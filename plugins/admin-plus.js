@@ -8,7 +8,14 @@ const { randomFooter } = require('../lib/menu-styles');
 const FOOTER = '> ' + randomFooter();
 
 function chanCtx() {
-    return {};
+    return {
+        forwardingScore: 999, isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+            newsletterJid: config.CHANNEL_JID || '120363415558267602@newsletter',
+            newsletterName: config.CHANNEL_METADATA_NAME,
+            serverMessageId: 2
+        }
+    };
 }
 
 function box(title, lines, emoji = '🛡️') {
