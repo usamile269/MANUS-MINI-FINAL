@@ -7,6 +7,7 @@ const { getUserBotSettings } = require('../data/UserBotSettings');
 const { renderMenu } = require('../lib/menu-styles');
 const { runtime } = require('../lib/functions');
 const axios = require('axios');
+const os = require('os');
 
 // 🚀 SPEED FIX (Bunty: "bot ki speed chahiye, fast karo") — the default
 // menu image (when the user hasn't set a custom DP) was being downloaded
@@ -95,9 +96,10 @@ cmd({
         };
 
         // ✅ New info-box fields for the updated menu look.
-        const ownerName = userConfig.OWNER_NAME || config.OWNER_NAME || 'Bunty Ahmad';
+        const ownerName = userConfig.OWNER_NAME || config.OWNER_NAME || 'Ahmad';
         const uptime = runtime(process.uptime());
         const mode = config.WORK_TYPE || 'public';
+        const ram = `${(process.memoryUsage().rss / 1048576).toFixed(2)} MB / ${(os.totalmem() / 1073741824).toFixed(2)} GB`;
 
         // 🆕 REMOVED (Bunty: "menustyle system remove, only ek menu rahe") —
         // was previously myConfig.MENU_STYLE || userConfig.MENU_STYLE || 1;
@@ -109,6 +111,7 @@ cmd({
             uptime,
             prefix: config.PREFIX || '.',
             mode,
+            ram,
             grouped,
             categoryDisplay,
             senderJid: m.sender,
@@ -371,7 +374,7 @@ cmd({
             'misc': { emoji: '✨', name: 'Miscellaneous' }
         };
 
-        const ownerName = userConfig.OWNER_NAME || config.OWNER_NAME || 'Bunty Ahmad';
+        const ownerName = userConfig.OWNER_NAME || config.OWNER_NAME || 'Ahmad';
         const uptime = runtime(process.uptime());
 
         const menu2 = renderMenu2({
