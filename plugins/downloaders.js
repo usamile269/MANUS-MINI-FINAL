@@ -921,6 +921,39 @@ async (conn, mek, m, { reply, args, from, q }) => {
 // ★ INSTAGRAM (1 cmd — RapidAPI)
 // ══════════════════════════════════
 
+// Detect a real media file from its magic bytes. Returns 'video' | 'image' | null.
+// null = HTML/JSON error page, a thumbnail mislabelled as video, a truncated file, etc.
+// (WhatsApp shows "something is wrong with the video file" when such bytes are sent as a video.)
+function igDetectKind(buf) {
+    if (!buf || buf.length < 12) return null;
+    if (buf.slice(4, 8).toString('ascii') === 'ftyp') return 'video'; // MP4
+    if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return 'video'; // WebM
+    if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image'; // JPEG
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image'; // PNG
+    if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return 'image'; // GIF
+    return null;
+}
+
+// Download a media URL and validate it is a real playable video/image file.
+// Returns { buf, kind } or null when the content is not valid media.
+async function igFetchMedia(mediaUrl) {
+    const res = await axios.get(mediaUrl, {
+        responseType: 'arraybuffer',
+        timeout: 60000,
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': 'https://www.instagram.com/',
+            'Accept': '*/*'
+        },
+        maxContentLength: 100 * 1024 * 1024, // 100MB max
+    });
+    const buf = Buffer.from(res.data);
+    if (buf.length < 1024) return null;
+    const kind = igDetectKind(buf);
+    if (!kind) return null;
+    return { buf, kind };
+}
+
 // 4. igdl
 cmd({ pattern: 'igdl', alias: ['instagram', 'insta', 'ig', 'igdl2', 'igdl4', 'ig3'], desc: 'Download Instagram reel/post', category: 'download', react: '📸' },
 async (conn, mek, m, { reply, args, from, q }) => {
@@ -933,8 +966,6 @@ async (conn, mek, m, { reply, args, from, q }) => {
         // methods used to run one after another (if(!mediaUrl){...}) — a dead
         // provider meant waiting out its full 10s timeout before even trying
         // the next one. Now raced in parallel; whichever resolves first wins.
-        let mediaUrl = null, isVid = true;
-
         const igMethods = [
             // Method 1: Vreden (same provider already confirmed reliable for YouTube)
             async () => {
@@ -999,32 +1030,48 @@ async (conn, mek, m, { reply, args, from, q }) => {
             },
         ];
 
+        // Race all 7 methods for speed, then validate the file before sending.
+        // BUG FIX: the race winner could be a dead API returning an HTML error
+        // page or a thumbnail mislabelled as video — the bot sent it as a video
+        // and WhatsApp showed "something is wrong with the video file". Now the
+        // downloaded bytes are checked (magic bytes) and a bad winner falls back
+        // to the other methods' URLs (yt-dlp first — most reliable).
+        const methodPromises = igMethods.map(fn => fn());
+        let winner;
         try {
-            const winner = await Promise.any(igMethods.map(fn => fn()));
-            mediaUrl = winner.url;
-            isVid = winner.isVid;
+            winner = await Promise.any(methodPromises);
         } catch (e) {
             console.log(`[IGDL] All 7 parallel methods failed for url: ${url}`);
+            throw new Error('No media');
         }
 
-        if (!mediaUrl) { console.log(`[IGDL] All 7 methods failed for url: ${url}`); throw new Error('No media'); }
-        // Download to server first (Instagram CDN URLs often expire or need headers)
-        const dlRes = await axios.get(mediaUrl, {
-            responseType: 'arraybuffer',
-            timeout: 60000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Referer': 'https://www.instagram.com/',
-                'Accept': '*/*'
-            },
-            maxContentLength: 100 * 1024 * 1024, // 100MB max
-        });
-        const mediaBuf = Buffer.from(dlRes.data);
-        if (mediaBuf.length < 1024) throw new Error('Downloaded file too small/corrupt');
-        if (isVid) {
-            await conn.sendMessage(from, { video: mediaBuf, caption: dlBox('INSTAGRAM', ['✅ Downloaded!'], '📸'), contextInfo: chanCtx() }, { quoted: fakevCard });
+        // Try the winner first (fast path); fall back to the rest if corrupt.
+        let got = null;
+        try { got = await igFetchMedia(winner.url); } catch (e) { console.log('[IGDL] winner download failed:', e.message); }
+        if (!got) {
+            const settled = await Promise.allSettled(methodPromises);
+            const seen = new Set([winner.url]);
+            const candidates = [];
+            const addCand = (c) => { if (c?.url && !seen.has(c.url)) { seen.add(c.url); candidates.push(c); } };
+            if (settled[6]?.status === 'fulfilled') addCand(settled[6].value); // yt-dlp first
+            for (let i = 0; i < settled.length; i++) {
+                if (i === 6) continue;
+                if (settled[i]?.status === 'fulfilled') addCand(settled[i].value);
+            }
+            for (const cand of candidates) {
+                try {
+                    got = await igFetchMedia(cand.url);
+                    if (got) break;
+                } catch (e) { console.log('[IGDL] fallback download failed:', e.message); }
+            }
+        }
+        if (!got) { console.log(`[IGDL] No valid media file for url: ${url}`); throw new Error('No valid media'); }
+
+        // Send by the ACTUAL file type (magic bytes), not the method's guess.
+        if (got.kind === 'video') {
+            await conn.sendMessage(from, { video: got.buf, caption: dlBox('INSTAGRAM', ['✅ Downloaded!'], '📸'), contextInfo: chanCtx() }, { quoted: fakevCard });
         } else {
-            await conn.sendMessage(from, { image: mediaBuf, caption: dlBox('INSTAGRAM', ['✅ Downloaded!'], '📸'), contextInfo: chanCtx() }, { quoted: fakevCard });
+            await conn.sendMessage(from, { image: got.buf, caption: dlBox('INSTAGRAM', ['✅ Downloaded!'], '📸'), contextInfo: chanCtx() }, { quoted: fakevCard });
         }
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
     } catch (e) {
