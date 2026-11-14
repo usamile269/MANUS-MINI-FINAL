@@ -122,6 +122,14 @@ cmd({
     const applyToScopes = self ? [GLOBAL_KEY] : (isGroup ? [from] : adminGroupIds);
     const scopeLabel = self ? ' — *OVERALL* (all groups)' : (isGroup ? '' : ` — applied to ${applyToScopes.length} group(s) you admin`);
 
+    // 🚨 FIX: `.setwelcome off` used to SAVE the word "off" as the welcome
+    // text AND force welcomeOn: true — so trying to turn welcome off turned
+    // it ON instead. Treat "off" as a disable, like .setgoodbye already does.
+    if (text.toLowerCase() === 'off') {
+        for (const s of applyToScopes) await setGroupSettings(s, { welcomeOn: false });
+        return reply(`✅ Welcome messages disabled${scopeLabel}.`);
+    }
+
     for (const s of applyToScopes) {
         const ok = await setGroupSettings(s, { welcomeMsg: text, welcomeOn: true });
         if (!ok) return fail(reply, "Couldn't save that — storage error, try again in a moment.");
