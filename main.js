@@ -1555,7 +1555,14 @@ async function ahmadPair(number, res = null) {
                         // A previously saved video is an explicit enable signal;
                         // this also repairs groups saved before .gwelcomevideo
                         // began setting welcomeOn automatically.
-                        if (!settings.welcomeOn && !settings.welcomeVideo) continue;
+                        // 🚨 TRAP REPAIR (Ahmad — welcome/goodbye FULLY off):
+                        // the old `.setwelcome off` bug saved the literal word
+                        // "off" as the welcome text AND forced welcomeOn=true,
+                        // so those groups keep firing a welcome card with the
+                        // text "off". Treat a saved text of exactly "off" as
+                        // OFF (no legitimate welcome message is just "off").
+                        const welcomeMsgIsTrap = typeof settings.welcomeMsg === 'string' && settings.welcomeMsg.trim().toLowerCase() === 'off';
+                        if ((!settings.welcomeOn && !settings.welcomeVideo) || (welcomeMsgIsTrap && !settings.welcomeVideo)) continue;
                         const { sendWelcome } = require('./lib/welcome-sender');
                         await sendWelcome(conn, gu.id, participant, settings).catch((e) => console.log('[WELCOME ERROR]', e.message));
                     } else if (action === 'remove' || action === 'leave') {
@@ -2805,7 +2812,8 @@ async function ahmadPair(number, res = null) {
                     && (userConfig?.WORK_TYPE || 'private') === 'private'
                     && !isOwner && !isMe
                     && !(isCmd && (command === 'mode' || command === 'modeall'));
-                if (privateGroupBlocked) continue;
+                // (private-mode gate moved below the group protections — see
+                // below — so antilink etc. still run in private mode.)
                 // `.ping` only needs the socket/probe timings; it does not need
                 // group title or admin permissions. Skipping that WhatsApp
                 // metadata round-trip makes the common group speed check fast,
@@ -3119,6 +3127,16 @@ async function ahmadPair(number, res = null) {
 
                     } catch (e) { console.log('[GROUP-EXTRA ENFORCEMENT ERROR]', e.message); }
                 }
+
+                // 🚨 FIX (Ahmad — antilink must work in private mode): the
+                // private-mode gate used to sit above the group protections,
+                // so in WORK_TYPE=private every non-owner group message was
+                // skipped before antilink/slowmode/nightmode/badwords could
+                // run — antilink looked ON but silently did nothing. The
+                // gate now runs AFTER the protections, so links still get
+                // deleted/warned in private mode; only command handling is
+                // skipped for non-owners (correct for private mode).
+                if (privateGroupBlocked) continue;
 
                 // 🚨 BUG FIX (fake-sender / ugly-forward-box bug): this used to
                 // (1) build a fake "quoted" message with hardcoded garbage jids
