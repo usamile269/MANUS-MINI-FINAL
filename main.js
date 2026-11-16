@@ -1542,6 +1542,18 @@ async function ahmadPair(number, res = null) {
                 groupMetadataCache.delete(gu.id); // membership/admin status just changed — force a fresh fetch next time
                 const { getGroupSettings } = require('./data/GroupSettings');
                 const settings = await getGroupSettings(gu.id);
+                // DEFAULT OFF for all users (Ahmad 2026-11-16): welcome +
+                // goodbye are OFF by default. A group only gets them if THAT
+                // group explicitly enabled them (via .welcome on / .setwelcome
+                // / .setgoodbye inside the group). The bot-wide GLOBAL setting
+                // no longer turns them on for every group — saved "on" values
+                // inherited from GLOBAL are ignored.
+                const { GroupSettings } = require('./data/GroupSettings');
+                let ownDoc = null;
+                try { ownDoc = await GroupSettings.findOne({ chatId: gu.id }); } catch (e) { ownDoc = null; }
+                const own = ownDoc ? (typeof ownDoc.toObject === 'function' ? ownDoc.toObject() : ownDoc) : {};
+                const welcomeOnOwn = own.welcomeOn === true || !!own.welcomeVideo;
+                const goodbyeOnOwn = !!(own.goodbyeMsg || own.goodbyeVideo);
                 const action = String(gu.action || gu.type || '').toLowerCase();
                 const participants = Array.isArray(gu.participants) ? gu.participants
                     .map(p => typeof p === 'string' ? p : (p?.id || p?.jid || p?.participant))
@@ -1562,7 +1574,7 @@ async function ahmadPair(number, res = null) {
                         // text "off". Treat a saved text of exactly "off" as
                         // OFF (no legitimate welcome message is just "off").
                         const welcomeMsgIsTrap = typeof settings.welcomeMsg === 'string' && settings.welcomeMsg.trim().toLowerCase() === 'off';
-                        if ((!settings.welcomeOn && !settings.welcomeVideo) || (welcomeMsgIsTrap && !settings.welcomeVideo)) continue;
+                        if (!welcomeOnOwn || (welcomeMsgIsTrap && !own.welcomeVideo)) continue;
                         const { sendWelcome } = require('./lib/welcome-sender');
                         await sendWelcome(conn, gu.id, participant, settings).catch((e) => console.log('[WELCOME ERROR]', e.message));
                     } else if (action === 'remove' || action === 'leave') {
@@ -1608,9 +1620,10 @@ async function ahmadPair(number, res = null) {
                         if (wasBotKick && settings.kickMsg) {
                             await sendKick(conn, gu.id, participant, settings).catch((e) => console.log('[KICK MSG ERROR]', e.message));
                         } else {
-                            // goodbyeMsg defaults to null (disabled) — only send if the
-                            // owner/admin has actually set one via .setgoodbye.
-                            if (!settings.goodbyeMsg && !settings.goodbyeVideo) continue;
+                            // goodbyeMsg defaults to null (disabled) — only send if
+                            // THIS group explicitly set one via .setgoodbye
+                            // (GLOBAL inheritance no longer turns it on).
+                            if (!goodbyeOnOwn) continue;
                             await sendGoodbye(conn, gu.id, participant, settings).catch((e) => console.log('[GOODBYE ERROR]', e.message));
                         }
                     }
