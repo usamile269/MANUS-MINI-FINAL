@@ -1044,7 +1044,18 @@ async (conn, mek, m, { reply, args, from, q }) => {
                 // For videos: get best mp4 URL; for images: get thumbnail
                 if (info.ext === 'mp4' || info._type === 'video' || (info.formats && info.formats.length)) {
                     const fmts = (info.formats || []).filter(f => f.url && f.ext === 'mp4');
-                    const best = fmts.sort((a, b) => (b.height || 0) - (a.height || 0))[0] || { url: info.url };
+                    // BUG FIX 3 (2026-11-16): prefer PROGRESSIVE (non-DASH) MP4s.
+                    // Sorting by height alone picks the highest DASH stream,
+                    // which for Instagram reels is VP9 (vcodec vp09) — WhatsApp
+                    // cannot play VP9, so igValidateVideo rejects it and the
+                    // download fails even though a perfectly good progressive
+                    // H.264+AAC MP4 (format '1'/'2'/'3') exists. Progressive
+                    // formats have no 'dash-' prefix; DASH-only streams do.
+                    // (Verified on reel DfNfZh4zTk3: progressive = H.264/AAC
+                    // 720x1280, passes validation; DASH = VP9, rejected.)
+                    const progressive = fmts.filter(f => !(f.format_id || '').startsWith('dash-'));
+                    const pool = progressive.length ? progressive : fmts;
+                    const best = pool.sort((a, b) => (b.height || 0) - (a.height || 0))[0] || { url: info.url };
                     if (!best.url) throw new Error('yt-dlp: no video url');
                     return { url: best.url, isVid: true };
                 }
