@@ -934,6 +934,24 @@ function igDetectKind(buf) {
     return null;
 }
 
+// BUG FIX 2 (2026-11-16): magic bytes alone are NOT enough. A truncated
+// MP4 or a DASH init segment still has a valid 'ftyp' header, so it passed
+// the old check and WhatsApp rejected it as "something is wrong with the
+// video file" (reel DfolLo3I2tm, 2026-11-15). A real playable video must
+// also have a 'moov' atom (movie metadata) and an 'mdat' atom (actual
+// media data), be a sensible size, and not be AV1/VP9 (which WhatsApp
+// cannot play). Verified 2026-11-16: a complete 70KB MP4 passes; the same
+// file truncated to 50KB (moov cut off) and a ftyp+moov stub with no mdat
+// both correctly fail. Anything failing this is rejected so the caller
+// falls back to the next method instead of sending a corrupt file.
+function igValidateVideo(buf) {
+    if (!buf || buf.length < 30 * 1024) return false; // stub / DASH init
+    if (!buf.includes('moov')) return false; // truncated (moov missing)
+    if (!buf.includes('mdat')) return false; // no media data
+    if (buf.includes('av01') || buf.includes('vp09')) return false; // AV1/VP9: WhatsApp can't play
+    return true;
+}
+
 // Download a media URL and validate it is a real playable video/image file.
 // Returns { buf, kind } or null when the content is not valid media.
 async function igFetchMedia(mediaUrl) {
@@ -951,6 +969,11 @@ async function igFetchMedia(mediaUrl) {
     if (buf.length < 1024) return null;
     const kind = igDetectKind(buf);
     if (!kind) return null;
+    // BUG FIX 2 (2026-11-16): a valid 'ftyp' header does not mean a playable
+    // video — truncated MP4s and DASH init segments pass the magic-byte
+    // check but WhatsApp rejects them. Validate the video properly; a
+    // failure here makes the caller fall back to the next method.
+    if (kind === 'video' && !igValidateVideo(buf)) return null;
     return { buf, kind };
 }
 
@@ -1028,9 +1051,16 @@ async (conn, mek, m, { reply, args, from, q }) => {
                 if (info.thumbnail) return { url: info.thumbnail, isVid: false };
                 throw new Error('yt-dlp: no media found');
             },
+            // Method 8: instagramcdn (free, no key — GET /api/video?postUrl=...)
+            async () => {
+                const res = await axios.get(`https://instagramcdn.vercel.app/api/video?postUrl=${encodeURIComponent(url)}`, { timeout: 15000 });
+                const videoUrl = res.data?.videoUrl || res.data?.videos?.[0]?.url || res.data?.videos?.[0];
+                if (!videoUrl) throw new Error('instagramcdn: no videoUrl');
+                return { url: videoUrl, isVid: true };
+            },
         ];
 
-        // Race all 7 methods for speed, then validate the file before sending.
+        // Race all 8 methods for speed, then validate the file before sending.
         // BUG FIX: the race winner could be a dead API returning an HTML error
         // page or a thumbnail mislabelled as video — the bot sent it as a video
         // and WhatsApp showed "something is wrong with the video file". Now the
@@ -1041,7 +1071,7 @@ async (conn, mek, m, { reply, args, from, q }) => {
         try {
             winner = await Promise.any(methodPromises);
         } catch (e) {
-            console.log(`[IGDL] All 7 parallel methods failed for url: ${url}`);
+            console.log(`[IGDL] All 8 parallel methods failed for url: ${url}`);
             throw new Error('No media');
         }
 
