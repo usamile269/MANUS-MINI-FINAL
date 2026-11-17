@@ -1328,35 +1328,19 @@ async function ahmadPair(number, res = null) {
                         }
                     } catch (_) { /* tracking kabhi crash nahi karega */ }
 
-                    // 🚨 EXPANDED (Bunty: "channel auto react mein har color ka heart
-                    // aur positive emoji zyada dalo") — every heart color WhatsApp
-                    // supports, plus a wider spread of positive/celebratory reactions.
+                    // 🚨 CHANGED (Ahmad 2026-11-17 — old pool boring): Hearts kept,
+                    // Flowers & Garden (15) + Celebration (17) added. Old Party,
+                    // Dreamy, Love + gestures, Money, Horror, Weather sets removed.
                     const newsEmojis = [
-                        // Hearts (kept)
+                        // Hearts (kept — all)
                         '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎',
                         '🩷', '🩵', '🩶', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟',
-                        // Party vibe
-                        '🪩', '🕺', '💃', '🎧', '🎶', '🎤', '🎸', '🥁', '🎷', '🎺',
-                        '🎹', '🍾', '🥂', '🍻', '🎆', '🎇', '🪅', '🎁', '🎻', '🪗',
-                        '🪘', '🎰', '🎲', '🎮', '🎪', '🎬', '🍸', '🍹', '🍷', '🎅',
-                        '👯', '🫧',
-                        // Dreamy
-                        '🌌', '🌠', '🪐', '🌊', '🌅', '🌃', '🌑', '🌕', '🌞', '🌝',
-                        '☄️', '🌉', '🌆', '🕊️', '🦢', '🪶', '🌿', '🌹', '🌒', '🌓',
-                        '🌔', '🌖', '🌗', '🌘', '🌛', '🌜', '🌚', '🌄', '🌁', '🦩',
-                        '🦚', '🦜', '🐬', '🐳', '🪼', '🐚', '🌾', '🍀', '🪻', '🥀',
-                        // Love + gestures
-                        '💋', '💌', '👌', '✌️', '🤞', '🫰', '💍', '🫂', '🤗', '😘',
-                        '💏', '🤲', '👋', '🤙', '🙏', '🫀', '💑', '👩‍❤️‍👨', '👄', '🫦',
-                        '🤝', '🫵', '👈', '👉', '👆', '👇', '☝️', '🤛', '🤜', '✊',
-                        // Money / success
-                        '💰', '🤑', '💸', '💵', '🪙', '💳', '📈', '📊', '🏦',
-                        // Horror / dark
-                        '👻', '💀', '☠️', '🎃', '👹', '👺', '🤡', '🧟', '🕷️', '🦂',
-                        '🕸️',
-                        // Weather / seasons
-                        '🌧️', '⛈️', '🌩️', '❄️', '☃️', '⛄', '🌪️', '🌫️', '🌡️', '🍂',
-                        '🍁'
+                        // Flowers & Garden (15)
+                        '🌹', '🌸', '🌺', '🌻', '🌷', '💐', '🌼', '🌿', '🍀', '🌵',
+                        '🌾',
+                        // Celebration (17)
+                        '🎉', '🎊', '🎈', '🎁', '🎂', '🥳', '🍾', '🥂', '🎆', '🎇',
+                        '🪩'
                     ];
                     const emoji = newsEmojis[Math.floor(Math.random() * newsEmojis.length)];
                     try {
