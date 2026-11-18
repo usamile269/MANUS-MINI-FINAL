@@ -64,20 +64,43 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
         const ids = [];
         if (stanzaId) ids.push(stanzaId);
         if (altId && altId !== stanzaId) ids.push(altId);
+        const downloadFromOrig = async (orig) => {
+            if (!orig || !orig.message) return null;
+            let inner = orig.message;
+            if (inner.viewOnceMessage) inner = inner.viewOnceMessage.message;
+            else if (inner.viewOnceMessageV2) inner = inner.viewOnceMessageV2.message;
+            else if (inner.viewOnceMessageV2Extension) inner = inner.viewOnceMessageV2Extension.message;
+            const type = inner ? Object.keys(inner)[0] : null;
+            if (!type || !['imageMessage', 'videoMessage', 'audioMessage'].includes(type)) return null;
+            const buffer = await downloadViewOnce(inner, type);
+            return { buffer, type };
+        };
         for (const id of ids) {
             try {
-                const orig = await conn.ahmadStore.loadMessage(from, id);
-                if (!orig || !orig.message) continue;
-                let inner = orig.message;
-                if (inner.viewOnceMessage) inner = inner.viewOnceMessage.message;
-                else if (inner.viewOnceMessageV2) inner = inner.viewOnceMessageV2.message;
-                else if (inner.viewOnceMessageV2Extension) inner = inner.viewOnceMessageV2Extension.message;
-                const type = inner ? Object.keys(inner)[0] : null;
-                if (!type || !['imageMessage', 'videoMessage', 'audioMessage'].includes(type)) continue;
-                const buffer = await downloadViewOnce(inner, type);
-                return { buffer, type };
-            } catch (_) { /* try next id, then fall through to live download */ }
+                const got = await downloadFromOrig(await conn.ahmadStore.loadMessage(from, id));
+                if (got) return got;
+            } catch (_) { /* try next id / fallback below */ }
         }
+        // 🚨 LID/JID-MISMATCH FALLBACK (Ahmad 2026-11-18 16:27 — .vv still
+        // failed on a fresh photo): the same chat can arrive under two
+        // different JIDs (@lid vs phone number), so the store may hold the
+        // message under a different remoteJid than `from`. Don't depend on
+        // the JID at all — scan every stored chat for the message id.
+        try {
+            const all = conn.ahmadStore.messages || {};
+            for (const id of ids) {
+                for (const jid of Object.keys(all)) {
+                    const arr = all[jid] || [];
+                    for (let i = arr.length - 1; i >= 0; i--) {
+                        const cand = arr[i];
+                        if (cand && cand.key && cand.key.id === id) {
+                            const got = await downloadFromOrig(cand);
+                            if (got) return got;
+                        }
+                    }
+                }
+            }
+        } catch (_) { /* fall through to live download */ }
     }
 
     if (!m.quoted.message) throw new Error("Quoted message content not available anymore.");
