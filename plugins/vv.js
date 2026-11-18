@@ -31,30 +31,41 @@ async function downloadViewOnce(msgContent, type) {
 // different session/chat.
 async function getViewOnceMedia(m, botNumber) {
     const stanzaId = m.quoted && m.quoted.stanzaId;
-    const cacheKey = `${botNumber || 'unknown'}::${stanzaId}`;
-    if (stanzaId && global.viewOnceCache && global.viewOnceCache.has(cacheKey)) {
-        const cached = global.viewOnceCache.get(cacheKey);
-        try {
-            const fs = require('fs');
-const { randomFooter } = require('../lib/menu-styles');
-            const buffer = fs.readFileSync(cached.filePath);
-            return { buffer, type: cached.type };
-        } catch (_) { /* file missing/expired, fall through to live download */ }
-    }
-    // Fallback: quoted messages sometimes carry the id under key.id instead
-    // of stanzaId — try that too before giving up on the cache.
     const altId = m.quoted && m.quoted.key && m.quoted.key.id;
-    if (altId && altId !== stanzaId && global.viewOnceCache) {
-        const altKey = `${botNumber || 'unknown'}::${altId}`;
-        if (global.viewOnceCache.has(altKey)) {
-            const cached = global.viewOnceCache.get(altKey);
+    const keys = [];
+    if (stanzaId) keys.push(`${botNumber || 'unknown'}::${stanzaId}`);
+    if (altId && altId !== stanzaId) keys.push(`${botNumber || 'unknown'}::${altId}`);
+
+    const tryCache = () => {
+        if (!global.viewOnceCache) return null;
+        for (const cacheKey of keys) {
+            if (!global.viewOnceCache.has(cacheKey)) continue;
+            const cached = global.viewOnceCache.get(cacheKey);
             try {
                 const fs = require('fs');
                 const buffer = fs.readFileSync(cached.filePath);
                 return { buffer, type: cached.type };
-            } catch (_) { /* file missing/expired, fall through to live download */ }
+            } catch (_) { /* file missing/expired, keep trying other keys */ }
         }
+        return null;
+    };
+
+    // Fast path: already captured.
+    let hit = tryCache();
+    if (hit) return hit;
+
+    // 🚨 RACE FIX (Ahmad 2026-11-18 — ".vv same issue / ni sahi howa"):
+    // the view-once capture runs in the background and takes a few seconds
+    // to download the media. If .vv is used right after the photo arrives,
+    // the cache is still empty and the live fallback fails (quoted
+    // view-once messages carry no mediaKey). Wait and retry the cache for
+    // up to ~10s before giving up on it.
+    for (let i = 0; i < 5; i++) {
+        await sleep(2000);
+        hit = tryCache();
+        if (hit) return hit;
     }
+
     if (!m.quoted.message) throw new Error("Quoted message content not available anymore.");
     let msg = m.quoted.message;
     if (msg?.viewOnceMessage) msg = msg.viewOnceMessage.message;
