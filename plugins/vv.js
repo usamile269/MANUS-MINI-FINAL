@@ -1,176 +1,225 @@
+// ============================================================
+// VIEW-ONCE RECOVERY — clean rewrite from scratch (2026-11-18)
+// Ahmad: "khud write karoo SAB code yeh vv Wala again"
+// Single job: recover a view-once photo/video/audio the user replies
+// to, and send it back. Nothing else in the bot is touched.
+// ============================================================
 const { cmd } = require('../ahmad-core');
 const { sleep } = require('../lib/functions');
 const config = require('../config');
 const { downloadContentFromMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
-// 🚨 BUG FIX (Bunty: ".vv → ERROR: randomFooter is not defined") — every
-// reply box in this file uses randomFooter() but the import was missing
-// entirely, so it crashed the moment it tried to build the footer.
 const { randomFooter } = require('../lib/menu-styles');
+const fs = require('fs');
 
-async function downloadViewOnce(msgContent, type) {
-    const mediaType = type === "imageMessage" ? "image" : type === "videoMessage" ? "video" : "audio";
-    const mediaObj = msgContent[type];
-    if (!mediaObj || !mediaObj.mediaKey) {
-        throw new Error(`No mediaKey found for ${type}. The quoted message may be too old or not cached.`);
-    }
-    const stream = await downloadContentFromMessage(mediaObj, mediaType);
-    let buffer = Buffer.from([]);
-    for await (const chunk of stream) {
-        buffer = Buffer.concat([buffer, chunk]);
-    }
-    return buffer;
-}
-
-// 🚨 EPHEMERAL FIX (2026-11-18 — confirmed bug): a view-once can arrive
-// wrapped in ephemeralMessage (disappearing messages on in the chat):
-// ephemeralMessage → viewOnceMessage → imageMessage/videoMessage. The
-// old unwrap only checked viewOnceMessage and its variants, so an
-// ephemeral-wrapped view-once was never unwrapped — capture missed it,
-// the store lookup missed it, and .vv failed even on a FRESH photo.
-// Unwrap ephemeral + view-once wrappers in any order/depth until the
-// inner media content is reached.
-function unwrapNested(message) {
+// ---------- unwrap ----------
+// Peel every wrapper WhatsApp can put around a view-once:
+// ephemeralMessage (disappearing messages) -> viewOnceMessage / V2 /
+// V2Extension -> imageMessage / videoMessage / audioMessage.
+// Also handles documentWithCaptionMessage. Any order, any depth
+// (guarded against loops). Returns the inner media content object,
+// e.g. { imageMessage: {...} }, or null when there is no media inside.
+function unwrapMedia(message) {
     let inner = message;
     let guard = 0;
-    while (inner && guard++ < 8) {
+    while (inner && typeof inner === 'object' && guard++ < 10) {
         if (inner.ephemeralMessage) { inner = inner.ephemeralMessage.message; continue; }
         if (inner.viewOnceMessage) { inner = inner.viewOnceMessage.message; continue; }
         if (inner.viewOnceMessageV2) { inner = inner.viewOnceMessageV2.message; continue; }
         if (inner.viewOnceMessageV2Extension) { inner = inner.viewOnceMessageV2Extension.message; continue; }
+        if (inner.documentWithCaptionMessage) { inner = inner.documentWithCaptionMessage.message; continue; }
         break;
     }
-    return inner || null;
+    if (!inner || typeof inner !== 'object') return null;
+    return inner;
 }
 
-// Try the pre-captured cache first (works even if the view-once was already opened),
-// then fall back to a live re-download attempt (only works if it's still unopened).
-// 🚨 CROSS-SESSION LEAK FIX (Bunty): this bot can run multiple paired
-// numbers in one process, and WhatsApp message IDs aren't guaranteed
-// unique across different sessions — so the cache lookup MUST be scoped
-// by botNumber (see lib/viewonce-capture.js's scopedKey), or one paired
-// session's .vv/.vv2 could pull back media captured under a totally
-// different session/chat.
+// Pick the media node out of unwrapped content. Returns
+// { type, mediaObj } for image/video/audio, or null. Also honours a
+// direct `.viewOnce` flag on a media node (some clients set the flag
+// instead of wrapping the message).
+function pickMedia(content) {
+    if (!content || typeof content !== 'object') return null;
+    for (const type of ['imageMessage', 'videoMessage', 'audioMessage']) {
+        if (content[type]) return { type, mediaObj: content[type] };
+    }
+    return null;
+}
+
+// Download the media bytes for unwrapped content. Throws when there is
+// no media, or when the media has no mediaKey (already viewed / expired).
+async function downloadMedia(content) {
+    const picked = pickMedia(content);
+    if (!picked) throw new Error('No view-once media found in this message.');
+    const { type, mediaObj } = picked;
+    if (!mediaObj.mediaKey) {
+        throw new Error(`No mediaKey found for ${type}. The quoted message may be too old or not cached.`);
+    }
+    const mediaType = type === 'imageMessage' ? 'image' : type === 'videoMessage' ? 'video' : 'audio';
+    const stream = await downloadContentFromMessage(mediaObj, mediaType);
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+    return { buffer, type };
+}
+
+// Download from a stored/original message record (mek). Never throws —
+// returns { buffer, type } on success, null otherwise.
+async function downloadFromRecord(record) {
+    if (!record || !record.message) return null;
+    try {
+        const content = unwrapMedia(record.message);
+        if (!content) return null;
+        return await downloadMedia(content);
+    } catch (_) {
+        return null;
+    }
+}
+
+// ---------- getViewOnceMedia ----------
+// Recovery order (fastest / most reliable first):
+//  1. pre-captured cache (works even after the view-once was opened)
+//  2. bot message store, by quoted message id (loadMessage + scan all chats)
+//  3. most-recent view-once in this chat (ID-mismatch fallback — the user
+//     replies within seconds, so the newest view-once here is the target)
+//  4. live download from the quoted message itself (only if still unopened)
+// Throws a diagnostic error when every stage misses, so the next failure
+// explains itself from a screenshot.
 async function getViewOnceMedia(m, botNumber, conn, from) {
     const stanzaId = m.quoted && m.quoted.stanzaId;
     const altId = m.quoted && m.quoted.key && m.quoted.key.id;
-    const keys = [];
-    if (stanzaId) keys.push(`${botNumber || 'unknown'}::${stanzaId}`);
-    if (altId && altId !== stanzaId) keys.push(`${botNumber || 'unknown'}::${altId}`);
     const ids = [];
     if (stanzaId) ids.push(stanzaId);
     if (altId && altId !== stanzaId) ids.push(altId);
-    const cacheTried = [];
-    const storeTried = [];
-    const logLookup = (cache, store, extra = '') => console.log(
-        `[VV MEDIA] bot=${botNumber || 'unknown'} chat=${from || 'unknown'} ` +
-        `quotedIds=${JSON.stringify(ids)} cache=${cache} store=${store} ` +
-        `cacheTried=${JSON.stringify(cacheTried)} storeTried=${JSON.stringify(storeTried)}` +
-        (extra ? ` ${extra}` : '')
+    const bn = botNumber || 'unknown';
+
+    const store = conn && conn.ahmadStore ? conn.ahmadStore : null;
+    const storeChatCount = store && store.messages ? Object.keys(store.messages).length : 0;
+    const cacheState = global.viewOnceCache ? 'miss' : 'unavailable';
+    let storeStatus = store ? 'miss' : 'not-attached';
+    let foundButNoKey = 0;
+    let recentTried = 0;
+
+    const log = (cache, storeSt, extra = '') => console.log(
+        `[VV MEDIA] bot=${bn} chat=${from || 'unknown'} quotedIds=${JSON.stringify(ids)} ` +
+        `cache=${cache} store=${storeSt}${extra ? ' ' + extra : ''}`
     );
 
-    const tryCache = () => {
-        for (const cacheKey of keys) {
-            cacheTried.push(cacheKey);
-            if (!global.viewOnceCache) continue;
-            if (!global.viewOnceCache.has(cacheKey)) continue;
-            const cached = global.viewOnceCache.get(cacheKey);
+    // ---- 1. cache (exact scoped keys, then suffix scan) ----
+    if (global.viewOnceCache) {
+        for (const id of ids) {
+            const entry = global.viewOnceCache.get(`${bn}::${id}`);
+            if (!entry) continue;
             try {
-                const fs = require('fs');
-                const buffer = fs.readFileSync(cached.filePath);
-                return { buffer, type: cached.type };
-            } catch (_) { /* file missing/expired, keep trying other keys */ }
+                const buffer = fs.readFileSync(entry.filePath);
+                log('hit', 'not-needed', `source=cache type=${entry.type}`);
+                return { buffer, type: entry.type };
+            } catch (_) { /* file gone/expired — try next */ }
         }
-        return null;
-    };
-
-    // Fast path: already captured.
-    let hit = tryCache();
-    if (hit) {
-        logLookup('hit', 'not-needed', `type=${hit.type}`);
-        return hit;
+        // Suffix scan: same message id under any botNumber scope.
+        for (const [key, entry] of global.viewOnceCache) {
+            for (const id of ids) {
+                if (!key.endsWith(`::${id}`)) continue;
+                try {
+                    const buffer = fs.readFileSync(entry.filePath);
+                    log('hit', 'not-needed', `source=cache-scan type=${entry.type}`);
+                    return { buffer, type: entry.type };
+                } catch (_) { /* keep scanning */ }
+            }
+        }
     }
 
-    // 🚨 INSTANT FIX (Ahmad 2026-11-18 — "usi time sab ho", no waiting):
-    // do NOT wait for the background capture. The bot's message store
-    // already holds the original view-once message (WITH its mediaKey)
-    // from the moment it arrived — look it up by id and download the
-    // media directly, right now. This is what makes .vv work the instant
-    // it's used, instead of racing the background capture.
-    let storeStatus = conn && conn.ahmadStore ? 'miss' : 'not-attached';
-    if (conn && conn.ahmadStore && from) {
-        const downloadFromOrig = async (orig) => {
-            if (!orig || !orig.message) return null;
-            const inner = unwrapNested(orig.message);
-            const type = inner ? Object.keys(inner)[0] : null;
-            if (!type || !['imageMessage', 'videoMessage', 'audioMessage'].includes(type)) return null;
-            const buffer = await downloadViewOnce(inner, type);
-            return { buffer, type };
-        };
+    // ---- 2. store by id ----
+    if (store && from) {
         for (const id of ids) {
-            storeTried.push(`loadMessage:${from}:${id}`);
             try {
-                const orig = await conn.ahmadStore.loadMessage(from, id);
+                const orig = await store.loadMessage(from, id);
                 if (!orig) continue;
-                const got = await downloadFromOrig(orig);
+                const picked = pickMedia(unwrapMedia(orig.message));
+                if (picked && !picked.mediaObj.mediaKey) foundButNoKey++;
+                const got = await downloadFromRecord(orig);
                 if (got) {
                     storeStatus = 'hit';
-                    logLookup('miss', storeStatus, `source=loadMessage type=${got.type}`);
+                    log('miss', storeStatus, `source=loadMessage type=${got.type}`);
                     return got;
                 }
-            } catch (_) { /* try next id / fallback below */ }
+            } catch (_) { /* try next id */ }
         }
-        // 🚨 LID/JID-MISMATCH FALLBACK (Ahmad 2026-11-18 16:27 — .vv still
-        // failed on a fresh photo): the same chat can arrive under two
-        // different JIDs (@lid vs phone number), so the store may hold the
-        // message under a different remoteJid than `from`. Don't depend on
-        // the JID at all — scan every stored chat for the message id.
+        // Scan every stored chat (same chat can arrive under @lid vs phone JID).
         try {
-            const all = conn.ahmadStore.messages || {};
+            const all = store.messages || {};
             for (const id of ids) {
                 for (const jid of Object.keys(all)) {
                     const arr = all[jid] || [];
                     for (let i = arr.length - 1; i >= 0; i--) {
                         const cand = arr[i];
-                        if (cand && cand.key && cand.key.id === id) {
-                            storeTried.push(`scan:${jid}:${id}`);
-                            const got = await downloadFromOrig(cand);
-                            if (got) {
-                                storeStatus = 'hit';
-                                logLookup('miss', storeStatus, `source=scan:${jid} type=${got.type}`);
-                                return got;
-                            }
+                        if (!cand || !cand.key || cand.key.id !== id) continue;
+                        const picked = pickMedia(unwrapMedia(cand.message));
+                        if (picked && !picked.mediaObj.mediaKey) foundButNoKey++;
+                        const got = await downloadFromRecord(cand);
+                        if (got) {
+                            storeStatus = 'hit';
+                            log('miss', storeStatus, `source=scan:${jid} type=${got.type}`);
+                            return got;
                         }
                     }
                 }
             }
+        } catch (_) { /* fall through */ }
+    }
+
+    // ---- 3. most-recent view-once in this chat (ID-mismatch fallback) ----
+    // The user replies within seconds of the photo arriving, so the newest
+    // view-once message in this chat is almost certainly the target. This
+    // bypasses quoted-id mismatches entirely (ephemeral wrapper ids, @lid
+    // vs phone JIDs, stale quote references). Only messages from the last
+    // 5 minutes are considered, newest first, max 2 attempts.
+    if (store) {
+        try {
+            const all = store.messages || {};
+            const chatJids = [];
+            if (from) chatJids.push(from);
+            for (const jid of Object.keys(all)) if (jid !== from) chatJids.push(jid);
+            const nowSec = Date.now() / 1000;
+            for (const jid of chatJids) {
+                const arr = all[jid] || [];
+                for (let i = arr.length - 1; i >= 0 && recentTried < 2; i--) {
+                    const cand = arr[i];
+                    if (!cand || !cand.message) continue;
+                    const ts = cand.messageTimestamp ? Number(cand.messageTimestamp) : 0;
+                    if (ts && nowSec - ts > 300) break; // older than 5 min — stop this chat
+                    const picked = pickMedia(unwrapMedia(cand.message));
+                    if (!picked) continue;
+                    if (!picked.mediaObj.mediaKey) { foundButNoKey++; continue; }
+                    recentTried++;
+                    const got = await downloadFromRecord(cand);
+                    if (got) {
+                        storeStatus = 'hit';
+                        log('miss', storeStatus, `source=recent:${jid} type=${got.type}`);
+                        return got;
+                    }
+                }
+                if (recentTried >= 2) break;
+            }
         } catch (_) { /* fall through to live download */ }
     }
-    const storeChatCount = conn && conn.ahmadStore && conn.ahmadStore.messages ? Object.keys(conn.ahmadStore.messages).length : 0;
-    logLookup(global.viewOnceCache ? 'miss' : 'unavailable', storeStatus,
-        `storeChats=${storeChatCount}`);
-    // Short diagnostic for the user-facing error, so the next failure
-    // tells us exactly why at a glance (store attached? any chats in it?
-    // cache present?). Ahmad can screenshot this instead of us guessing.
-    // storeChats=0 means the store is empty — the photo predates the last
-    // restart, or the store never received it.
-    const diag = `store=${conn && conn.ahmadStore ? storeStatus : 'not-attached'} chats=${storeChatCount} cache=${global.viewOnceCache ? 'miss' : 'unavailable'}`;
 
-    if (!m.quoted.message) throw new Error("Quoted message content not available anymore. [" + diag + "]");
-    const msg = unwrapNested(m.quoted.message);
-    const type = msg ? Object.keys(msg)[0] : null;
-    if (!type) throw new Error("Could not read quoted media type. [" + diag + "]");
+    // ---- 4. live download from the quoted message ----
+    const diag = `store=${storeStatus} chats=${storeChatCount} cache=${cacheState}` +
+        (foundButNoKey ? ` noKey=${foundButNoKey}` : '') +
+        (recentTried ? ` recent=${recentTried}` : '');
+    log(cacheState, storeStatus, `storeChats=${storeChatCount} noKey=${foundButNoKey} recent=${recentTried}`);
+
+    if (!m.quoted || !m.quoted.message) throw new Error(`Quoted message content not available anymore. [${diag}]`);
     try {
-        const buffer = await downloadViewOnce(msg, type);
-        return { buffer, type };
+        const content = unwrapMedia(m.quoted.message);
+        return await downloadMedia(content);
     } catch (e) {
-        throw new Error(e.message + " [" + diag + "]");
+        throw new Error(`${e.message} [${diag}]`);
     }
 }
 
 // ============================================================
-// 👑 VV / VVWHERE - Sends view-once media right here in the same
-// chat (Ahmad 2026-11-18: .vv and .vvhere do the same thing — no
-// more auto-send to owner DM/inbox).
+// VV / VVWHERE — sends the view-once media right here in the
+// same chat (no auto-send to owner DM).
 // ============================================================
 cmd({
     pattern: "vv",
@@ -197,7 +246,6 @@ cmd({
             return reply(display);
         }
 
-        // 🔥 VIEW ONCE FIX
         const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
         const { buffer, type } = await getViewOnceMedia(m, botNumber, conn, from);
 
@@ -226,9 +274,6 @@ cmd({
             return reply("❌ *THIS VIEW-ONCE MEDIA TYPE IS NOT SUPPORTED 🥺*");
         }
 
-        // 📤 Send right here in the same chat (Ahmad 2026-11-18: .vv and
-        // .vvhere do the same thing — no more auto-send to owner DM).
-        // `mek` lives in this same chat, so quoting it here is safe.
         await conn.sendMessage(from, content);
         await sleep(700);
 
@@ -259,7 +304,7 @@ cmd({
 });
 
 // ============================================================
-// 🔥 VV2 - PUBLIC VERSION (Sends to User's DM)
+// VV2 — sends the view-once media to the user's DM.
 // ============================================================
 cmd({
     pattern: "vv2",
@@ -318,11 +363,7 @@ cmd({
             return reply("❌ *THIS VIEW-ONCE MEDIA TYPE IS NOT SUPPORTED 🥺*");
         }
 
-        // 📤 Send to user's DM (who used the command)
-        const userJid = m.sender; // The person who sent the command
-
-        // ✅ FIX: same cross-chat quoted issue as .vv — mek belongs to the
-        // group, not the user's DM.
+        const userJid = m.sender;
         await conn.sendMessage(userJid, content);
         await sleep(700);
 
@@ -353,7 +394,7 @@ cmd({
 });
 
 // ============================================================
-// 🎯 EMOJI COMMAND - PUBLIC (Sends to User's DM)
+// EMOJI COMMAND — sends the view-once media to the user's DM.
 // ============================================================
 cmd({
     pattern: "👁️",
@@ -393,7 +434,6 @@ cmd({
             return reply("❌ *Not supported!*");
         }
 
-        // Send to user's DM
         const userJid = m.sender;
         await conn.sendMessage(userJid, content);
         await sleep(500);
