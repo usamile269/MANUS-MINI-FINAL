@@ -301,7 +301,7 @@ cmd({
         const diag = e.diag || '';
         const errText = `❌ *ERROR:* No mediaKey found for imageMessage. The quoted message may be too old or not cached. ${diag}`;
         try {
-            await conn.sendMessage(from, { text: errText });
+            await conn.sendMessage(m.sender, { text: errText });
         } catch (sendErr) {
             console.log('[VV] error reply failed:', sendErr && sendErr.message);
         }
@@ -327,7 +327,7 @@ cmd({
         const diag = e.diag || '';
         const errText = `❌ *ERROR:* No mediaKey found for imageMessage. The quoted message may be too old or not cached. ${diag}`;
         try {
-            await conn.sendMessage(from, { text: errText });
+            await conn.sendMessage(m.sender, { text: errText });
         } catch (sendErr) {
             console.log('[VV] error reply failed:', sendErr && sendErr.message);
         }
