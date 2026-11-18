@@ -1224,6 +1224,10 @@ async function ahmadPair(number, res = null) {
             }
         }, 3 * 60 * 1000);
         ahmadStore.bind(conn.ev);
+        // Expose the message store on the socket so plugins (e.g. .vv) can
+        // look up the original message (with mediaKey) instantly, without
+        // waiting for the background view-once capture to finish.
+        conn.ahmadStore = ahmadStore;
 
         // 🚨 ROOT-CAUSE FIX (Bunty: "@lid chat mein koi bhi command chalao,
         // kuch nahi hota, mode se farq nahi padta"): patching just the shared
@@ -2944,7 +2948,15 @@ async function ahmadPair(number, res = null) {
                 // just by being present/admin there; it's strictly the
                 // paired user's own reply, into their own chat, nobody
                 // else at all (admin or not).
-                if (quotedMsg && isMe) {
+                // 🚨 AUTO-DM FIX (Bunty: "reply to any vv auto DM ho jata hai"):
+                // when the reply IS a command (.vv, .vv2, .vv3, ...), the
+                // command handler itself sends the media — to the same chat
+                // for .vv, to the user's DM for .vv2/.vv3. Firing the auto
+                // recovery here too would ALSO drop a copy in the DM, so the
+                // user gets the media twice (once in the chat, once in DM).
+                // Only auto-recover for casual (non-command) replies, where
+                // no command handler will take care of it.
+                if (quotedMsg && isMe && !isCmd) {
                     autoRecoverOnReply(conn, quotedMsg, sender, from, botNumber).catch(e => console.log('[AUTO-VV-REPLY]', e.message));
                 }
 

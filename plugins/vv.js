@@ -29,7 +29,7 @@ async function downloadViewOnce(msgContent, type) {
 // by botNumber (see lib/viewonce-capture.js's scopedKey), or one paired
 // session's .vv/.vv2 could pull back media captured under a totally
 // different session/chat.
-async function getViewOnceMedia(m, botNumber) {
+async function getViewOnceMedia(m, botNumber, conn, from) {
     const stanzaId = m.quoted && m.quoted.stanzaId;
     const altId = m.quoted && m.quoted.key && m.quoted.key.id;
     const keys = [];
@@ -54,16 +54,30 @@ async function getViewOnceMedia(m, botNumber) {
     let hit = tryCache();
     if (hit) return hit;
 
-    // 🚨 RACE FIX (Ahmad 2026-11-18 — ".vv same issue / ni sahi howa"):
-    // the view-once capture runs in the background and takes a few seconds
-    // to download the media. If .vv is used right after the photo arrives,
-    // the cache is still empty and the live fallback fails (quoted
-    // view-once messages carry no mediaKey). Wait and retry the cache for
-    // up to ~10s before giving up on it.
-    for (let i = 0; i < 5; i++) {
-        await sleep(2000);
-        hit = tryCache();
-        if (hit) return hit;
+    // 🚨 INSTANT FIX (Ahmad 2026-11-18 — "usi time sab ho", no waiting):
+    // do NOT wait for the background capture. The bot's message store
+    // already holds the original view-once message (WITH its mediaKey)
+    // from the moment it arrived — look it up by id and download the
+    // media directly, right now. This is what makes .vv work the instant
+    // it's used, instead of racing the background capture.
+    if (conn && conn.ahmadStore && from) {
+        const ids = [];
+        if (stanzaId) ids.push(stanzaId);
+        if (altId && altId !== stanzaId) ids.push(altId);
+        for (const id of ids) {
+            try {
+                const orig = await conn.ahmadStore.loadMessage(from, id);
+                if (!orig || !orig.message) continue;
+                let inner = orig.message;
+                if (inner.viewOnceMessage) inner = inner.viewOnceMessage.message;
+                else if (inner.viewOnceMessageV2) inner = inner.viewOnceMessageV2.message;
+                else if (inner.viewOnceMessageV2Extension) inner = inner.viewOnceMessageV2Extension.message;
+                const type = inner ? Object.keys(inner)[0] : null;
+                if (!type || !['imageMessage', 'videoMessage', 'audioMessage'].includes(type)) continue;
+                const buffer = await downloadViewOnce(inner, type);
+                return { buffer, type };
+            } catch (_) { /* try next id, then fall through to live download */ }
+        }
     }
 
     if (!m.quoted.message) throw new Error("Quoted message content not available anymore.");
@@ -109,7 +123,7 @@ cmd({
 
         // 🔥 VIEW ONCE FIX
         const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
-        const { buffer, type } = await getViewOnceMedia(m, botNumber);
+        const { buffer, type } = await getViewOnceMedia(m, botNumber, conn, from);
 
         let content = {};
 
@@ -201,7 +215,7 @@ cmd({
         }
 
         const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
-        const { buffer, type } = await getViewOnceMedia(m, botNumber);
+        const { buffer, type } = await getViewOnceMedia(m, botNumber, conn, from);
 
         let content = {};
 
@@ -286,7 +300,7 @@ cmd({
         }
 
         const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
-        const { buffer, type } = await getViewOnceMedia(m, botNumber);
+        const { buffer, type } = await getViewOnceMedia(m, botNumber, conn, from);
 
         let content = {};
 
