@@ -41,6 +41,20 @@ const { randomFooter } = require('../lib/menu-styles');
             return { buffer, type: cached.type };
         } catch (_) { /* file missing/expired, fall through to live download */ }
     }
+    // Fallback: quoted messages sometimes carry the id under key.id instead
+    // of stanzaId — try that too before giving up on the cache.
+    const altId = m.quoted && m.quoted.key && m.quoted.key.id;
+    if (altId && altId !== stanzaId && global.viewOnceCache) {
+        const altKey = `${botNumber || 'unknown'}::${altId}`;
+        if (global.viewOnceCache.has(altKey)) {
+            const cached = global.viewOnceCache.get(altKey);
+            try {
+                const fs = require('fs');
+                const buffer = fs.readFileSync(cached.filePath);
+                return { buffer, type: cached.type };
+            } catch (_) { /* file missing/expired, fall through to live download */ }
+        }
+    }
     if (!m.quoted.message) throw new Error("Quoted message content not available anymore.");
     let msg = m.quoted.message;
     if (msg?.viewOnceMessage) msg = msg.viewOnceMessage.message;
@@ -53,11 +67,13 @@ const { randomFooter } = require('../lib/menu-styles');
 }
 
 // ============================================================
-// 👑 VV - OWNER ONLY (Sends to Owner's Inbox)
+// 👑 VV / VVWHERE - Sends view-once media right here in the same
+// chat (Ahmad 2026-11-18: .vv and .vvhere do the same thing — no
+// more auto-send to owner DM/inbox).
 // ============================================================
 cmd({
     pattern: "vv",
-    alias: ["viewonce", "view"],
+    alias: ["viewonce", "view", "vvhere"],
     react: "🫶🏻",
     desc: "Retrieve view-once media",
     category: "tools",
@@ -109,27 +125,16 @@ cmd({
             return reply("❌ *THIS VIEW-ONCE MEDIA TYPE IS NOT SUPPORTED 🥺*");
         }
 
-        // 📤 Send to owner's inbox
-        // 🚨 BUG FIX: config.OWNER_NUMBER can be a stale/placeholder value if
-        // it was never explicitly configured. Since this bot runs on its own
-        // WhatsApp account, the bot's own connected number IS the owner in
-        // practice — using conn.user.id guarantees a valid, correct JID.
-        const ownerJid = conn.user.id.split(':')[0].split('@')[0] + "@s.whatsapp.net";
-
-        // ✅ FIX: `mek` belongs to the GROUP chat, not ownerJid's DM. Passing
-        // { quoted: mek } here tells Baileys to attach a reply-context that
-        // points at a message living in a different chat than the one we're
-        // sending to — an invalid cross-chat reference that can trip WhatsApp's
-        // protocol validation and kill the socket connection (the "bot goes
-        // offline" symptom). Also spaced out the calls slightly so several
-        // media/react/text sends don't fire in the same instant.
-        await conn.sendMessage(ownerJid, content);
+        // 📤 Send right here in the same chat (Ahmad 2026-11-18: .vv and
+        // .vvhere do the same thing — no more auto-send to owner DM).
+        // `mek` lives in this same chat, so quoting it here is safe.
+        await conn.sendMessage(from, content);
         await sleep(700);
 
         const done = `╭═══ ✅ VIEW ONCE ═══⊷
 ┃❃╭──────────────
 ┃❃│ ✅ Media retrieved successfully!
-┃❃│ 📤 Sent to owner inbox
+┃❃│ 📤 Sent here in this chat
 ┃❃╰───────────────
 ╰═════════════════⊷
 
