@@ -21,6 +21,27 @@ async function downloadViewOnce(msgContent, type) {
     return buffer;
 }
 
+// 🚨 EPHEMERAL FIX (2026-11-18 — confirmed bug): a view-once can arrive
+// wrapped in ephemeralMessage (disappearing messages on in the chat):
+// ephemeralMessage → viewOnceMessage → imageMessage/videoMessage. The
+// old unwrap only checked viewOnceMessage and its variants, so an
+// ephemeral-wrapped view-once was never unwrapped — capture missed it,
+// the store lookup missed it, and .vv failed even on a FRESH photo.
+// Unwrap ephemeral + view-once wrappers in any order/depth until the
+// inner media content is reached.
+function unwrapNested(message) {
+    let inner = message;
+    let guard = 0;
+    while (inner && guard++ < 8) {
+        if (inner.ephemeralMessage) { inner = inner.ephemeralMessage.message; continue; }
+        if (inner.viewOnceMessage) { inner = inner.viewOnceMessage.message; continue; }
+        if (inner.viewOnceMessageV2) { inner = inner.viewOnceMessageV2.message; continue; }
+        if (inner.viewOnceMessageV2Extension) { inner = inner.viewOnceMessageV2Extension.message; continue; }
+        break;
+    }
+    return inner || null;
+}
+
 // Try the pre-captured cache first (works even if the view-once was already opened),
 // then fall back to a live re-download attempt (only works if it's still unopened).
 // 🚨 CROSS-SESSION LEAK FIX (Bunty): this bot can run multiple paired
@@ -79,10 +100,7 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
     if (conn && conn.ahmadStore && from) {
         const downloadFromOrig = async (orig) => {
             if (!orig || !orig.message) return null;
-            let inner = orig.message;
-            if (inner.viewOnceMessage) inner = inner.viewOnceMessage.message;
-            else if (inner.viewOnceMessageV2) inner = inner.viewOnceMessageV2.message;
-            else if (inner.viewOnceMessageV2Extension) inner = inner.viewOnceMessageV2Extension.message;
+            const inner = unwrapNested(orig.message);
             const type = inner ? Object.keys(inner)[0] : null;
             if (!type || !['imageMessage', 'videoMessage', 'audioMessage'].includes(type)) return null;
             const buffer = await downloadViewOnce(inner, type);
@@ -138,10 +156,7 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
     const diag = `store=${conn && conn.ahmadStore ? storeStatus : 'not-attached'} chats=${storeChatCount} cache=${global.viewOnceCache ? 'miss' : 'unavailable'}`;
 
     if (!m.quoted.message) throw new Error("Quoted message content not available anymore. [" + diag + "]");
-    let msg = m.quoted.message;
-    if (msg?.viewOnceMessage) msg = msg.viewOnceMessage.message;
-    else if (msg?.viewOnceMessageV2) msg = msg.viewOnceMessageV2.message;
-    else if (msg?.viewOnceMessageV2Extension) msg = msg.viewOnceMessageV2Extension.message;
+    const msg = unwrapNested(m.quoted.message);
     const type = msg ? Object.keys(msg)[0] : null;
     if (!type) throw new Error("Could not read quoted media type. [" + diag + "]");
     try {
