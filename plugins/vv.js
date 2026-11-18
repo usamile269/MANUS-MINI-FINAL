@@ -35,10 +35,22 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
     const keys = [];
     if (stanzaId) keys.push(`${botNumber || 'unknown'}::${stanzaId}`);
     if (altId && altId !== stanzaId) keys.push(`${botNumber || 'unknown'}::${altId}`);
+    const ids = [];
+    if (stanzaId) ids.push(stanzaId);
+    if (altId && altId !== stanzaId) ids.push(altId);
+    const cacheTried = [];
+    const storeTried = [];
+    const logLookup = (cache, store, extra = '') => console.log(
+        `[VV MEDIA] bot=${botNumber || 'unknown'} chat=${from || 'unknown'} ` +
+        `quotedIds=${JSON.stringify(ids)} cache=${cache} store=${store} ` +
+        `cacheTried=${JSON.stringify(cacheTried)} storeTried=${JSON.stringify(storeTried)}` +
+        (extra ? ` ${extra}` : '')
+    );
 
     const tryCache = () => {
-        if (!global.viewOnceCache) return null;
         for (const cacheKey of keys) {
+            cacheTried.push(cacheKey);
+            if (!global.viewOnceCache) continue;
             if (!global.viewOnceCache.has(cacheKey)) continue;
             const cached = global.viewOnceCache.get(cacheKey);
             try {
@@ -52,7 +64,10 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
 
     // Fast path: already captured.
     let hit = tryCache();
-    if (hit) return hit;
+    if (hit) {
+        logLookup('hit', 'not-needed', `type=${hit.type}`);
+        return hit;
+    }
 
     // 🚨 INSTANT FIX (Ahmad 2026-11-18 — "usi time sab ho", no waiting):
     // do NOT wait for the background capture. The bot's message store
@@ -60,10 +75,8 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
     // from the moment it arrived — look it up by id and download the
     // media directly, right now. This is what makes .vv work the instant
     // it's used, instead of racing the background capture.
+    let storeStatus = conn && conn.ahmadStore ? 'miss' : 'not-attached';
     if (conn && conn.ahmadStore && from) {
-        const ids = [];
-        if (stanzaId) ids.push(stanzaId);
-        if (altId && altId !== stanzaId) ids.push(altId);
         const downloadFromOrig = async (orig) => {
             if (!orig || !orig.message) return null;
             let inner = orig.message;
@@ -76,9 +89,16 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
             return { buffer, type };
         };
         for (const id of ids) {
+            storeTried.push(`loadMessage:${from}:${id}`);
             try {
-                const got = await downloadFromOrig(await conn.ahmadStore.loadMessage(from, id));
-                if (got) return got;
+                const orig = await conn.ahmadStore.loadMessage(from, id);
+                if (!orig) continue;
+                const got = await downloadFromOrig(orig);
+                if (got) {
+                    storeStatus = 'hit';
+                    logLookup('miss', storeStatus, `source=loadMessage type=${got.type}`);
+                    return got;
+                }
             } catch (_) { /* try next id / fallback below */ }
         }
         // 🚨 LID/JID-MISMATCH FALLBACK (Ahmad 2026-11-18 16:27 — .vv still
@@ -94,14 +114,21 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
                     for (let i = arr.length - 1; i >= 0; i--) {
                         const cand = arr[i];
                         if (cand && cand.key && cand.key.id === id) {
+                            storeTried.push(`scan:${jid}:${id}`);
                             const got = await downloadFromOrig(cand);
-                            if (got) return got;
+                            if (got) {
+                                storeStatus = 'hit';
+                                logLookup('miss', storeStatus, `source=scan:${jid} type=${got.type}`);
+                                return got;
+                            }
                         }
                     }
                 }
             }
         } catch (_) { /* fall through to live download */ }
     }
+    logLookup(global.viewOnceCache ? 'miss' : 'unavailable', storeStatus,
+        `storeChats=${conn && conn.ahmadStore && conn.ahmadStore.messages ? Object.keys(conn.ahmadStore.messages).length : 0}`);
 
     if (!m.quoted.message) throw new Error("Quoted message content not available anymore.");
     let msg = m.quoted.message;

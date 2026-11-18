@@ -1,6 +1,6 @@
 const { cmd } = require('../ahmad-core');
 const config = require('../config');
-const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+const { downloadContentFromMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
 const { getViewOnceMedia } = require('./vv');
 const { ownerOnlyDenied, toSansBold } = require('../lib/menu-styles');
 
@@ -25,21 +25,22 @@ function fail(reply, text) {
     return reply(`❌ ${toSansBold(text)}`);
 }
 
-// ==================== RECOVER TO GROUP (post in current chat) ====================
+// ==================== LEGACY RECOVER-HERE ALIASES ====================
 cmd({
-    pattern: "vvhere",
-    alias: ["vvpost", "recoverhere"],
+    // `.vvhere` is deliberately owned only by plugins/vv.js. Registering it
+    // here too made behavior depend on filesystem plugin load order.
+    pattern: "vvpost",
+    alias: ["recoverhere"],
     desc: "👁️ Recover view-once and post it right here",
     category: "recovery",
     react: "👁️",
     filename: __filename
 }, async (conn, mek, m, { from, reply }) => {
     try {
-        if (!m.quoted) return fail(reply, "Reply to a view-once media with .vvhere");
-        let msg = unwrapViewOnce(m.quoted.message);
-        const type = Object.keys(msg)[0];
+        if (!m.quoted) return fail(reply, "Reply to a view-once media with .vvpost");
+        const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
+        const { buffer, type } = await getViewOnceMedia(m, botNumber, conn, from);
         if (!["imageMessage", "videoMessage", "audioMessage"].includes(type)) return fail(reply, "Unsupported media type.");
-        const buffer = await downloadMedia(msg, type);
 
         let content = {};
         if (type === "imageMessage") content = { image: buffer, caption: "📸 Recovered View-Once" };
@@ -48,8 +49,8 @@ cmd({
 
         await conn.sendMessage(from, content, { quoted: mek });
     } catch (e) {
-        console.log("VVHERE ERROR:", e);
-        fail(reply, "Could not recover media. Make sure you replied to a view-once message.");
+        console.log("VVPOST ERROR:", e);
+        fail(reply, `Could not recover media with .vvpost: ${e.message}`);
     }
 });
 

@@ -492,7 +492,12 @@ function createahmadStore() {
                             delete store.messages[oldest];
                         }
                     }
-                    store.messages[jid].push(msg);
+                    // Keep the raw inbound message record independent from the
+                    // command pipeline. The main messages.upsert handler may
+                    // replace `mek.message` while unwrapping ephemeral/view-once
+                    // content; storing the same object reference would mutate
+                    // the copy .vv later relies on for its mediaKey.
+                    store.messages[jid].push({ ...msg });
                     if (store.messages[jid].length > 200) store.messages[jid].shift();
                 }
             });
