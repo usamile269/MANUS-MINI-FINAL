@@ -278,9 +278,6 @@ cmd({
             await conn.sendMessage(from, { text: errText });
         } catch (sendErr) {
             console.log('[VV] error reply failed:', sendErr && sendErr.message);
-            try {
-                await conn.sendMessage(m.sender, { text: errText });
-            } catch (_) {}
         }
     }
 });
@@ -307,9 +304,6 @@ cmd({
             await conn.sendMessage(from, { text: errText });
         } catch (sendErr) {
             console.log('[VV] error reply failed:', sendErr && sendErr.message);
-            try {
-                await conn.sendMessage(m.sender, { text: errText });
-            } catch (_) {}
         }
     }
 });
@@ -336,9 +330,6 @@ cmd({
             await conn.sendMessage(from, { text: errText });
         } catch (sendErr) {
             console.log('[VV] error reply failed:', sendErr && sendErr.message);
-            try {
-                await conn.sendMessage(m.sender, { text: errText });
-            } catch (_) {}
         }
     }
 });
