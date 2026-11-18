@@ -127,18 +127,29 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
             }
         } catch (_) { /* fall through to live download */ }
     }
+    const storeChatCount = conn && conn.ahmadStore && conn.ahmadStore.messages ? Object.keys(conn.ahmadStore.messages).length : 0;
     logLookup(global.viewOnceCache ? 'miss' : 'unavailable', storeStatus,
-        `storeChats=${conn && conn.ahmadStore && conn.ahmadStore.messages ? Object.keys(conn.ahmadStore.messages).length : 0}`);
+        `storeChats=${storeChatCount}`);
+    // Short diagnostic for the user-facing error, so the next failure
+    // tells us exactly why at a glance (store attached? any chats in it?
+    // cache present?). Ahmad can screenshot this instead of us guessing.
+    // storeChats=0 means the store is empty — the photo predates the last
+    // restart, or the store never received it.
+    const diag = `store=${conn && conn.ahmadStore ? storeStatus : 'not-attached'} chats=${storeChatCount} cache=${global.viewOnceCache ? 'miss' : 'unavailable'}`;
 
-    if (!m.quoted.message) throw new Error("Quoted message content not available anymore.");
+    if (!m.quoted.message) throw new Error("Quoted message content not available anymore. [" + diag + "]");
     let msg = m.quoted.message;
     if (msg?.viewOnceMessage) msg = msg.viewOnceMessage.message;
     else if (msg?.viewOnceMessageV2) msg = msg.viewOnceMessageV2.message;
     else if (msg?.viewOnceMessageV2Extension) msg = msg.viewOnceMessageV2Extension.message;
     const type = msg ? Object.keys(msg)[0] : null;
-    if (!type) throw new Error("Could not read quoted media type.");
-    const buffer = await downloadViewOnce(msg, type);
-    return { buffer, type };
+    if (!type) throw new Error("Could not read quoted media type. [" + diag + "]");
+    try {
+        const buffer = await downloadViewOnce(msg, type);
+        return { buffer, type };
+    } catch (e) {
+        throw new Error(e.message + " [" + diag + "]");
+    }
 }
 
 // ============================================================

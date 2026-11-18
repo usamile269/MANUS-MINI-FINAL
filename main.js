@@ -497,7 +497,21 @@ function createahmadStore() {
                     // replace `mek.message` while unwrapping ephemeral/view-once
                     // content; storing the same object reference would mutate
                     // the copy .vv later relies on for its mediaKey.
-                    store.messages[jid].push({ ...msg });
+                    // 🚨 DEEP FIX (Ahmad 2026-11-18 — .vv still failing after
+                    // the shallow copy): a shallow copy only protects against
+                    // `mek.message = ...` reassignment. If anything mutates
+                    // the nested message object in place, the shallow copy's
+                    // mediaKey is lost too. Deep-clone so the stored record
+                    // is fully independent, with a safe fallback.
+                    let storedMsg;
+                    try {
+                        storedMsg = (typeof structuredClone === 'function')
+                            ? structuredClone(msg)
+                            : JSON.parse(JSON.stringify(msg));
+                    } catch (_) {
+                        storedMsg = { ...msg };
+                    }
+                    store.messages[jid].push(storedMsg);
                     if (store.messages[jid].length > 200) store.messages[jid].shift();
                 }
             });
