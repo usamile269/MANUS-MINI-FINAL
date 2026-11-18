@@ -44,6 +44,10 @@ function pickMedia(content) {
 function scopedKey(botNumber, id) { return `${botNumber || 'unknown'}::${id}`; }
 
 // Download one media object. Returns { buffer, type } or null.
+// View-once media can stall forever once it has been viewed (WhatsApp
+// deletes it from the CDN), so the download is capped at 20 seconds —
+// on timeout it returns null and the next recovery stage runs instead
+// of the command hanging with only the emoji reaction showing.
 async function downloadMedia(content, type) {
     try {
         const media = content[type];
@@ -51,11 +55,25 @@ async function downloadMedia(content, type) {
         const mediaType = type === 'imageMessage' ? 'image' : type === 'videoMessage' ? 'video' : 'audio';
         const stream = await downloadContentFromMessage(media, mediaType);
         let buffer = Buffer.from([]);
-        for await (const chunk of stream) {
-            buffer = Buffer.concat([buffer, chunk]);
-            if (buffer.length > 60 * 1024 * 1024) return null;
+        let timer = null;
+        const timeoutPromise = new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('DOWNLOAD_TIMEOUT')), 20000);
+        });
+        const readPromise = (async () => {
+            for await (const chunk of stream) {
+                buffer = Buffer.concat([buffer, chunk]);
+                if (buffer.length > 60 * 1024 * 1024) return null;
+            }
+            return { buffer, type };
+        })();
+        try {
+            const result = await Promise.race([readPromise, timeoutPromise]);
+            clearTimeout(timer);
+            return result;
+        } catch (e) {
+            clearTimeout(timer);
+            return null;
         }
-        return { buffer, type };
     } catch (e) {
         return null;
     }
@@ -245,7 +263,10 @@ cmd({
 }, async (conn, m, { from }) => {
     try {
         const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
-        const result = await getViewOnceMedia(m, botNumber, conn, from);
+        const result = await Promise.race([
+            getViewOnceMedia(m, botNumber, conn, from),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('VV_TIMEOUT')), 30000))
+        ]);
         await sendRecovered(conn, from, result, m);
     } catch (e) {
         const diag = e.diag || '';
@@ -263,7 +284,10 @@ cmd({
 }, async (conn, m, { from }) => {
     try {
         const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
-        const result = await getViewOnceMedia(m, botNumber, conn, from);
+        const result = await Promise.race([
+            getViewOnceMedia(m, botNumber, conn, from),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('VV_TIMEOUT')), 30000))
+        ]);
         await sendRecovered(conn, m.sender, result, m);
     } catch (e) {
         const diag = e.diag || '';
@@ -281,7 +305,10 @@ cmd({
 }, async (conn, m, { from }) => {
     try {
         const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
-        const result = await getViewOnceMedia(m, botNumber, conn, from);
+        const result = await Promise.race([
+            getViewOnceMedia(m, botNumber, conn, from),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('VV_TIMEOUT')), 30000))
+        ]);
         await sendRecovered(conn, m.sender, result, m);
     } catch (e) {
         const diag = e.diag || '';
