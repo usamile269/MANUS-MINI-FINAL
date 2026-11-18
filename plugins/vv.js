@@ -53,7 +53,10 @@ async function downloadMedia(content, type) {
         const media = content[type];
         if (!media || !media.mediaKey) return null;
         const mediaType = type === 'imageMessage' ? 'image' : type === 'videoMessage' ? 'video' : 'audio';
-        const stream = await downloadContentFromMessage(media, mediaType);
+        const stream = await Promise.race([
+            downloadContentFromMessage(media, mediaType),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('DOWNLOAD_TIMEOUT')), 15000))
+        ]);
         let buffer = Buffer.from([]);
         let timer = null;
         const timeoutPromise = new Promise((_, reject) => {
@@ -265,7 +268,7 @@ cmd({
         const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
         const result = await Promise.race([
             getViewOnceMedia(m, botNumber, conn, from),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('VV_TIMEOUT')), 30000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('VV_TIMEOUT')), 15000))
         ]);
         await sendRecovered(conn, from, result, m);
     } catch (e) {
@@ -286,7 +289,7 @@ cmd({
         const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
         const result = await Promise.race([
             getViewOnceMedia(m, botNumber, conn, from),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('VV_TIMEOUT')), 30000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('VV_TIMEOUT')), 15000))
         ]);
         await sendRecovered(conn, m.sender, result, m);
     } catch (e) {
@@ -307,7 +310,7 @@ cmd({
         const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
         const result = await Promise.race([
             getViewOnceMedia(m, botNumber, conn, from),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('VV_TIMEOUT')), 30000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('VV_TIMEOUT')), 15000))
         ]);
         await sendRecovered(conn, m.sender, result, m);
     } catch (e) {
