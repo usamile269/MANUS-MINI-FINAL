@@ -258,6 +258,7 @@ cmd({
     desc: 'Recover a view-once photo/video in this chat'
 }, async (conn, m, { from }) => {
     try {
+        await conn.sendMessage(from, { text: '⏳ Recovering your view-once...' });
         const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
         const result = await runRecovery(m, botNumber, conn, from);
         await sendMedia(conn, from, result);
