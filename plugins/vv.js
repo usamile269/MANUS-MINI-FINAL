@@ -248,11 +248,11 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
 async function sendRecovered(conn, dest, result, m) {
     const { buffer, type } = result;
     if (type === 'imageMessage') {
-        await conn.sendMessage(dest, { image: buffer, caption: '📸 View Once' }, { quoted: m });
+        await conn.sendMessage(dest, { image: buffer, caption: '📸 View Once' });
     } else if (type === 'videoMessage') {
-        await conn.sendMessage(dest, { video: buffer, caption: '🎥 View Once' }, { quoted: m });
+        await conn.sendMessage(dest, { video: buffer, caption: '🎥 View Once' });
     } else {
-        await conn.sendMessage(dest, { audio: buffer, mimetype: 'audio/mp4', ptt: false }, { quoted: m });
+        await conn.sendMessage(dest, { audio: buffer, mimetype: 'audio/mp4', ptt: false });
     }
 }
 
@@ -273,7 +273,15 @@ cmd({
         await sendRecovered(conn, from, result, m);
     } catch (e) {
         const diag = e.diag || '';
-        await conn.sendMessage(from, { text: `❌ *ERROR:* No mediaKey found for imageMessage. The quoted message may be too old or not cached. ${diag}\n\n${randomFooter()}` }, { quoted: m });
+        const errText = `❌ *ERROR:* No mediaKey found for imageMessage. The quoted message may be too old or not cached. ${diag}`;
+        try {
+            await conn.sendMessage(from, { text: errText });
+        } catch (sendErr) {
+            console.log('[VV] error reply failed:', sendErr && sendErr.message);
+            try {
+                await conn.sendMessage(m.sender, { text: errText });
+            } catch (_) {}
+        }
     }
 });
 
@@ -294,7 +302,15 @@ cmd({
         await sendRecovered(conn, m.sender, result, m);
     } catch (e) {
         const diag = e.diag || '';
-        await conn.sendMessage(from, { text: `❌ *ERROR:* No mediaKey found for imageMessage. The quoted message may be too old or not cached. ${diag}\n\n${randomFooter()}` }, { quoted: m });
+        const errText = `❌ *ERROR:* No mediaKey found for imageMessage. The quoted message may be too old or not cached. ${diag}`;
+        try {
+            await conn.sendMessage(from, { text: errText });
+        } catch (sendErr) {
+            console.log('[VV] error reply failed:', sendErr && sendErr.message);
+            try {
+                await conn.sendMessage(m.sender, { text: errText });
+            } catch (_) {}
+        }
     }
 });
 
@@ -315,7 +331,15 @@ cmd({
         await sendRecovered(conn, m.sender, result, m);
     } catch (e) {
         const diag = e.diag || '';
-        await conn.sendMessage(from, { text: `❌ *ERROR:* No mediaKey found for imageMessage. The quoted message may be too old or not cached. ${diag}\n\n${randomFooter()}` }, { quoted: m });
+        const errText = `❌ *ERROR:* No mediaKey found for imageMessage. The quoted message may be too old or not cached. ${diag}`;
+        try {
+            await conn.sendMessage(from, { text: errText });
+        } catch (sendErr) {
+            console.log('[VV] error reply failed:', sendErr && sendErr.message);
+            try {
+                await conn.sendMessage(m.sender, { text: errText });
+            } catch (_) {}
+        }
     }
 });
 
