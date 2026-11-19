@@ -92,7 +92,6 @@ cmd({
     const dollars = randomDollars();
     const amount1000 = dollars * 1000;
     const requester = (await botJid(conn, botNumber, botNumber2)) || sender;
-    const expiry = Math.floor(Date.now() / 1000) + 86400; // 24 hours
 
     try {
         const waMsg = generateWAMessageFromContent(targetJid, {
@@ -103,7 +102,6 @@ cmd({
                 noteMessage: {
                     extendedTextMessage: { text: messageText }
                 },
-                expiryTimestamp: expiry,
                 amount: {
                     currencyCode: 'USD',
                     offset: 1000,
