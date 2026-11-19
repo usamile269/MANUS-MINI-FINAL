@@ -1,29 +1,23 @@
 'use strict';
 // ============================================================
-// .vv — SIMPLE version (2026-11-19), now with the old working capture
-// as a fallback for ALREADY-OPENED view-onces.
-// Same approach as the working reference bots (BUNTY_MD / ALI_MD):
-// download DIRECTLY from the raw quotedMessage of the .vv command
-// message. If that fails (opened = mediaKey stripped), fall back to
-// global.viewOnceCache — the capture-on-arrival cache from
-// lib/viewonce-capture.js (old Ahmad MD working flow), which saved the
-// media the moment it arrived. So .vv works whether the view-once was
-// opened or not — as long as the bot received it after the latest deploy.
-// Framework (code-verified): main.js calls
-//   cmd.function(conn, mek, m, { from, reply, sender, ... })
-// so handlers MUST take FOUR parameters.
-// The raw quotedMessage lives on the ORIGINAL .vv command message m:
-//   m.message.extendedTextMessage.contextInfo.quotedMessage
-// (sms() preserves m.message for extendedTextMessage; it only unwraps
-// when the message ITSELF is a view-once. m.quoted.message is the
-// same raw quotedMessage, kept as a fallback.)
-// Destinations (standing rule): .vv result+error -> SAME chat only.
-// .vv2/.vv3 result+error -> requester's DM only, never the group,
-// never the owner.
-// Honest limit: this works ONLY when WhatsApp delivered a mediaKey
-// for the quoted view-once — i.e. the photo/video is UNOPENED and
-// was sent from ANOTHER number. An opened view-once has no key and
-// no code can recover it.
+// .vv — professional & simple (2026-11-19)
+//
+// One job: give back a view-once photo/video when someone replies
+// to it with .vv (same chat), .vv2 or .vv3 (requester's DM).
+//
+// How it works (two steps, in order)
+//   1. Live download — straight from the raw quotedMessage of the
+//      .vv command message. Works while the view-once is unopened.
+//   2. Cache fallback — if the live download fails (already opened,
+//      key stripped), read the copy that lib/viewonce-capture.js saved
+//      the moment the view-once arrived.
+// So .vv works opened or not, as long as the bot received the
+// view-once after the latest deploy.
+//
+// Framework: main.js calls cmd.function(conn, mek, m, {from, reply,
+// sender, ...}), so handlers MUST take FOUR parameters.
+// Destinations: .vv -> SAME chat only. .vv2/.vv3 -> requester's DM
+// only, never the group, never the owner.
 // ============================================================
 const { cmd } = require('../ahmad-core');
 const fs = require('fs');
@@ -32,6 +26,7 @@ const { randomFooter } = require('../lib/menu-styles');
 const vc = require('../lib/viewonce-capture');
 
 const DOWNLOAD_TIMEOUT_MS = 15000;
+const MAX_MEDIA_BYTES = 60 * 1024 * 1024; // 60 MB
 
 // Peel every wrapper WhatsApp can put around a view-once.
 function unwrapMedia(message) {
@@ -62,52 +57,76 @@ function pickMedia(content) {
 }
 
 // Raw quotedMessage from the ORIGINAL .vv command message.
+// (sms() keeps m.message for extendedTextMessage; m.quoted.message is
+// the same raw quotedMessage, kept as a fallback.)
 function getRawQuoted(m) {
     try {
         return m?.message?.extendedTextMessage?.contextInfo?.quotedMessage
             || m?.msg?.contextInfo?.quotedMessage
             || m?.quoted?.message
             || null;
-    } catch (_) { return null; }
+    } catch (_) {
+        return null;
+    }
 }
 
-// Core: download directly from the raw quotedMessage.
+// Step 1: live download from the raw quotedMessage.
 // Returns { buf, type }. Throws a plain-English error on failure.
 async function downloadFromRawQuoted(m) {
     const raw = getRawQuoted(m);
     if (!raw) throw new Error('Reply to a view-once photo or video first.');
+
     const content = unwrapMedia(raw);
     if (!content) throw new Error('Not a view-once media message.');
+
     const picked = pickMedia(content);
     if (!picked) throw new Error('Not a view-once media message.');
     if (!picked.media.mediaKey) {
         throw new Error('Found the message but WhatsApp already stripped the media key (the view-once was opened before the bot could download it).');
     }
+
     const kind = picked.type === 'imageMessage' ? 'image' : picked.type === 'videoMessage' ? 'video' : 'audio';
     const stream = await Promise.race([
         downloadContentFromMessage(picked.media, kind),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('DOWNLOAD_TIMEOUT')), DOWNLOAD_TIMEOUT_MS))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('DOWNLOAD_TIMEOUT')), DOWNLOAD_TIMEOUT_MS)),
     ]);
+
     let buf = Buffer.from([]);
     for await (const chunk of stream) {
         buf = Buffer.concat([buf, chunk]);
-        if (buf.length > 60 * 1024 * 1024) throw new Error('Media too large.');
+        if (buf.length > MAX_MEDIA_BYTES) throw new Error('Media too large.');
     }
     if (!buf.length) throw new Error('Failed to download view-once media.');
     return { buf, type: picked.type };
 }
 
-// Backward-compatible dispatcher for plugins/recovery-tools.js
-// (.vvpost/.vvdoc call the OLD signature getViewOnceMedia(m, botNumber,
-// conn, from) and expect { buffer, type } with type in
-// imageMessage/videoMessage/audioMessage, throwing on failure).
+// Step 2: read the capture-on-arrival copy (for already-opened view-onces).
+// Returns { buf, type } or null.
+function downloadFromCache(conn, m) {
+    try {
+        const botNumber = jidNormalizedUser(conn?.user?.id || '').split('@')[0];
+        const ids = [];
+        const q = m?.quoted;
+        if (q?.stanzaId) ids.push(q.stanzaId);
+        if (q?.id && !ids.includes(q.id)) ids.push(q.id);
+        const ctx = m?.message?.extendedTextMessage?.contextInfo || m?.msg?.contextInfo;
+        if (ctx?.stanzaId && !ids.includes(ctx.stanzaId)) ids.push(ctx.stanzaId);
+        for (const id of ids) {
+            const cached = vc.readCached ? vc.readCached(botNumber, id) : null;
+            if (cached) return { buf: cached.buffer, type: cached.type };
+        }
+        return null;
+    } catch (_) {
+        return null;
+    }
+}
+
+// Backward-compatible wrapper for plugins/recovery-tools.js
+// (.vvpost/.vvdoc call the OLD signature and expect { buffer, type }).
 async function getViewOnceMedia(a, b, c, d) {
-    // New style: (conn, quotedMek, { botNumber, from }) — not used by
-    // the simple version, but kept so old callers don't crash.
     if (a && a.user && b && b.key) {
         throw new Error('Reply to a view-once photo or video first.');
     }
-    // Old style: (m, botNumber, conn, from)
     const m = a;
     const res = await downloadFromRawQuoted(m);
     return { buffer: res.buf, type: res.type };
@@ -126,13 +145,10 @@ async function sendRecovered(conn, dest, result) {
 }
 
 // Send an error to the RIGHT destination only.
-// .vv -> same chat (reply, then sendMessage(from)); never any DM.
-// .vv2/.vv3 -> requester's DM only; never the chat, never the owner.
 async function sendErr(conn, from, sender, reply, msg, toDM) {
     if (toDM) {
-        const dest = sender;
-        if (dest) {
-            try { await conn.sendMessage(dest, { text: msg }); return; } catch (_) {}
+        if (sender) {
+            try { await conn.sendMessage(sender, { text: msg }); return; } catch (_) {}
         }
         if (typeof reply === 'function') {
             try { await reply(msg); return; } catch (_) {}
@@ -153,42 +169,14 @@ function errorText(e) {
     return `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
 }
 
-// Fallback for an ALREADY-OPENED view-once: the live download above
-// fails (no mediaKey), but capture-on-arrival saved the media to
-// global.viewOnceCache the moment it arrived. Look it up by the quoted
-// message's stanzaId, keyed the same way the capture file writes it
-// (botNumber::messageId). Returns { buf, type } or null.
-function downloadFromCache(conn, m) {
-    try {
-        const botNumber = jidNormalizedUser(conn?.user?.id || '').split('@')[0];
-        const ids = [];
-        const q = m?.quoted;
-        if (q?.stanzaId) ids.push(q.stanzaId);
-        if (q?.id && !ids.includes(q.id)) ids.push(q.id);
-        const ctx = m?.message?.extendedTextMessage?.contextInfo || m?.msg?.contextInfo;
-        if (ctx?.stanzaId && !ids.includes(ctx.stanzaId)) ids.push(ctx.stanzaId);
-        const cache = global.viewOnceCache;
-        if (!cache || !ids.length) return null;
-        for (const id of ids) {
-            const key = vc.scopedKey ? vc.scopedKey(botNumber, id) : `${botNumber || 'unknown'}::${id}`;
-            const entry = cache.get(key);
-            if (entry?.filePath) {
-                const buf = fs.readFileSync(entry.filePath);
-                if (buf?.length) return { buf, type: entry.type };
-            }
-        }
-        return null;
-    } catch (_) { return null; }
-}
-
 async function runRecovery(conn, mek, m, { from, reply, sender }, toDM) {
     try {
         let result = null;
         try {
             result = await downloadFromRawQuoted(m);
         } catch (e) {
-            // Raw download failed (usually: already opened, key stripped).
-            // Fall back to the capture-on-arrival cache.
+            // Live download failed (usually: already opened). Fall back
+            // to the capture-on-arrival copy.
             result = downloadFromCache(conn, m);
             if (!result) throw e;
         }
@@ -209,7 +197,7 @@ cmd({
     alias: ['viewonce', 'view', 'vvhere'],
     react: '👁️',
     category: 'tools',
-    desc: 'Recover a view-once photo/video in this chat'
+    desc: 'Recover a view-once photo/video in this chat',
 }, async (conn, mek, m, { from, reply, sender }) => {
     await runRecovery(conn, mek, m, { from, reply, sender }, false);
 });
@@ -220,20 +208,20 @@ cmd({
     alias: ['viewonce2', 'getmedia'],
     react: '👁️',
     category: 'tools',
-    desc: 'Recover a view-once photo/video to your DM'
+    desc: 'Recover a view-once photo/video to your DM',
 }, async (conn, mek, m, { from, reply, sender }) => {
     await runRecovery(conn, mek, m, { from, reply, sender }, true);
 });
 
-// .vv3 / 👁️ — result to the requester's DM
+// .vv3 — result to the requester's DM
 cmd({
     pattern: 'vv3',
     alias: ['👁️'],
     react: '👁️',
     category: 'tools',
-    desc: 'Recover a view-once photo/video to your DM'
+    desc: 'Recover a view-once photo/video to your DM',
 }, async (conn, mek, m, { from, reply, sender }) => {
     await runRecovery(conn, mek, m, { from, reply, sender }, true);
 });
 
-module.exports = { getViewOnceMedia, unwrapMedia, downloadFromRawQuoted };
+module.exports = { getViewOnceMedia, unwrapMedia, downloadFromRawQuoted, downloadFromCache };
