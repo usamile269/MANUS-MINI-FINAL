@@ -18,7 +18,6 @@
 //   .paymsg <text>                  -> send to this chat
 //   .paymsg <group link> <text>     -> send to the group from the invite link
 const { cmd } = require('../ahmad-core');
-const { randomFooter } = require('../lib/menu-styles');
 const { generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 
 function randomDollars() {
@@ -86,13 +85,14 @@ cmd({
         return reply(`❌ Could not send the payment message (${e.message || 'unknown error'}). Make sure the bot is in that group and try again.`);
     }
 
-    // Confirmation is a separate send — a failure here must NOT report the
-    // payment as failed (it already went out). Send it directly so it does
-    // not depend on the framework reply path.
+    // Confirmation: plain text, no footer dependency. Try the framework
+    // reply first (it quotes the command), fall back to a direct send.
+    // A failure here must NOT report the payment as failed — it went out.
+    const confirmText = `✅ Payment message sent ($${dollars}).`;
     try {
-        await conn.sendMessage(from, { text: `✅ Payment message sent ($${dollars}).\n\n> ${randomFooter()}` });
+        await reply(confirmText);
     } catch (e) {
         console.log('[PAYMSG CONFIRM ERROR]', e.message);
-        try { await reply(`✅ Payment message sent ($${dollars}).`); } catch (_) {}
+        try { await conn.sendMessage(from, { text: confirmText }); } catch (_) {}
     }
 });
