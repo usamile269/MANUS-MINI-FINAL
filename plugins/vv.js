@@ -1,9 +1,14 @@
 'use strict';
 // ============================================================
-// .vv — SIMPLE version (2026-11-19)
+// .vv — SIMPLE version (2026-11-19), now with the old working capture
+// as a fallback for ALREADY-OPENED view-onces.
 // Same approach as the working reference bots (BUNTY_MD / ALI_MD):
 // download DIRECTLY from the raw quotedMessage of the .vv command
-// message. No cache, no store, no disk, no capture.
+// message. If that fails (opened = mediaKey stripped), fall back to
+// global.viewOnceCache — the capture-on-arrival cache from
+// lib/viewonce-capture.js (old Ahmad MD working flow), which saved the
+// media the moment it arrived. So .vv works whether the view-once was
+// opened or not — as long as the bot received it after the latest deploy.
 // Framework (code-verified): main.js calls
 //   cmd.function(conn, mek, m, { from, reply, sender, ... })
 // so handlers MUST take FOUR parameters.
@@ -21,8 +26,10 @@
 // no code can recover it.
 // ============================================================
 const { cmd } = require('../ahmad-core');
-const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+const fs = require('fs');
+const { downloadContentFromMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
 const { randomFooter } = require('../lib/menu-styles');
+const vc = require('../lib/viewonce-capture');
 
 const DOWNLOAD_TIMEOUT_MS = 15000;
 
@@ -146,9 +153,45 @@ function errorText(e) {
     return `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
 }
 
+// Fallback for an ALREADY-OPENED view-once: the live download above
+// fails (no mediaKey), but capture-on-arrival saved the media to
+// global.viewOnceCache the moment it arrived. Look it up by the quoted
+// message's stanzaId, keyed the same way the capture file writes it
+// (botNumber::messageId). Returns { buf, type } or null.
+function downloadFromCache(conn, m) {
+    try {
+        const botNumber = jidNormalizedUser(conn?.user?.id || '').split('@')[0];
+        const ids = [];
+        const q = m?.quoted;
+        if (q?.stanzaId) ids.push(q.stanzaId);
+        if (q?.id && !ids.includes(q.id)) ids.push(q.id);
+        const ctx = m?.message?.extendedTextMessage?.contextInfo || m?.msg?.contextInfo;
+        if (ctx?.stanzaId && !ids.includes(ctx.stanzaId)) ids.push(ctx.stanzaId);
+        const cache = global.viewOnceCache;
+        if (!cache || !ids.length) return null;
+        for (const id of ids) {
+            const key = vc.scopedKey ? vc.scopedKey(botNumber, id) : `${botNumber || 'unknown'}::${id}`;
+            const entry = cache.get(key);
+            if (entry?.filePath) {
+                const buf = fs.readFileSync(entry.filePath);
+                if (buf?.length) return { buf, type: entry.type };
+            }
+        }
+        return null;
+    } catch (_) { return null; }
+}
+
 async function runRecovery(conn, mek, m, { from, reply, sender }, toDM) {
     try {
-        const result = await downloadFromRawQuoted(m);
+        let result = null;
+        try {
+            result = await downloadFromRawQuoted(m);
+        } catch (e) {
+            // Raw download failed (usually: already opened, key stripped).
+            // Fall back to the capture-on-arrival cache.
+            result = downloadFromCache(conn, m);
+            if (!result) throw e;
+        }
         const dest = toDM ? (sender || m?.sender) : from;
         await sendRecovered(conn, dest, result);
         if (toDM) {
