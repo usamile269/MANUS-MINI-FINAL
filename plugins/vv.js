@@ -347,10 +347,9 @@ cmd({
         await sendRecovered(conn, from, result);
     } catch (e) {
         console.log('[VV ERROR]', e && e.message);
-        const diag = e?.diag || '';
         const msg = e?.message?.includes('VV_TIMEOUT')
             ? '❌ *Timed out while recovering the media. Please try again with a fresh view-once.*'
-            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'} ${diag}`;
+            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
         const dest = sender || m?.sender;
         if (dest) {
             try { await conn.sendMessage(dest, { text: msg }); } catch (_) {}
@@ -384,10 +383,9 @@ cmd({
         await sendRecovered(conn, dest, result);
     } catch (e) {
         console.log('[VV2 ERROR]', e && e.message);
-        const diag = e?.diag || '';
         const msg = e?.message?.includes('VV_TIMEOUT')
             ? '❌ *Timed out while recovering the media. Please try again with a fresh view-once.*'
-            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'} ${diag}`;
+            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
         const dest = sender || m?.sender;
         if (dest) {
             try { await conn.sendMessage(dest, { text: msg }); } catch (_) {}
@@ -421,10 +419,9 @@ cmd({
         await sendRecovered(conn, dest, result);
     } catch (e) {
         console.log('[VV3 ERROR]', e && e.message);
-        const diag = e?.diag || '';
         const msg = e?.message?.includes('VV_TIMEOUT')
             ? '❌ *Timed out while recovering the media. Please try again with a fresh view-once.*'
-            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'} ${diag}`;
+            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
         const dest = sender || m?.sender;
         if (dest) {
             try { await conn.sendMessage(dest, { text: msg }); } catch (_) {}
