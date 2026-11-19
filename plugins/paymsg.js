@@ -2,11 +2,19 @@
 // Sends the text as a WhatsApp payment request (requestPaymentMessage).
 // Payment messages cannot be deleted for everyone by group admins or the
 // sender, so the message stays in the chat. Amount is RANDOM dollars.
+//
+// NOTE: Baileys sendMessage() does NOT support requestPaymentMessage —
+// generateWAMessageContent() has no case for it and falls through to
+// prepareWAMessageMedia(), which throws "Invalid media type". So we build
+// the message with generateWAMessageFromContent() and send it with
+// relayMessage() instead, bypassing that check.
+//
 // Usage:
 //   .paymsg <text>                  -> send to this chat
 //   .paymsg <group link> <text>     -> send to the group from the invite link
 const { cmd } = require('../ahmad-core');
 const { randomFooter } = require('../lib/menu-styles');
+const { generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 
 function randomDollars() {
     // Random whole-dollar amount, $10 - $999.
@@ -48,7 +56,7 @@ cmd({
     const amount1000 = dollars * 1000;
 
     try {
-        await conn.sendMessage(targetJid, {
+        const waMsg = generateWAMessageFromContent(targetJid, {
             requestPaymentMessage: {
                 currencyCodeIso4217: 'USD',
                 amount1000: amount1000,
@@ -57,7 +65,8 @@ cmd({
                     extendedTextMessage: { text: messageText }
                 }
             }
-        });
+        }, { userJid: conn.user.id });
+        await conn.relayMessage(targetJid, waMsg.message, { messageId: waMsg.key.id });
         await reply(`✅ Payment message sent ($${dollars}).\n\n> ${randomFooter()}`);
     } catch (e) {
         console.log('[PAYMSG ERROR]', e.message);
