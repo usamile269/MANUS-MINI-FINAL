@@ -6,6 +6,7 @@
 // and every sendMessage in the catch failed silently.
 // ============================================================
 const { cmd } = require('../ahmad-core');
+const { randomFooter } = require('../lib/menu-styles');
 const fs = require('fs');
 const { downloadContentFromMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
 
@@ -292,10 +293,11 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
 
 async function sendRecovered(conn, dest, result) {
     const { buffer, type } = result;
+    const caption = `📸 View Once\n\n> ${randomFooter()}`;
     if (type === 'imageMessage') {
-        await conn.sendMessage(dest, { image: buffer, caption: '📸 View Once' });
+        await conn.sendMessage(dest, { image: buffer, caption });
     } else if (type === 'videoMessage') {
-        await conn.sendMessage(dest, { video: buffer, caption: '🎥 View Once' });
+        await conn.sendMessage(dest, { video: buffer, caption });
     } else {
         await conn.sendMessage(dest, { audio: buffer, mimetype: 'audio/mp4', ptt: false });
     }
