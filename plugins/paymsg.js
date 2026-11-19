@@ -46,27 +46,21 @@ cmd({
 
     const dollars = randomDollars();
     const amount1000 = dollars * 1000;
-    const requester = conn.user?.id || sender;
 
     try {
         await conn.sendMessage(targetJid, {
             requestPaymentMessage: {
                 currencyCodeIso4217: 'USD',
                 amount1000: amount1000,
-                requestFrom: requester,
+                requestFrom: sender,
                 noteMessage: {
                     extendedTextMessage: { text: messageText }
-                },
-                amount: {
-                    currencyCode: 'USD',
-                    offset: 1000,
-                    value: amount1000
                 }
             }
         });
         await reply(`✅ Payment message sent ($${dollars}).\n\n> ${randomFooter()}`);
     } catch (e) {
         console.log('[PAYMSG ERROR]', e.message);
-        return reply('❌ Could not send the payment message. Make sure the bot is in that group and try again.');
+        return reply(`❌ Could not send the payment message (${e.message || 'unknown error'}). Make sure the bot is in that group and try again.`);
     }
 });
