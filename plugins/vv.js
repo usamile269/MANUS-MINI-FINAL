@@ -6,6 +6,8 @@
 // and every sendMessage in the catch failed silently.
 // ============================================================
 const { cmd } = require('../ahmad-core');
+const os = require('os');
+const path = require('path');
 const { randomFooter } = require('../lib/menu-styles');
 const fs = require('fs');
 const { downloadContentFromMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
@@ -130,6 +132,27 @@ function getQuotedIds(m) {
     return ids;
 }
 
+// Read Grok's persistent disk cache (os.tmpdir()/ahmad-vv-cache/).
+// viewonce-capture.js writes one .json metadata file + one media file per
+// captured view-once (keyed by botNumber::messageId, 30-min life). Returns
+// { buffer, type } or null. This is what lets .vv recover a view-once
+// after a process restart (the in-memory cache is wiped on restart).
+function loadDiskCache(botNumber, id) {
+    try {
+        const key = `${botNumber || 'unknown'}::${id}`;
+        const safeName = key.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const dir = path.join(os.tmpdir(), 'ahmad-vv-cache');
+        const meta = JSON.parse(fs.readFileSync(path.join(dir, safeName + '.json'), 'utf8'));
+        if (!meta || !meta.filePath || !meta.type) return null;
+        if (Date.now() - meta.cachedAt > 30 * 60 * 1000) return null;
+        const buffer = fs.readFileSync(meta.filePath);
+        if (!buffer || !buffer.length) return null;
+        return { buffer, type: meta.type };
+    } catch (_) {
+        return null;
+    }
+}
+
 // Recovery stages (fastest / most reliable first):
 // 0. Raw quoted message (direct download)
 // 1. In-memory viewOnceCache (pre-captured on upsert)
@@ -179,6 +202,17 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
                         }
                     } catch (_) {}
                 }
+            }
+        }
+    } catch (_) {}
+
+    // ---- Stage 1b: persistent disk cache (survives process restarts) ----
+    try {
+        for (const id of ids) {
+            const got = loadDiskCache(botNumber, id);
+            if (got) {
+                diag.cache = 'disk';
+                return got;
             }
         }
     } catch (_) {}
