@@ -118,7 +118,15 @@ cmd({
             senderName: m.pushName || null
         });
 
-        // ✅ Send menu with image + channel forward style
+        // ✅ Send menu with video/image + channel forward style
+        // Custom video (set via .setbotvideo / .setbotvideoall) wins over
+        // the image — the menu is sent as a video with the caption.
+        // Otherwise the custom DP (.setbotdp) or the default hosted image.
+        const customVideoB64 = myConfig.MENU_VIDEO || userConfig.MENU_VIDEO;
+        let menuVideo = null;
+        if (customVideoB64) {
+            try { menuVideo = Buffer.from(customVideoB64, 'base64'); } catch { menuVideo = null; }
+        }
         // Custom DP (set via .setbotdp) is stored as base64 -> send as a Buffer.
         // Otherwise fall back to the default hosted image URL.
         const customImageB64 = myConfig.MENU_IMAGE || userConfig.MENU_IMAGE;
@@ -162,7 +170,21 @@ cmd({
             }
         }
 
-        const menuMessage = menuImage ? {
+        const menuMessage = menuVideo ? {
+            video: menuVideo,
+            caption: menu,
+            mimetype: 'video/mp4',
+            contextInfo: {
+                forwardingScore: 999,
+                isForwarded: true,
+                mentionedJid: [m.sender],
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: config.CHANNEL_JID || '120363415558267602@newsletter',
+                    newsletterName: config.CHANNEL_METADATA_NAME,
+                    serverMessageId: 2,
+                },
+            },
+        } : menuImage ? {
             image: menuImage,
             caption: menu,
             contextInfo: {

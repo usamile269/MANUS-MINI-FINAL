@@ -677,8 +677,39 @@ cmd({
 });
 
 // ============================================================
+// 14a. CUSTOM BOT MENU VIDEO (YOUR OWN) — like .setbotaudio but video:
+// reply to a video to set it as YOUR OWN .menu video. When set, .menu
+// sends the video with the caption instead of the image.
+// ============================================================
+cmd({
+    pattern: "setbotvideo",
+    alias: ["botvideo", "setbotvid", "menuvideo"],
+    desc: "Reply to a video to set it as YOUR OWN .menu video",
+    category: "settings",
+    react: "🎬"
+}, async (conn, mek, m, { sender, isOwner, isMe, reply }) => {
+    try {
+        if (!isOwner && !isMe) return reply(ownerOnlyDenied());
+        if (!m.quoted || m.quoted.mtype !== 'videoMessage') {
+            return reply('❌ Reply to a video.\\n💡 Use: .setbotvideo (reply to video)');
+        }
+        if (!isSelfOwned(conn, mek, sender)) return reply('❌ Identity mismatch — safety block, try again.');
+        const buffer = await m.quoted.download();
+        if (buffer.length > 8 * 1024 * 1024) {
+            return reply('❌ This video is too large. Send one under 8MB.');
+        }
+        const saved = await setUserBotSettings(sender, { MENU_VIDEO: buffer.toString('base64') });
+        if (!saved) return reply('❌ Save fail hui (Mongo issue) — try again.');
+        reply('✅ Your .menu video updated.');
+    } catch (e) {
+        reply('❌ Failed: ' + e.message);
+    }
+});
+
+// ============================================================
 // 14c. OWNER: SET THE REAL GLOBAL BOT AUDIO (default for everyone)
 // ============================================================
+
 cmd({
     pattern: "overallaudio",
     alias: ["overallbotaudio", "globalbotaudio", "obotaudio", "setglobalbotaudio"],
@@ -696,6 +727,33 @@ cmd({
             return reply('❌ This audio is too large. Send one under 5MB.');
         }
         await updateConfig('MENU_AUDIO', buffer.toString('base64'), botNumber, config, reply);
+    } catch (e) {
+        reply('❌ Failed: ' + e.message);
+    }
+});
+
+// ============================================================
+// 14d. OWNER: SET THE MENU VIDEO FOR EVERYONE — like .overallaudio but
+// video: reply to a video to change the bot's .menu video for EVERYONE
+// (unlike .setbotvideo which only changes YOUR own)
+// ============================================================
+cmd({
+    pattern: "setbotvideoall",
+    alias: ["overallbotvideo", "globalbotvideo", "obotvideo", "setglobalbotvideo", "overallvideo"],
+    desc: "OWNER ONLY: reply to video to change the bot's .menu video for EVERYONE (unlike .setbotvideo which only changes YOUR own)",
+    category: "owner",
+    react: "👑"
+}, async (conn, mek, m, { isOwner, reply, botNumber, config }) => {
+    if (!isOwner) return reply(ownerOnlyDenied());
+    try {
+        if (!m.quoted || m.quoted.mtype !== 'videoMessage') {
+            return reply('❌ Reply to a video.\\n💡 Use: .setbotvideoall (reply to video)');
+        }
+        const buffer = await m.quoted.download();
+        if (buffer.length > 8 * 1024 * 1024) {
+            return reply('❌ This video is too large. Send one under 8MB.');
+        }
+        await updateConfig('MENU_VIDEO', buffer.toString('base64'), botNumber, config, reply);
     } catch (e) {
         reply('❌ Failed: ' + e.message);
     }
@@ -723,7 +781,7 @@ cmd({
     if (!isSelfOwned(conn, mek, sender)) return reply('❌ Identity mismatch — safety block, try again.');
     const saved = await deleteUserBotSettings(sender);
     if (!saved) return reply('❌ Clear fail hua (Mongo save issue) — try again, purani settings abhi bhi active hain.');
-    reply('✅ Aapka bot name/DP/audio clear ho gaye — ab owner ka latest default use hoga.');
+    reply('✅ Aapka bot name/DP/audio/video clear ho gaye — ab owner ka latest default use hoga.');
 });
 
 // OWNER: reset the bot-wide default itself
@@ -736,9 +794,9 @@ cmd({
 }, async (conn, mek, m, { isOwner, reply, botNumber }) => {
     if (!isOwner) return reply(ownerOnlyDenied());
     const currentConfig = await getUserConfigFromMongoDB(botNumber);
-    const newConfig = { ...currentConfig, BOT_NAME: null, MENU_IMAGE: null, MENU_AUDIO: null, MENU_STYLE: 1 };
+    const newConfig = { ...currentConfig, BOT_NAME: null, MENU_IMAGE: null, MENU_AUDIO: null, MENU_VIDEO: null, MENU_STYLE: 1 };
     await updateUserConfig(botNumber, newConfig);
-    reply('✅ Bot-wide default name/DP/audio/menu-style reset ho gaye.');
+    reply('✅ Bot-wide default name/DP/audio/video/menu-style reset ho gaye.');
 });
 
 // 🆕 (Bunty: ".cleardb — user ka data wipe ho jaye db se, fresh new ho
