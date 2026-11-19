@@ -8,6 +8,7 @@
 const { cmd } = require('../ahmad-core');
 const fs = require('fs');
 const { downloadContentFromMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
+const { randomFooter } = require('../lib/menu-styles');
 
 // Peel every wrapper WhatsApp can put around a view-once:
 // ephemeralMessage -> viewOnceMessage / V2 / V2Extension -> media.
@@ -229,38 +230,11 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
         }
     } catch (_) {}
 
-    // ---- Stage 3: most-recent media in this chat (last 5 min) ----
-    // Ignores message IDs — catches ID / JID mismatches.
-    try {
-        const store = conn?.ahmadStore;
-        const msgMap = store?.messages || {};
-        const arr = msgMap[from] || [];
-        const now = Date.now();
-        let attempts = 0;
-
-        for (let i = arr.length - 1; i >= 0 && attempts < 3; i--) {
-            const cand = arr[i];
-            if (!cand?.message) continue;
-            const ts = Number(cand.messageTimestamp || 0) * 1000;
-            if (ts && now - ts > 5 * 60 * 1000) break;
-
-            const content = unwrapMedia(cand.message);
-            if (!content) continue;
-            const picked = pickMedia(content);
-            if (!picked) continue;
-            if (!picked.media.mediaKey) {
-                diag.noKey++;
-                continue;
-            }
-            attempts++;
-            diag.recent++;
-            const got = await downloadFromRecord(cand);
-            if (got) {
-                diag.store = 'hit';
-                return got;
-            }
-        }
-    } catch (_) {}
+    // ---- Stage 3 REMOVED (2026-11-19): the old "most-recent media in
+    // this chat, ignores IDs" fallback returned the WRONG media — e.g.
+    // replying .vv to a view-once VIDEO returned an earlier PHOTO from
+    // the same chat. When the quoted message can't be found by ID, the
+    // honest error below is correct; never guess a different message.
 
     // ---- Stage 4: live m.quoted ----
     try {
@@ -293,9 +267,9 @@ async function getViewOnceMedia(m, botNumber, conn, from) {
 async function sendRecovered(conn, dest, result) {
     const { buffer, type } = result;
     if (type === 'imageMessage') {
-        await conn.sendMessage(dest, { image: buffer, caption: '📸 View Once' });
+        await conn.sendMessage(dest, { image: buffer, caption: `📸 View Once\n\n> ${randomFooter()}` });
     } else if (type === 'videoMessage') {
-        await conn.sendMessage(dest, { video: buffer, caption: '🎥 View Once' });
+        await conn.sendMessage(dest, { video: buffer, caption: `🎥 View Once\n\n> ${randomFooter()}` });
     } else {
         await conn.sendMessage(dest, { audio: buffer, mimetype: 'audio/mp4', ptt: false });
     }
