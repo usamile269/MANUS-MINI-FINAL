@@ -1,22 +1,41 @@
+'use strict';
 // ============================================================
-// VIEW-ONCE RECOVERY — fixed 2026-11-18
-// Root cause of "emoji only, no reply": handlers had wrong arity.
-// main.js calls: cmd.function(conn, mek, m, { from, reply, sender, ... })
-// Previous code used (conn, m, { from }) so from/quoted/sender were broken
-// and every sendMessage in the catch failed silently.
+// VIEW-ONCE RECOVERY — written from scratch by Muse (2026-11-19)
+// Framework (code-verified): main.js calls
+//   cmd.function(conn, mek, m, { from, reply, sender, ... })
+// so handlers MUST take FOUR parameters. The old (conn, m, {from})
+// signature left `from` undefined and every send failed silently.
+// Recovery order (cache is the source of truth — a stored message
+// without a mediaKey is useless):
+//   0. Memory cache (captureCache) — with a short WAIT, because .vv
+//      can arrive before the capture download finishes. This wait
+//      closes the race that caused most "cache=miss" failures.
+//   1. Disk cache (Railway volume, survives process restarts).
+//   2. Raw quotedMessage (direct download, needs mediaKey).
+//   3. ahmadStore (loadMessage + scan, needs mediaKey).
+//   4. Live m.quoted (needs mediaKey).
+// Destinations (standing rule): .vv result+error -> SAME chat only.
+// .vv2/.vv3 result+error -> requester's DM only, never the group,
+// never the owner. .antiviewonce auto-forward -> same chat.
+// NEVER return a different message's media (the old "most-recent
+// media in this chat" fallback returned a photo for a video .vv).
 // ============================================================
 const { cmd } = require('../ahmad-core');
-const fs = require('fs');
 const { downloadContentFromMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
 const { randomFooter } = require('../lib/menu-styles');
+const vc = require('../lib/viewonce-capture');
 
-// Peel every wrapper WhatsApp can put around a view-once:
-// ephemeralMessage -> viewOnceMessage / V2 / V2Extension -> media.
-// Also documentWithCaptionMessage. Guarded against loops.
+const CAPTURE_WAIT_MS = 3000;   // max time to wait for capture to finish
+const CAPTURE_POLL_MS = 500;    // poll interval while waiting
+const OVERALL_TIMEOUT_MS = 20000;
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Peel every wrapper WhatsApp can put around a view-once.
 function unwrapMedia(message) {
     let inner = message;
     let guard = 0;
-    while (inner && typeof inner === 'object' && guard++ < 10) {
+    while (inner && typeof inner === 'object' && guard++ < 12) {
         if (inner.ephemeralMessage) { inner = inner.ephemeralMessage.message; continue; }
         if (inner.viewOnceMessage) { inner = inner.viewOnceMessage.message; continue; }
         if (inner.viewOnceMessageV2) { inner = inner.viewOnceMessageV2.message; continue; }
@@ -25,7 +44,6 @@ function unwrapMedia(message) {
         break;
     }
     if (!inner || typeof inner !== 'object') return null;
-    // Prefer explicit viewOnce flag when present
     for (const key of ['imageMessage', 'videoMessage', 'audioMessage']) {
         if (inner[key] && inner[key].viewOnce) return { [key]: inner[key] };
     }
@@ -41,65 +59,41 @@ function pickMedia(content) {
     return null;
 }
 
-function scopedKey(botNumber, id) {
-    return `${botNumber || 'unknown'}::${id}`;
+function scopedKey(botNumber, jid, msgId) {
+    return vc.scopedKey(botNumber, jid, msgId);
 }
 
-// Download one media object. Returns { buffer, type } or null.
-// Hard timeouts so a viewed/expired CDN object can never hang the command.
 async function downloadMedia(content, type) {
     try {
         const media = content[type];
         if (!media || !media.mediaKey) return null;
-
-        const mediaType = type === 'imageMessage' ? 'image'
-            : type === 'videoMessage' ? 'video' : 'audio';
-
+        const kind = type === 'imageMessage' ? 'image' : type === 'videoMessage' ? 'video' : 'audio';
         const stream = await Promise.race([
-            downloadContentFromMessage(media, mediaType),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('DOWNLOAD_TIMEOUT')), 12000)
-            )
+            downloadContentFromMessage(media, kind),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('DOWNLOAD_TIMEOUT')), 12000))
         ]);
-
-        let buffer = Buffer.from([]);
-        let timer = null;
-        const timeoutPromise = new Promise((_, reject) => {
-            timer = setTimeout(() => reject(new Error('DOWNLOAD_TIMEOUT')), 18000);
-        });
-
-        const readPromise = (async () => {
-            for await (const chunk of stream) {
-                buffer = Buffer.concat([buffer, chunk]);
-                if (buffer.length > 60 * 1024 * 1024) return null; // 60 MB safety
-            }
-            return { buffer, type };
-        })();
-
-        try {
-            const result = await Promise.race([readPromise, timeoutPromise]);
-            clearTimeout(timer);
-            return result;
-        } catch (_) {
-            clearTimeout(timer);
-            return null;
+        let buf = Buffer.from([]);
+        for await (const chunk of stream) {
+            buf = Buffer.concat([buf, chunk]);
+            if (buf.length > 60 * 1024 * 1024) return null;
         }
-    } catch (_) {
-        return null;
-    }
+        return buf.length ? { buffer: buf, type } : null;
+    } catch (_) { return null; }
 }
 
 async function downloadFromRecord(record) {
     try {
-        if (!record || !record.message) return null;
+        if (!record) return null;
+        if (record.buf && record.buf.length) {
+            return { buffer: record.buf, type: record.mediaType };
+        }
+        if (!record.message) return null;
         const content = unwrapMedia(record.message);
         if (!content) return null;
         const picked = pickMedia(content);
         if (!picked) return null;
         return await downloadMedia(content, picked.type);
-    } catch (_) {
-        return null;
-    }
+    } catch (_) { return null; }
 }
 
 // Raw quotedMessage from contextInfo (survives even when m.quoted is rebuilt).
@@ -108,9 +102,7 @@ function getRawQuoted(m) {
         return m?.message?.extendedTextMessage?.contextInfo?.quotedMessage
             || m?.msg?.contextInfo?.quotedMessage
             || null;
-    } catch (_) {
-        return null;
-    }
+    } catch (_) { return null; }
 }
 
 function getQuotedIds(m) {
@@ -122,179 +114,254 @@ function getQuotedIds(m) {
             if (q.id && !ids.includes(q.id)) ids.push(q.id);
             if (q.key?.id && !ids.includes(q.key.id)) ids.push(q.key.id);
         }
-        // Also from raw contextInfo
-        const ctx = m?.message?.extendedTextMessage?.contextInfo
-            || m?.msg?.contextInfo;
+        const ctx = m?.message?.extendedTextMessage?.contextInfo || m?.msg?.contextInfo;
         if (ctx?.stanzaId && !ids.includes(ctx.stanzaId)) ids.push(ctx.stanzaId);
     } catch (_) {}
     return ids;
 }
 
-// Recovery stages (fastest / most reliable first):
-// 0. Raw quoted message (direct download)
-// 1. In-memory viewOnceCache (pre-captured on upsert)
-// 2. ahmadStore by id (messages map + loadMessage)
-// 3. Most-recent media in same chat (last 5 min, ignores IDs)
-// 4. Live m.quoted
-async function getViewOnceMedia(m, botNumber, conn, from) {
-    const diag = { store: 'miss', chats: 0, cache: 'unavailable', noKey: 0, recent: 0 };
-    const ids = getQuotedIds(m);
+// Core recovery. Returns { buf, mediaType, caption, source, diag }.
+// Throws a plain-English error (message already embeds the diag once).
+async function getViewOnceMediaCore(conn, quotedMek, { botNumber, from }) {
+    const diag = { store: 'miss', chats: 0, cache: 'miss', disk: 'miss', noKey: 0 };
+    const qKey = quotedMek?.key || {};
+    const jid = qKey.remoteJid || from;
+    const msgId = qKey.id;
+    const bot = botNumber || conn?.user?.id || '';
+    const cacheKey = msgId ? scopedKey(bot, jid, msgId) : null;
 
-    // ---- Stage 0: raw quotedMessage ----
-    try {
-        const raw = getRawQuoted(m);
-        if (raw) {
-            const content = unwrapMedia(raw);
-            if (content) {
-                const picked = pickMedia(content);
-                if (picked) {
-                    if (!picked.media.mediaKey) diag.noKey++;
-                    else {
-                        const got = await downloadMedia(content, picked.type);
-                        if (got) return got;
-                    }
-                }
+    // ---- Stage 0: memory cache, with a WAIT for the capture race ----
+    // .vv can arrive before the capture download finishes. Poll briefly
+    // so a just-arriving view-once is found instead of reported missing.
+    if (cacheKey) {
+        const deadline = Date.now() + CAPTURE_WAIT_MS;
+        while (Date.now() <= deadline) {
+            const rec = vc.captureCache?.get(cacheKey);
+            if (rec && rec.buf && rec.buf.length) {
+                diag.cache = 'hit';
+                return { buf: rec.buf, mediaType: rec.mediaType, caption: rec.caption || '', source: 'memory', diag };
             }
-        }
-    } catch (_) {}
-
-    // ---- Stage 1: in-memory cache ----
-    try {
-        const cache = global.viewOnceCache;
-        if (cache) {
-            diag.cache = 'miss';
-            for (const id of ids) {
-                let entry = cache.get(scopedKey(botNumber, id));
-                if (!entry) {
-                    for (const [key, val] of cache) {
-                        if (key.endsWith('::' + id)) { entry = val; break; }
+            // Also try the legacy global cache (filePath entries).
+            try {
+                const g = global.viewOnceCache;
+                if (g) {
+                    const twoPart = `${String(bot).replace(/[^0-9]/g, '')}::${msgId}`;
+                    let entry = g.get(twoPart);
+                    if (!entry) {
+                        for (const [k, v] of g) {
+                            if (k.endsWith('::' + msgId)) { entry = v; break; }
+                        }
                     }
-                }
-                if (entry?.filePath) {
-                    try {
+                    if (entry?.filePath) {
+                        const fs = require('fs');
                         const buffer = fs.readFileSync(entry.filePath);
                         if (buffer?.length) {
                             diag.cache = 'hit';
-                            return { buffer, type: entry.type };
+                            return { buf: buffer, mediaType: entry.type, caption: '', source: 'memory', diag };
                         }
-                    } catch (_) {}
+                    }
+                }
+            } catch (_) {}
+            await sleep(CAPTURE_POLL_MS);
+        }
+    }
+
+    // ---- Stage 1: disk cache (survives process restarts) ----
+    if (cacheKey) {
+        try {
+            const rec = vc.loadDiskRecord(cacheKey);
+            if (rec && rec.buf && rec.buf.length) {
+                diag.disk = 'hit';
+                return { buf: rec.buf, mediaType: rec.mediaType, caption: rec.caption || '', source: 'disk', diag };
+            }
+        } catch (_) {}
+    }
+
+    // ---- Stage 2: raw quotedMessage (direct download) ----
+    try {
+        const raw = getRawQuoted({ message: quotedMek?.message, msg: quotedMek });
+        const content = raw ? unwrapMedia(raw) : null;
+        if (content) {
+            const picked = pickMedia(content);
+            if (picked) {
+                if (!picked.media.mediaKey) diag.noKey++;
+                else {
+                    const got = await downloadMedia(content, picked.type);
+                    if (got) return { buf: got.buffer, mediaType: got.type, caption: '', source: 'quoted', diag };
                 }
             }
         }
     } catch (_) {}
 
-    // ---- Stage 2: ahmadStore (custom shape: messages[jid][] + loadMessage) ----
+    // ---- Stage 3: ahmadStore (needs mediaKey in the stored copy) ----
     try {
         const store = conn?.ahmadStore;
         if (store) {
             const msgMap = store.messages || {};
             diag.chats = Object.keys(msgMap).length;
-
-            for (const id of ids) {
-                // Preferred API
-                let record = null;
-                try {
-                    if (typeof store.loadMessage === 'function') {
-                        record = await store.loadMessage(from, id);
+            let record = null;
+            if (msgId && typeof store.loadMessage === 'function') {
+                try { record = await store.loadMessage(jid, msgId); } catch (_) {}
+            }
+            if (!record && msgId) {
+                for (const cjid of Object.keys(msgMap)) {
+                    const arr = msgMap[cjid] || [];
+                    for (let i = arr.length - 1; i >= 0; i--) {
+                        if (arr[i]?.key?.id === msgId) { record = arr[i]; break; }
                     }
-                } catch (_) {}
-
-                // Fallback: scan every chat's message array
-                if (!record) {
-                    for (const jid of Object.keys(msgMap)) {
-                        const arr = msgMap[jid] || [];
-                        for (let i = arr.length - 1; i >= 0; i--) {
-                            const cand = arr[i];
-                            if (cand?.key?.id === id) {
-                                record = cand;
-                                break;
-                            }
-                        }
-                        if (record) break;
-                    }
+                    if (record) break;
                 }
-
-                if (record) {
-                    const content = unwrapMedia(record.message);
-                    if (content) {
-                        const picked = pickMedia(content);
-                        if (picked && !picked.media.mediaKey) diag.noKey++;
-                        const got = await downloadFromRecord(record);
-                        if (got) {
-                            diag.store = 'hit';
-                            return got;
-                        }
+            }
+            if (record) {
+                const content = unwrapMedia(record.message);
+                if (content) {
+                    const picked = pickMedia(content);
+                    if (picked && !picked.media.mediaKey) diag.noKey++;
+                    const got = await downloadFromRecord(record);
+                    if (got) {
+                        diag.store = 'hit';
+                        return { buf: got.buffer, mediaType: got.type, caption: '', source: 'store', diag };
                     }
                 }
             }
         }
     } catch (_) {}
 
-    // ---- Stage 3 REMOVED (2026-11-19): the old "most-recent media in
-    // this chat, ignores IDs" fallback returned the WRONG media — e.g.
-    // replying .vv to a view-once VIDEO returned an earlier PHOTO from
-    // the same chat. When the quoted message can't be found by ID, the
-    // honest error below is correct; never guess a different message.
-
     // ---- Stage 4: live m.quoted ----
     try {
-        const quoted = m.quoted;
+        const quoted = quotedMek?.message ? { message: quotedMek.message } : null;
         if (quoted) {
-            const content = unwrapMedia(quoted.message || quoted);
+            const content = unwrapMedia(quoted.message);
             if (content) {
                 const picked = pickMedia(content);
                 if (picked) {
                     if (!picked.media.mediaKey) diag.noKey++;
                     else {
                         const got = await downloadMedia(content, picked.type);
-                        if (got) return got;
+                        if (got) return { buf: got.buffer, mediaType: got.type, caption: '', source: 'quoted', diag };
                     }
                 }
             }
         }
     } catch (_) {}
 
-    const diagStr = `[store=${diag.store} chats=${diag.chats} cache=${diag.cache}` +
-        (diag.noKey ? ` noKey=${diag.noKey}` : '') +
-        (diag.recent ? ` recent=${diag.recent}` : '') + ']';
-    const err = new Error(
-        `No mediaKey found for imageMessage. The quoted message may be too old or not cached. ${diagStr}`
-    );
+    const diagStr = `[store=${diag.store} chats=${diag.chats} cache=${diag.cache} disk=${diag.disk}` +
+        (diag.noKey ? ` noKey=${diag.noKey}` : '') + ']';
+    const reason = diag.noKey
+        ? 'Found the message but WhatsApp already stripped the media key (the view-once was opened before the bot could download it).'
+        : 'Could not find this view-once in the bot cache. Send a brand-new view-once AFTER the latest deploy and reply .vv without opening it first.';
+    const err = new Error(`${reason} ${diagStr}`);
     err.diag = diagStr;
     throw err;
 }
 
+// Backward-compatible dispatcher for plugins/recovery-tools.js
+// (.vvpost/.vvdoc call the OLD signature and expect { buffer, type }
+// with type in imageMessage/videoMessage/audioMessage, throwing on
+// failure). New-style callers pass (conn, quotedMek, {botNumber, from})
+// and get { buf, mediaType, caption, source, diag }.
+async function getViewOnceMedia(a, b, c, d) {
+    // New style: (conn, quotedMek, { botNumber, from })
+    if (a && a.user && b && b.key) {
+        return getViewOnceMediaCore(a, b, c || {});
+    }
+    // Old style: (m, botNumber, conn, from)
+    const m = a;
+    const botNumber = b;
+    const conn = c;
+    const from = d;
+    const quoted = m?.quoted;
+    if (!quoted) throw new Error('Reply to a view-once photo or video first.');
+    const quotedMek = {
+        key: {
+            remoteJid: from,
+            id: quoted.id || quoted.stanzaId,
+            fromMe: false,
+            participant: quoted.sender
+        },
+        message: quoted.message || quoted
+    };
+    const res = await getViewOnceMediaCore(conn, quotedMek, { botNumber, from });
+    return { buffer: res.buf, type: res.mediaType };
+}
+
 async function sendRecovered(conn, dest, result) {
-    const { buffer, type } = result;
+    const buf = result.buf || result.buffer;
+    const type = result.mediaType || result.type;
+    const caption = `📸 View Once\n\n> ${randomFooter()}`;
     if (type === 'imageMessage') {
-        await conn.sendMessage(dest, { image: buffer, caption: `📸 View Once\n\n> ${randomFooter()}` });
+        await conn.sendMessage(dest, { image: buf, caption });
     } else if (type === 'videoMessage') {
-        await conn.sendMessage(dest, { video: buffer, caption: `🎥 View Once\n\n> ${randomFooter()}` });
+        await conn.sendMessage(dest, { video: buf, caption: '🎥 View Once\n\n> ' + randomFooter() });
     } else {
-        await conn.sendMessage(dest, { audio: buffer, mimetype: 'audio/mp4', ptt: false });
+        await conn.sendMessage(dest, { audio: buf, mimetype: 'audio/mp4', ptt: false });
     }
 }
 
-async function safeErrorReply(conn, from, sender, replyFn, text) {
-    // Prefer the framework reply() — it is already bound correctly.
-    if (typeof replyFn === 'function') {
-        try {
-            await replyFn(text);
-            return;
-        } catch (_) {}
-    }
-    try {
-        await conn.sendMessage(from, { text });
+// Send an error to the RIGHT destination only.
+// .vv -> same chat (reply, then sendMessage(from)); never any DM.
+// .vv2/.vv3 -> requester's DM only; never the chat, never the owner.
+async function sendErr(conn, from, sender, reply, msg, toDM) {
+    if (toDM) {
+        const dest = sender;
+        if (dest) {
+            try { await conn.sendMessage(dest, { text: msg }); return; } catch (_) {}
+        }
+        if (typeof reply === 'function') {
+            try { await reply(msg); return; } catch (_) {}
+        }
+        try { await conn.sendMessage(from, { text: msg }); } catch (_) {}
         return;
-    } catch (_) {}
-    if (sender && sender !== from) {
-        try {
-            await conn.sendMessage(sender, { text });
-        } catch (_) {}
+    }
+    if (typeof reply === 'function') {
+        try { await reply(msg); return; } catch (_) {}
+    }
+    try { await conn.sendMessage(from, { text: msg }); } catch (_) {}
+}
+
+function errorText(e) {
+    if (e?.message?.includes('VV_TIMEOUT')) {
+        return '❌ *Timed out while recovering the media. Please try again with a fresh view-once.*';
+    }
+    // e.message already embeds the diag once — never append it again.
+    return `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
+}
+
+async function runRecovery(conn, mek, m, { from, reply, sender }, toDM) {
+    const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
+    const quoted = m?.quoted;
+    const raw = getRawQuoted(m);
+    if (!quoted && !raw) {
+        const msg = '❌ *Reply to a view-once photo or video with .vv*';
+        await sendErr(conn, from, sender || m?.sender, reply, msg, toDM);
+        return;
+    }
+    const quotedMek = {
+        key: {
+            remoteJid: from,
+            id: quoted?.id || quoted?.stanzaId,
+            fromMe: false,
+            participant: quoted?.sender
+        },
+        message: quoted?.message || quoted || raw
+    };
+    try {
+        const result = await Promise.race([
+            getViewOnceMediaCore(conn, quotedMek, { botNumber, from }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('VV_TIMEOUT')), OVERALL_TIMEOUT_MS))
+        ]);
+        const dest = toDM ? (sender || m?.sender) : from;
+        await sendRecovered(conn, dest, result);
+        if (toDM) {
+            await sendErr(conn, from, sender || m?.sender, reply, '✅ *View-once media sent to your DM.*', true);
+        }
+    } catch (e) {
+        console.log('[VV ERROR]', e && e.message);
+        await sendErr(conn, from, sender || m?.sender, reply, errorText(e), toDM);
     }
 }
 
-// .vv / .vvhere — send recovered media in the SAME chat
+// .vv / .vvhere — result to the SAME chat
 cmd({
     pattern: 'vv',
     alias: ['viewonce', 'view', 'vvhere'],
@@ -302,32 +369,10 @@ cmd({
     category: 'tools',
     desc: 'Recover a view-once photo/video in this chat'
 }, async (conn, mek, m, { from, reply, sender }) => {
-    try {
-        if (!m?.quoted && !getRawQuoted(m)) {
-            return safeErrorReply(conn, from, sender, reply,
-                '❌ *Reply to a view-once photo or video with .vv*');
-        }
-
-        const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
-        const result = await Promise.race([
-            getViewOnceMedia(m, botNumber, conn, from),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('VV_TIMEOUT')), 20000)
-            )
-        ]);
-
-        await sendRecovered(conn, from, result);
-    } catch (e) {
-        console.log('[VV ERROR]', e && e.message);
-        const diag = e?.diag || '';
-        const msg = e?.message?.includes('VV_TIMEOUT')
-            ? '❌ *Timed out while recovering the media. Please try again with a fresh view-once.*'
-            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
-        await safeErrorReply(conn, from, sender || m?.sender, reply, msg);
-    }
+    await runRecovery(conn, mek, m, { from, reply, sender }, false);
 });
 
-// .vv2 — send recovered media to the user's DM
+// .vv2 — result to the requester's DM
 cmd({
     pattern: 'vv2',
     alias: ['viewonce2', 'getmedia'],
@@ -335,34 +380,10 @@ cmd({
     category: 'tools',
     desc: 'Recover a view-once photo/video to your DM'
 }, async (conn, mek, m, { from, reply, sender }) => {
-    try {
-        if (!m?.quoted && !getRawQuoted(m)) {
-            return safeErrorReply(conn, from, sender, reply,
-                '❌ *Reply to a view-once photo or video with .vv2*');
-        }
-
-        const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
-        const result = await Promise.race([
-            getViewOnceMedia(m, botNumber, conn, from),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('VV_TIMEOUT')), 20000)
-            )
-        ]);
-
-        const dest = sender || m.sender;
-        await sendRecovered(conn, dest, result);
-        await safeErrorReply(conn, from, dest, reply, '✅ *View-once media sent to your DM.*');
-    } catch (e) {
-        console.log('[VV2 ERROR]', e && e.message);
-        const diag = e?.diag || '';
-        const msg = e?.message?.includes('VV_TIMEOUT')
-            ? '❌ *Timed out while recovering the media. Please try again with a fresh view-once.*'
-            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
-        await safeErrorReply(conn, from, sender || m?.sender, reply, msg);
-    }
+    await runRecovery(conn, mek, m, { from, reply, sender }, true);
 });
 
-// .vv3 / 👁️ — same as .vv2 (DM)
+// .vv3 / 👁️ — result to the requester's DM
 cmd({
     pattern: 'vv3',
     alias: ['👁️'],
@@ -370,31 +391,7 @@ cmd({
     category: 'tools',
     desc: 'Recover a view-once photo/video to your DM'
 }, async (conn, mek, m, { from, reply, sender }) => {
-    try {
-        if (!m?.quoted && !getRawQuoted(m)) {
-            return safeErrorReply(conn, from, sender, reply,
-                '❌ *Reply to a view-once photo or video with .vv3*');
-        }
-
-        const botNumber = jidNormalizedUser(conn.user.id).split('@')[0];
-        const result = await Promise.race([
-            getViewOnceMedia(m, botNumber, conn, from),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('VV_TIMEOUT')), 20000)
-            )
-        ]);
-
-        const dest = sender || m.sender;
-        await sendRecovered(conn, dest, result);
-        await safeErrorReply(conn, from, dest, reply, '✅ *View-once media sent to your DM.*');
-    } catch (e) {
-        console.log('[VV3 ERROR]', e && e.message);
-        const diag = e?.diag || '';
-        const msg = e?.message?.includes('VV_TIMEOUT')
-            ? '❌ *Timed out while recovering the media. Please try again with a fresh view-once.*'
-            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
-        await safeErrorReply(conn, from, sender || m?.sender, reply, msg);
-    }
+    await runRecovery(conn, mek, m, { from, reply, sender }, true);
 });
 
 module.exports = { getViewOnceMedia, unwrapMedia, downloadMedia, downloadFromRecord, scopedKey };
