@@ -2,6 +2,7 @@
 // Sends the text as a WhatsApp payment request (requestPaymentMessage).
 // Payment messages cannot be deleted for everyone by group admins or the
 // sender, so the message stays in the chat. Amount is RANDOM dollars.
+// Sends ONLY the payment card — no confirmation text (like JAWAD-MD).
 //
 // NOTE: Baileys sendMessage() does NOT support requestPaymentMessage —
 // generateWAMessageContent() has no case for it and falls through to
@@ -9,10 +10,13 @@
 // the message with generateWAMessageFromContent() and send it with
 // relayMessage() instead, bypassing that check.
 //
-// requestFrom MUST be the bot's PHONE JID (botNumber@s.whatsapp.net).
-// conn.user.id can be a @lid on newer multi-device accounts, and a LID
-// requestFrom renders as "Requested from Unknown" with no Send button.
-// botNumber is the real phone number from pairing (sanitizedNumber).
+// requestFrom AND userJid MUST be the bot's PHONE JID
+// (botNumber@s.whatsapp.net). conn.user.id can be a @lid on newer
+// multi-device accounts: a LID requestFrom renders as "Requested from
+// Unknown", and a LID userJid makes the card look like it came from the
+// person who ran the command instead of the bot. botNumber is the real
+// phone number from pairing (sanitizedNumber), so the card is from the
+// bot and "Requested from" shows WhatsApp / WhatsApp Business.
 //
 // Usage:
 //   .paymsg <text>                  -> send to this chat
@@ -58,8 +62,8 @@ cmd({
 
     const dollars = randomDollars();
     const amount1000 = dollars * 1000;
-    // Bot's real phone JID — NOT conn.user.id (can be a @lid = "Unknown").
-    const requester = botNumber ? `${botNumber}@s.whatsapp.net` : (conn.user?.id || sender);
+    // Bot's real phone JID — NOT conn.user.id (can be a @lid).
+    const botJid = botNumber ? `${botNumber}@s.whatsapp.net` : (conn.user?.id || sender);
     const expiry = Math.floor(Date.now() / 1000) + 86400; // 24 hours
 
     try {
@@ -67,7 +71,7 @@ cmd({
             requestPaymentMessage: {
                 currencyCodeIso4217: 'USD',
                 amount1000: amount1000,
-                requestFrom: requester,
+                requestFrom: botJid,
                 noteMessage: {
                     extendedTextMessage: { text: messageText }
                 },
@@ -78,21 +82,11 @@ cmd({
                     value: amount1000
                 }
             }
-        }, { userJid: conn.user.id });
+        }, { userJid: botJid });
         await conn.relayMessage(targetJid, waMsg.message, { messageId: waMsg.key.id });
+        // No confirmation text — the payment card itself is the output.
     } catch (e) {
         console.log('[PAYMSG ERROR]', e.message);
         return reply(`❌ Could not send the payment message (${e.message || 'unknown error'}). Make sure the bot is in that group and try again.`);
-    }
-
-    // Confirmation: plain text, no footer dependency. Try the framework
-    // reply first (it quotes the command), fall back to a direct send.
-    // A failure here must NOT report the payment as failed — it went out.
-    const confirmText = `✅ Payment message sent ($${dollars}).`;
-    try {
-        await reply(confirmText);
-    } catch (e) {
-        console.log('[PAYMSG CONFIRM ERROR]', e.message);
-        try { await conn.sendMessage(from, { text: confirmText }); } catch (_) {}
     }
 });
