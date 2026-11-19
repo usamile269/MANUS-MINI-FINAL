@@ -1191,15 +1191,23 @@ async function ahmadPair(number, res = null) {
             // 🚨 SPEED FIX: HQ link previews fetch remote URLs on connect; not needed for login speed.
             generateHighQualityLinkPreview: false,
             syncFullHistory: false,
-            // 🚨 ROOT-LEVEL FIX: syncFullHistory:false alone only skips the BIG
-            // comprehensive history sync — WhatsApp still sends smaller
-            // "recent messages" history-sync chunks by default, which is what
-            // was causing old commands to fire again after a reconnect. This
-            // callback tells Baileys to skip processing ANY history-sync
-            // notification entirely, so there's nothing to replay in the first
-            // place. (The timestamp-based filter in the message handler stays
-            // too, as a second layer of defense.)
-            shouldSyncHistoryMessage: () => false,
+            // 🚨 DECRYPT FIX (DeepSeek, 2026-11-19 — root cause of the
+            // [DECRYPT-DEBUG] "entire batch had no decrypted content"
+            // failures on group view-onces): returning false for EVERY
+            // history-sync type also blocked the small syncs
+            // (INITIAL_BOOTSTRAP, RECENT, ON_DEMAND) that deliver the
+            // LID↔phone-number mappings and group sender keys. Without
+            // those mappings, Signal session lookup fails and group
+            // messages arrive with no decrypted content (mek.message
+            // empty), so .vv capture has nothing to save. This callback
+            // now skips ONLY the heavy FULL sync (syncType 2) and allows
+            // bootstrap / recent / on-demand sync, so the mappings and
+            // sender keys reach the bot. The old "no replays after a
+            // reconnect" concern is still covered by the timestamp-based
+            // freshness filter in the message handler (second layer).
+            // NOTE: a fresh re-pair is required after this change so a
+            // clean sync happens.
+            shouldSyncHistoryMessage: (msg) => (msg && msg.syncType) !== 2,
             markOnlineOnConnect: true,
             browser: Browsers.ubuntu('Chrome'),
             getMessage: async (key) => {
