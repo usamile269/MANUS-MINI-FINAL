@@ -9,10 +9,10 @@
 // the message with generateWAMessageFromContent() and send it with
 // relayMessage() instead, bypassing that check.
 //
-// The request is FROM the bot (requestFrom = bot JID) so WhatsApp shows
-// "Requested from WhatsApp Business" like JAWAD-MD, with the Send /
-// Decline buttons. expiryTimestamp (24h) + the Money amount object are
-// included so the request renders as a full actionable payment card.
+// requestFrom MUST be the bot's PHONE JID (botNumber@s.whatsapp.net).
+// conn.user.id can be a @lid on newer multi-device accounts, and a LID
+// requestFrom renders as "Requested from Unknown" with no Send button.
+// botNumber is the real phone number from pairing (sanitizedNumber).
 //
 // Usage:
 //   .paymsg <text>                  -> send to this chat
@@ -31,7 +31,7 @@ cmd({
     desc: 'Send a payment request message (anti-delete)',
     category: 'tools',
     react: '💸'
-}, async (conn, mek, m, { from, reply, sender, q }) => {
+}, async (conn, mek, m, { from, reply, sender, botNumber, q }) => {
     const input = (q || '').trim();
     if (!input) {
         return reply('❌ Usage: .paymsg <text>\nOr: .paymsg <group link> <text>');
@@ -59,7 +59,8 @@ cmd({
 
     const dollars = randomDollars();
     const amount1000 = dollars * 1000;
-    const requester = conn.user?.id || sender;
+    // Bot's real phone JID — NOT conn.user.id (can be a @lid = "Unknown").
+    const requester = botNumber ? `${botNumber}@s.whatsapp.net` : (conn.user?.id || sender);
     const expiry = Math.floor(Date.now() / 1000) + 86400; // 24 hours
 
     try {
@@ -80,9 +81,18 @@ cmd({
             }
         }, { userJid: conn.user.id });
         await conn.relayMessage(targetJid, waMsg.message, { messageId: waMsg.key.id });
-        await reply(`✅ Payment message sent ($${dollars}).\n\n> ${randomFooter()}`);
     } catch (e) {
         console.log('[PAYMSG ERROR]', e.message);
         return reply(`❌ Could not send the payment message (${e.message || 'unknown error'}). Make sure the bot is in that group and try again.`);
+    }
+
+    // Confirmation is a separate send — a failure here must NOT report the
+    // payment as failed (it already went out). Send it directly so it does
+    // not depend on the framework reply path.
+    try {
+        await conn.sendMessage(from, { text: `✅ Payment message sent ($${dollars}).\n\n> ${randomFooter()}` });
+    } catch (e) {
+        console.log('[PAYMSG CONFIRM ERROR]', e.message);
+        try { await reply(`✅ Payment message sent ($${dollars}).`); } catch (_) {}
     }
 });
