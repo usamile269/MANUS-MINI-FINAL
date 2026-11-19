@@ -122,7 +122,8 @@ function getQuotedIds(m) {
 
 // Core recovery. Returns { buf, mediaType, caption, source, diag }.
 // Throws a plain-English error (message already embeds the diag once).
-async function getViewOnceMediaCore(conn, quotedMek, { botNumber, from }) {
+async function getViewOnceMediaCore(conn, quotedMek, opts) {
+    const { botNumber, from } = opts || {};
     const diag = { store: 'miss', chats: 0, cache: 'miss', disk: 'miss', noKey: 0 };
     const qKey = quotedMek?.key || {};
     const jid = qKey.remoteJid || from;
@@ -178,8 +179,15 @@ async function getViewOnceMediaCore(conn, quotedMek, { botNumber, from }) {
     }
 
     // ---- Stage 2: raw quotedMessage (direct download) ----
+    // This MUST come from the ORIGINAL .vv command message
+    // (m.message.extendedTextMessage.contextInfo.quotedMessage), NOT
+    // from the rebuilt quotedMek — the reference bot (BUNTY_MD) works
+    // precisely because it reads the raw quotedMessage straight from
+    // the command message. The old code looked at quotedMek.message
+    // (the view-once itself), which has no extendedTextMessage, so
+    // this stage always missed.
     try {
-        const raw = getRawQuoted({ message: quotedMek?.message, msg: quotedMek });
+        const raw = opts.rawQuoted || null;
         const content = raw ? unwrapMedia(raw) : null;
         if (content) {
             const picked = pickMedia(content);
@@ -281,7 +289,7 @@ async function getViewOnceMedia(a, b, c, d) {
         },
         message: quoted.message || quoted
     };
-    const res = await getViewOnceMediaCore(conn, quotedMek, { botNumber, from });
+    const res = await getViewOnceMediaCore(conn, quotedMek, { botNumber, from, rawQuoted: getRawQuoted(m) });
     return { buffer: res.buf, type: res.mediaType };
 }
 
@@ -347,7 +355,7 @@ async function runRecovery(conn, mek, m, { from, reply, sender }, toDM) {
     };
     try {
         const result = await Promise.race([
-            getViewOnceMediaCore(conn, quotedMek, { botNumber, from }),
+            getViewOnceMediaCore(conn, quotedMek, { botNumber, from, rawQuoted: getRawQuoted(m) }),
             new Promise((_, reject) => setTimeout(() => reject(new Error('VV_TIMEOUT')), OVERALL_TIMEOUT_MS))
         ]);
         const dest = toDM ? (sender || m?.sender) : from;
