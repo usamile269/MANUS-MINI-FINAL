@@ -9,6 +9,11 @@
 // the message with generateWAMessageFromContent() and send it with
 // relayMessage() instead, bypassing that check.
 //
+// The request is FROM the bot (requestFrom = bot JID) so WhatsApp shows
+// "Requested from WhatsApp Business" like JAWAD-MD, with the Send /
+// Decline buttons. expiryTimestamp (24h) + the Money amount object are
+// included so the request renders as a full actionable payment card.
+//
 // Usage:
 //   .paymsg <text>                  -> send to this chat
 //   .paymsg <group link> <text>     -> send to the group from the invite link
@@ -54,15 +59,23 @@ cmd({
 
     const dollars = randomDollars();
     const amount1000 = dollars * 1000;
+    const requester = conn.user?.id || sender;
+    const expiry = Math.floor(Date.now() / 1000) + 86400; // 24 hours
 
     try {
         const waMsg = generateWAMessageFromContent(targetJid, {
             requestPaymentMessage: {
                 currencyCodeIso4217: 'USD',
                 amount1000: amount1000,
-                requestFrom: sender,
+                requestFrom: requester,
                 noteMessage: {
                     extendedTextMessage: { text: messageText }
+                },
+                expiryTimestamp: expiry,
+                amount: {
+                    currencyCode: 'USD',
+                    offset: 1000,
+                    value: amount1000
                 }
             }
         }, { userJid: conn.user.id });
