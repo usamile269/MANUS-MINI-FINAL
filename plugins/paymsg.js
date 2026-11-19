@@ -10,23 +10,40 @@
 // the message with generateWAMessageFromContent() and send it with
 // relayMessage() instead, bypassing that check.
 //
-// requestFrom AND userJid MUST be the bot's PHONE JID
-// (botNumber@s.whatsapp.net). conn.user.id can be a @lid on newer
-// multi-device accounts: a LID requestFrom renders as "Requested from
-// Unknown", and a LID userJid makes the card look like it came from the
-// person who ran the command instead of the bot. botNumber is the real
-// phone number from pairing (sanitizedNumber), so the card is from the
-// bot and "Requested from" shows WhatsApp / WhatsApp Business.
+// requestFrom AND userJid MUST be the bot's PHONE JID. If either one ends
+// up as the command sender (or a @lid), WhatsApp renders "Requested from
+// <sender's name>" / "Unknown" instead of WhatsApp / WhatsApp Business.
+// The bot's phone JID is derived robustly: botNumber (real number from
+// pairing) first, then conn.user.id normalized to a phone JID. A LID is
+// NEVER used — it renders as "Unknown", and a sender JID renders as the
+// sender's name.
 //
 // Usage:
 //   .paymsg <text>                  -> send to this chat
 //   .paymsg <group link> <text>     -> send to the group from the invite link
 const { cmd } = require('../ahmad-core');
-const { generateWAMessageFromContent } = require('@whiskeysockets/baileys');
+const { generateWAMessageFromContent, jidNormalizedUser } = require('@whiskeysockets/baileys');
 
 function randomDollars() {
     // Random whole-dollar amount, $10 - $999.
     return Math.floor(Math.random() * 990) + 10;
+}
+
+// Return the bot's phone JID (digits@s.whatsapp.net), or null if it cannot
+// be determined. Never returns a LID or the command sender's JID.
+function botPhoneJid(conn, botNumber, botNumber2, sender, senderNumber) {
+    const digits = (v) => String(v || '').replace(/[^0-9]/g, '');
+    const snd = digits(senderNumber) || digits(sender);
+    // 1. botNumber — the bot's real number from pairing.
+    const b = digits(botNumber);
+    if (b && b.length >= 8 && b.length <= 15 && b !== snd) return `${b}@s.whatsapp.net`;
+    // 2. botNumber2 — jidNormalizedUser(conn.user.id).
+    const b2 = jidNormalizedUser(botNumber2 || '') || '';
+    if (b2.endsWith('@s.whatsapp.net') && digits(b2) !== snd) return b2;
+    // 3. conn.user.id — use it only if it is already a phone JID.
+    const uid = jidNormalizedUser(conn.user?.id || '') || '';
+    if (uid.endsWith('@s.whatsapp.net') && digits(uid) !== snd) return uid;
+    return null;
 }
 
 cmd({
@@ -34,7 +51,7 @@ cmd({
     desc: 'Send a payment request message (anti-delete)',
     category: 'tools',
     react: '💸'
-}, async (conn, mek, m, { from, reply, sender, botNumber, q }) => {
+}, async (conn, mek, m, { from, reply, sender, senderNumber, botNumber, botNumber2, q }) => {
     const input = (q || '').trim();
     if (!input) {
         return reply('❌ Usage: .paymsg <text>\nOr: .paymsg <group link> <text>');
@@ -62,8 +79,10 @@ cmd({
 
     const dollars = randomDollars();
     const amount1000 = dollars * 1000;
-    // Bot's real phone JID — NOT conn.user.id (can be a @lid).
-    const botJid = botNumber ? `${botNumber}@s.whatsapp.net` : (conn.user?.id || sender);
+    const botJid = botPhoneJid(conn, botNumber, botNumber2, sender, senderNumber);
+    if (!botJid) {
+        return reply('❌ Could not determine the bot number. Try again.');
+    }
     const expiry = Math.floor(Date.now() / 1000) + 86400; // 24 hours
 
     try {
