@@ -350,10 +350,13 @@ cmd({
         const msg = e?.message?.includes('VV_TIMEOUT')
             ? '❌ *Timed out while recovering the media. Please try again with a fresh view-once.*'
             : `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
-        const dest = sender || m?.sender;
-        if (dest) {
-            try { await conn.sendMessage(dest, { text: msg }); } catch (_) {}
+        // SAME CHAT ONLY — never send a .vv error to any DM. The old code
+        // sent it to `sender` (the requester's DM), so when the owner ran
+        // .vv in a group the error landed in his own DM.
+        if (typeof reply === 'function') {
+            try { await reply(msg); return; } catch (_) {}
         }
+        try { await conn.sendMessage(from, { text: msg }); } catch (_) {}
     }
 });
 
