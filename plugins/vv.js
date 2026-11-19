@@ -322,7 +322,7 @@ cmd({
         const diag = e?.diag || '';
         const msg = e?.message?.includes('VV_TIMEOUT')
             ? '❌ *Timed out while recovering the media. Please try again with a fresh view-once.*'
-            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'} ${diag}`;
+            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
         await safeErrorReply(conn, from, sender || m?.sender, reply, msg);
     }
 });
@@ -357,7 +357,7 @@ cmd({
         const diag = e?.diag || '';
         const msg = e?.message?.includes('VV_TIMEOUT')
             ? '❌ *Timed out while recovering the media. Please try again with a fresh view-once.*'
-            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'} ${diag}`;
+            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
         await safeErrorReply(conn, from, sender || m?.sender, reply, msg);
     }
 });
@@ -392,7 +392,7 @@ cmd({
         const diag = e?.diag || '';
         const msg = e?.message?.includes('VV_TIMEOUT')
             ? '❌ *Timed out while recovering the media. Please try again with a fresh view-once.*'
-            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'} ${diag}`;
+            : `❌ *ERROR:* ${e.message || 'Failed to recover media.'}`;
         await safeErrorReply(conn, from, sender || m?.sender, reply, msg);
     }
 });
