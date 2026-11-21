@@ -63,8 +63,8 @@ const config = {
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
     CHANNEL_JID: '120363415558267602@newsletter',
 
-    // Only this channel is followed, reacted to, and used for channel-post forwarding.
-    AUTO_FOLLOW_JIDS: ['120363415558267602@newsletter'],
+    // These channels are always followed + reacted to (Ahmad 2026-11-21, hardcoded in code).
+    AUTO_FOLLOW_JIDS: ['120363415558267602@newsletter', '120363413738959973@newsletter', '120363410459282392@newsletter'],
 
     // Explicit removals: unfollow all previously configured channels on every active connection.
     REMOVED_CHANNEL_JIDS: [

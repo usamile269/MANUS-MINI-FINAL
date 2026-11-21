@@ -22,7 +22,12 @@ try {
     const __jidStore = require('./lib/jsondb').model('ChannelJids');
     const __savedJids = (__jidStore.docs || []).find((d) => d && d.key === 'lists');
     if (__savedJids) {
-        if (Array.isArray(__savedJids.follow)) config.AUTO_FOLLOW_JIDS = __savedJids.follow.slice();
+        // 🚨 MERGE, not replace (Ahmad 2026-11-21: hardcoded JIDs must ALWAYS stay on) —
+        // the saved list used to REPLACE config.AUTO_FOLLOW_JIDS, so any JID added
+        // in code (config.js) was silently dropped at boot whenever a saved list
+        // existed. Now the saved list is UNIONED with the config defaults, so
+        // code-added channels can never be lost, and .addjid additions still work.
+        if (Array.isArray(__savedJids.follow)) config.AUTO_FOLLOW_JIDS = [...new Set([...(config.AUTO_FOLLOW_JIDS || []), ...__savedJids.follow])];
         if (Array.isArray(__savedJids.post)) config.CHANNEL_POST_JIDS = __savedJids.post.slice();
     }
 } catch (e) {
