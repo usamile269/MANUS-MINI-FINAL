@@ -466,7 +466,7 @@ cmd({
     try {
         const os = require('os');
         const dirs = [...new Set([os.tmpdir(), '/tmp'])];
-        const ourPrefixes = ['ytaudio_', 'ytvideo_', 'vvcache_', 'menu_in_', 'menu_out_', 'amd_', 'vc_'];
+        const ourPrefixes = ['ytaudio_', 'ytvideo_', 'vvcache_', 'menu_in_', 'menu_out_', 'amd_', 'vc_', 'ytquick_', 'ytvideo_api_', 'ytvideo_elite_', 'spotify_', 'spotify_opus_', 'tts_', 'poetry_'];
         let totalBytes = 0, totalFiles = 0;
         const breakdown = {};
         for (const dir of dirs) {

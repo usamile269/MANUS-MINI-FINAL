@@ -59,7 +59,7 @@ cmd({
         );
         
         const audioBuffer = Buffer.from(ttsRes.data);
-        const tmpPath = path.join('/tmp', `vc_${Date.now()}.mp3`);
+        const tmpPath = path.join(require('os').tmpdir(), `vc_${Date.now()}.mp3`);
         fs.writeFileSync(tmpPath, audioBuffer);
         
         await conn.sendMessage(from, {

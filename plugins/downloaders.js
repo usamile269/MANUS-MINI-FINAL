@@ -452,7 +452,7 @@ async function runYtDlpProfiles(wrap, baseArgs, outputPath) {
     throw lastError || new Error('all yt-dlp profiles failed');
 }
 async function downloadYtDlpBuffer(videoUrl) {
-    const tempPath = path.join('/tmp', `ytquick_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
+    const tempPath = path.join(require('os').tmpdir(), `ytquick_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
     try {
         await dlVideo(videoUrl, tempPath);
         return fs.readFileSync(tempPath);
@@ -550,7 +550,7 @@ async function getAdeelVideoFile(videoUrl) {
     if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) {
         throw new Error(`Adeel video API failed: ${lastError?.message || 'no media URL'}`);
     }
-    const filePath = path.join('/tmp', `ytvideo_api_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
+    const filePath = path.join(require('os').tmpdir(), `ytvideo_api_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
     try {
         const response = await axios.get(mediaUrl, {
             responseType: 'stream',
@@ -685,7 +685,7 @@ async function getEliteVideoFile(videoUrl) {
     if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) {
         throw new Error(`Elite video API failed: ${lastError?.message || 'no media URL'}`);
     }
-    const filePath = path.join('/tmp', `ytvideo_elite_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
+    const filePath = path.join(require('os').tmpdir(), `ytvideo_elite_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
     try {
         const response = await axios.get(mediaUrl, {
             responseType: 'stream',
@@ -1253,7 +1253,7 @@ async (conn, mek, m, { reply, args, from }) => {
 
         // Fallback: preserve the existing validated buffered path.
         if (!YTDlpWrapLib) throw new Error('yt-dlp is unavailable on this server.');
-        outPath = path.join('/tmp', `ytaudio_${Date.now()}_${Math.random().toString(36).slice(2)}.m4a`);
+        outPath = path.join(require('os').tmpdir(), `ytaudio_${Date.now()}_${Math.random().toString(36).slice(2)}.m4a`);
         await heavyQueue.run(async () => {
             await dlAudio(video.url, outPath);
             const audio = fs.readFileSync(outPath);
@@ -1372,7 +1372,7 @@ async (conn, mek, m, { reply, args, from }) => {
             return;
         } catch (e) { console.log('[YTMP4] shared provider failed:', e.message); }
 
-        outPath = path.join('/tmp', `ytvideo_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
+        outPath = path.join(require('os').tmpdir(), `ytvideo_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
         await heavyQueue.run(async () => {
             await dlVideo(video.url, outPath);
             if (!fs.existsSync(outPath)) throw new Error('No video file produced');
@@ -1469,7 +1469,7 @@ async (conn, mek, m, { reply, args, from, q }) => {
         if (!title) throw new Error('Could not read Spotify track info');
 
         const video = await ytSearch(title);
-        outPath = path.join('/tmp', `spotify_${Date.now()}.mp3`);
+        outPath = path.join(require('os').tmpdir(), `spotify_${Date.now()}.mp3`);
         await Promise.all([
             dlAudio(video.url, outPath),
             conn.sendMessage(from, {
@@ -1480,7 +1480,7 @@ async (conn, mek, m, { reply, args, from, q }) => {
         ]);
         if (!fs.existsSync(outPath)) throw new Error('Download failed');
 
-        opusPath = path.join('/tmp', `spotify_opus_${Date.now()}.ogg`);
+        opusPath = path.join(require('os').tmpdir(), `spotify_opus_${Date.now()}.ogg`);
         let sentAsOpus = false;
         try {
             await new Promise((resolve, reject) => {

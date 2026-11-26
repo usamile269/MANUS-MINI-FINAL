@@ -177,7 +177,7 @@ cmd({ pattern: 'poetry', alias: ['poetryaudio', 'shayari'], desc: 'Send real poe
 async (conn, mek, m, { from, args, q, reply }) => {
     const query = (q || args.join(' ')).trim();
     if (!query) return reply('🎙️ Usage: .poetry Ahmad Faraz\n🔗 Or send a direct TikTok, YouTube, or Instagram link.');
-    const work = `/tmp/poetry_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const work = require('path').join(require('os').tmpdir(), `poetry_${Date.now()}_${Math.random().toString(36).slice(2)}`);
     const input = `${work}.source`;
     const output = `${work}.mp3`;
     let sourceTitle = query;
@@ -185,7 +185,7 @@ async (conn, mek, m, { from, args, q, reply }) => {
     try {
         await conn.sendMessage(from, { react: { text: '🎙️', key: mek.key } });
         await heavyQueue.run(async () => {
-            fs.mkdirSync('/tmp', { recursive: true });
+            fs.mkdirSync(require('os').tmpdir(), { recursive: true });
             if (/^https?:\/\//i.test(query)) {
                 sourceUrl = query;
                 try {

@@ -425,7 +425,7 @@ function markProcessed(number, id) {
 // with tight limits like KataBump's free tier.
 function sweepOrphanedTempFiles() {
     const dirs = [require('os').tmpdir(), '/tmp'];
-    const ourPrefixes = ['ytaudio_', 'ytvideo_', 'vvcache_', 'menu_in_', 'menu_out_', 'amd_', 'vc_'];
+    const ourPrefixes = ['ytaudio_', 'ytvideo_', 'vvcache_', 'menu_in_', 'menu_out_', 'amd_', 'vc_', 'ytquick_', 'ytvideo_api_', 'ytvideo_elite_', 'spotify_', 'spotify_opus_', 'tts_', 'poetry_'];
     const ONE_HOUR = 60 * 60 * 1000;
     const now = Date.now();
     for (const dir of new Set(dirs)) {

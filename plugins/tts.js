@@ -26,7 +26,7 @@ cmd({
             timeout: 30000
         });
         
-        const tmpPath = path.join('/tmp', `tts_${Date.now()}.mp3`);
+        const tmpPath = path.join(require('os').tmpdir(), `tts_${Date.now()}.mp3`);
         fs.writeFileSync(tmpPath, Buffer.from(res.data));
         
         await conn.sendMessage(from, {

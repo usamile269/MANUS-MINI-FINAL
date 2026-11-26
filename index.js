@@ -1,3 +1,13 @@
+// TEMP-ON-DISK FIX (2026-11-26): the panel's /tmp is a small separate
+// tmpfs that filled up and broke media sends with ENOSPC ("Menu failed to
+// load!") even though the 10 GB disk was nearly empty. Point the whole
+// process tree's temp dir at a folder on the big disk instead.
+try {
+    const _tmpDir = require('path').join(process.cwd(), '.tmp');
+    require('fs').mkdirSync(_tmpDir, { recursive: true });
+    process.env.TMPDIR = _tmpDir;
+} catch {}
+
 // Prevent the whole server from crashing on an unexpected error anywhere in the app.
 // Without these, any single unhandled rejection (a stray API call, a bad media message, etc.)
 // kills the entire Node process on modern Node versions — which matches the "bot crashes,
