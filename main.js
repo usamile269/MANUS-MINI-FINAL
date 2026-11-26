@@ -1214,21 +1214,7 @@ async function ahmadPair(number, res = null) {
             // clean sync happens.
             shouldSyncHistoryMessage: (msg) => (msg && msg.syncType) !== 2,
             markOnlineOnConnect: true,
-            // 👁️ VV FIX: Browsers.ubuntu('Chrome') paired the bot as a WEB-class
-            // companion (PlatformType.CHROME), and WhatsApp withholds view-once
-            // media from web companions — capture only ever got an empty
-            // placeholder ("cannot derive from empty media key", Baileys
-            // #2909), so .vv could never work. Browsers.android('Chrome')
-            // makes browser[1] === 'Android', which Baileys maps to
-            // PlatformType.ANDROID_PHONE, so view-once media is actually
-            // delivered. NOTE: this only takes effect on NEW pairings —
-            // existing sessions must unlink and re-pair.
-            // Pairing-identity coherence: Browsers.android('Chrome') yields
-            // os='Chrome' with platformType=ANDROID_PHONE — an incoherent
-            // device identity that WhatsApp's primary app rejects at the
-            // link step ("Couldn't link device"). A literal Android tuple
-            // keeps os and platformType consistent (both Android).
-            browser: ['Android', 'Android', '14.0.0'],
+            browser: Browsers.ubuntu('Chrome'),
             getMessage: async (key) => {
                 try {
                     const msg = await ahmadStore.loadMessage(key.remoteJid, key.id);
