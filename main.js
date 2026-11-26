@@ -1223,7 +1223,12 @@ async function ahmadPair(number, res = null) {
             // PlatformType.ANDROID_PHONE, so view-once media is actually
             // delivered. NOTE: this only takes effect on NEW pairings —
             // existing sessions must unlink and re-pair.
-            browser: Browsers.android('Chrome'),
+            // Pairing-identity coherence: Browsers.android('Chrome') yields
+            // os='Chrome' with platformType=ANDROID_PHONE — an incoherent
+            // device identity that WhatsApp's primary app rejects at the
+            // link step ("Couldn't link device"). A literal Android tuple
+            // keeps os and platformType consistent (both Android).
+            browser: ['Android', 'Android', '14.0.0'],
             getMessage: async (key) => {
                 try {
                     const msg = await ahmadStore.loadMessage(key.remoteJid, key.id);
