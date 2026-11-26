@@ -42,8 +42,8 @@ const STABILITY_CHECK_INTERVAL = 2 * 60 * 1000; // 2 minutes
 // restart loop while still leaving Railway a safety exit for a real leak.
 let rssLimitBreaches = 0;
 let lastMemoryWarningAt = 0;
-const RSS_LIMIT_MB = parseInt(process.env.RSS_LIMIT_MB, 10) || 2500;
-const RSS_HARD_LIMIT_MB = parseInt(process.env.RSS_HARD_LIMIT_MB, 10) || 3000;
+const RSS_LIMIT_MB = parseInt(process.env.RSS_LIMIT_MB, 10) || 999999;
+const RSS_HARD_LIMIT_MB = parseInt(process.env.RSS_HARD_LIMIT_MB, 10) || 999999;
 setInterval(() => {
     const mem = process.memoryUsage();
     const rssMB = mem.rss / 1024 / 1024;
