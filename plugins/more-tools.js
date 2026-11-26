@@ -1,4 +1,5 @@
 const { cmd } = require('../ahmad-core');
+const mediaCache = require('../lib/media-cache');
 const axios = require('axios');
 const fs = require('fs');
 const os = require('os');
@@ -63,6 +64,10 @@ function getQuotedType(m) {
 }
 
 async function toWebpSticker(inputBuffer, isVideo) {
+    // ALMARI: same photo/video sent again -> same sticker, no re-convert.
+    const _stkKey = 'sticker-' + mediaCache.hash(inputBuffer) + (isVideo ? '-v' : '-i');
+    const _stkHit = mediaCache.get(_stkKey);
+    if (_stkHit) { try { return fs.readFileSync(_stkHit); } catch {} }
     const inPath = tmp(isVideo ? '.mp4' : '.jpg');
     const outPath = tmp('.webp');
     fs.writeFileSync(inPath, inputBuffer);
@@ -77,6 +82,7 @@ async function toWebpSticker(inputBuffer, isVideo) {
             ]).toFormat('webp').save(outPath);
         });
         const buf = fs.readFileSync(outPath);
+        try { mediaCache.put(_stkKey, buf); } catch {}
         return buf;
     } finally {
         // 🚨 STORAGE FIX: was only cleaned up on the success path — if ffmpeg

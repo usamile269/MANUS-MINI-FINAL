@@ -1,4 +1,5 @@
 const { cmd } = require('../ahmad-core');
+const mediaCache = require('../lib/media-cache');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
@@ -26,6 +27,10 @@ function chanCtx() {
 
 // GIF → Animated WebP sticker converter
 async function gifToSticker(gifUrl) {
+    // ALMARI: same gif URL again -> same sticker, no re-download/convert.
+    const _gifKey = 'gifstk-' + mediaCache.hash(Buffer.from(String(gifUrl)));
+    const _gifHit = mediaCache.get(_gifKey);
+    if (_gifHit) { try { return fs.readFileSync(_gifHit); } catch {} }
     const res = await axios.get(gifUrl, { responseType: 'arraybuffer', timeout: 20000 });
     const inPath = path.join(tmpdir(), `stk_${Date.now()}.gif`);
     const outPath = path.join(tmpdir(), `stk_${Date.now()}.webp`);
@@ -41,6 +46,7 @@ async function gifToSticker(gifUrl) {
             .save(outPath);
     });
     const buf = fs.readFileSync(outPath);
+    try { mediaCache.put(_gifKey, buf); } catch {}
     try { fs.unlinkSync(inPath); fs.unlinkSync(outPath); } catch {}
     return buf;
 }

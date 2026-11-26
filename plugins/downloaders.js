@@ -23,6 +23,7 @@ const { randomFooter, toSansBold } = require('../lib/menu-styles');
 // 🆕 (Bunty: "queue wala crash na ho") — bounds how many yt-dlp/ffmpeg
 // jobs run at the same time across the whole bot.
 const { heavyQueue } = require('../lib/queue');
+const mediaCache = require('../lib/media-cache');
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 const FOOTER = '> ' + randomFooter();
@@ -1204,6 +1205,17 @@ async (conn, mek, m, { reply, args, from }) => {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const started = Date.now();
         const video = await ytSearch(query);
+        // ALMARI: same song asked again? Send the saved copy instantly.
+        const _audioCacheKey = 'yt-audio-' + mediaCache.hash(Buffer.from(String(video.url || '')));
+        const _audioCached = mediaCache.get(_audioCacheKey);
+        if (_audioCached) {
+            const _buf = fs.readFileSync(_audioCached);
+            const _fmt = detectAudioFormat(_buf);
+            await sendWithRetry(conn, from, { audio: _buf, mimetype: _fmt.mimetype, fileName: `${video.title?.slice(0, 35) || 'audio'}.${_fmt.ext}`, ptt: false }, { quoted: fakevCard });
+            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
+            console.log('[YTMP3] almari (cache) hit - sent instantly');
+            return;
+        }
         // Preview immediately, before any heavy queue work.
         await conn.sendMessage(from, {
             image: { url: video.thumb },
@@ -1224,6 +1236,7 @@ async (conn, mek, m, { reply, args, from }) => {
                     ptt: false
                 }, { quoted: fakevCard });
                 await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
+                try { mediaCache.put(_audioCacheKey, media.buffer); } catch {}
                 console.log(`[YTMP3] Adeel buffered primary completed in ${Date.now() - started}ms`);
             }, async position => {
                 await replyWithRetry(conn, from, mek, `⏳ Download queue position: #${position}`);
@@ -1244,6 +1257,7 @@ async (conn, mek, m, { reply, args, from }) => {
                     ptt: false
                 }, { quoted: fakevCard });
                 await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
+                try { mediaCache.put(_audioCacheKey, media.buffer); } catch {}
                 console.log(`[YTMP3] Elite fallback completed in ${Date.now() - started}ms`);
             }, async position => {
                 await replyWithRetry(conn, from, mek, `⏳ Download queue position: #${position}`);
@@ -1257,6 +1271,7 @@ async (conn, mek, m, { reply, args, from }) => {
         await heavyQueue.run(async () => {
             await dlAudio(video.url, outPath);
             const audio = fs.readFileSync(outPath);
+            try { mediaCache.put(_audioCacheKey, audio); } catch {}
             const audioFormat = detectAudioFormat(audio);
             await sendWithRetry(conn, from, { audio, mimetype: audioFormat.mimetype, fileName: `${video.title?.slice(0, 35) || 'audio'}.${audioFormat.ext}`, ptt: false }, { quoted: fakevCard });
             try { fs.unlinkSync(outPath); } catch {}
@@ -1284,6 +1299,15 @@ async (conn, mek, m, { reply, args, from }) => {
         await conn.sendMessage(from, { react: { text: '⏳', key: mek.key } });
         const started = Date.now();
         const video = await ytSearch(query);
+        // ALMARI: same video asked again? Send the saved copy instantly.
+        const _videoCacheKey = 'yt-video-' + mediaCache.hash(Buffer.from(String(video.url || '')));
+        const _videoCached = mediaCache.get(_videoCacheKey);
+        if (_videoCached) {
+            await sendWithRetry(conn, from, { video: fs.readFileSync(_videoCached), mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
+            await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
+            console.log('[YTMP4] almari (cache) hit - sent instantly');
+            return;
+        }
         // Fast primary: let WhatsApp fetch the verified CDN URL directly.
         // If an upload node rejects it, use the working streamed-file fallback.
         try {
@@ -1291,6 +1315,7 @@ async (conn, mek, m, { reply, args, from }) => {
                 const videoCaption = dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬');
                 try {
                     const mediaUrl = await getAdeelVideoLink(video.url);
+                    mediaCache.fillFromUrl(_videoCacheKey, mediaUrl);
                     await sendWithRetry(conn, from, {
                         video: { url: mediaUrl },
                         mimetype: 'video/mp4',
@@ -1309,6 +1334,7 @@ async (conn, mek, m, { reply, args, from }) => {
                             contextInfo: chanCtx()
                         }, { quoted: fakevCard });
                     } finally {
+                        try { mediaCache.putFile(_videoCacheKey, media.filePath); } catch {}
                         try { if (fs.existsSync(media.filePath)) fs.unlinkSync(media.filePath); } catch {}
                     }
                 }
@@ -1327,6 +1353,7 @@ async (conn, mek, m, { reply, args, from }) => {
                 const videoCaption = dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬');
                 try {
                     const mediaUrl = await getEliteVideoLink(video.url);
+                    mediaCache.fillFromUrl(_videoCacheKey, mediaUrl);
                     await sendWithRetry(conn, from, {
                         video: { url: mediaUrl },
                         mimetype: 'video/mp4',
@@ -1345,6 +1372,7 @@ async (conn, mek, m, { reply, args, from }) => {
                             contextInfo: chanCtx()
                         }, { quoted: fakevCard });
                     } finally {
+                        try { mediaCache.putFile(_videoCacheKey, media.filePath); } catch {}
                         try { if (fs.existsSync(media.filePath)) fs.unlinkSync(media.filePath); } catch {}
                     }
                 }
@@ -1364,6 +1392,7 @@ async (conn, mek, m, { reply, args, from }) => {
             await heavyQueue.run(async () => {
                 const buffer = await raceVideoMedia(video.url);
                 await sendWithRetry(conn, from, { video: buffer, mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
+                try { mediaCache.put(_videoCacheKey, buffer); } catch {}
                 await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
             }, async position => {
                 await replyWithRetry(conn, from, mek, `⏳ Download queue position: #${position}`);
@@ -1377,6 +1406,7 @@ async (conn, mek, m, { reply, args, from }) => {
             await dlVideo(video.url, outPath);
             if (!fs.existsSync(outPath)) throw new Error('No video file produced');
             await sendWithRetry(conn, from, { video: fs.readFileSync(outPath), mimetype: 'video/mp4', caption: dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬'), contextInfo: chanCtx() }, { quoted: fakevCard });
+            try { mediaCache.putFile(_videoCacheKey, outPath); } catch {}
             try { fs.unlinkSync(outPath); } catch {}
             await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
         }, async position => {
