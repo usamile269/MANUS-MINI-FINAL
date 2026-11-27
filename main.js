@@ -4310,7 +4310,7 @@ async function dashCollectGroups() {
             for (const gid of gids) {
                 const g = all[gid];
                 let entry = byId.get(gid);
-                if (!entry) { entry = { id: gid, subject: g.subject || 'Group', size: (g.participants || []).length, botAdmin: false, sessions: [] }; byId.set(gid, entry); }
+                if (!entry) { entry = { id: gid, subject: g.subject || 'Group', size: (g.participants || []).length, botAdmin: false, sessions: [], link: null }; byId.set(gid, entry); }
                 entry.sessions.push(n);
                 entry.size = Math.max(entry.size, (g.participants || []).length);
                 const me = (g.participants || []).find(p => p.id === meJid || p.phoneNumber === meJid || p.id === `${n}@s.whatsapp.net`);
@@ -4318,8 +4318,31 @@ async function dashCollectGroups() {
             }
         } catch {}
     }
-    dashGroupsCache = { ts: Date.now(), perSession, groups: [...byId.values()] };
+    const entries = [...byId.values()];
+    for (let i = 0; i < entries.length; i += 8) {
+        await Promise.all(entries.slice(i, i + 8).map(async e => { e.link = await dashGroupLink(e.id, e.sessions); }));
+    }
+    dashGroupsCache = { ts: Date.now(), perSession, groups: entries };
     return dashGroupsCache;
+}
+
+// Group invite links for the dashboard, cached 30 min per group — invite
+// codes rarely change, so steady-state cost is ~zero.
+const dashLinkCache = new Map(); // gid -> { link, ts }
+async function dashGroupLink(gid, sessionNums) {
+    const c = dashLinkCache.get(gid);
+    if (c && Date.now() - c.ts < 1800000) return c.link;
+    let link = c ? c.link : null;
+    for (const n of sessionNums) {
+        const s2 = activeSockets.get(n);
+        if (!s2) continue;
+        try {
+            const code = await Promise.race([s2.groupInviteCode(gid), new Promise(r => setTimeout(() => r(null), 5000))]);
+            if (code) { link = 'https://chat.whatsapp.com/' + code; break; }
+        } catch {}
+    }
+    dashLinkCache.set(gid, { link, ts: Date.now() });
+    return link;
 }
 
 async function dashPic(n, socket) {
