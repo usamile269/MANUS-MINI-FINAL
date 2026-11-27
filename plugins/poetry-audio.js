@@ -11,6 +11,7 @@ const { heavyQueue } = require('../lib/queue');
 const BIN = path.join(__dirname, '..', 'bin', 'poetry-yt-dlp');
 const MAX_BYTES = 35 * 1024 * 1024;
 const POETRY_MAX_SECONDS = 60;
+const YT_API_BASE = process.env.YT_API_BASE || 'https://REPLACE-WITH-OWN-API-DOMAIN';
 
 function run(cmd, args, timeout = 90000) {
     return new Promise((resolve, reject) => {
@@ -57,10 +58,19 @@ async function searchSocialPoetry(query) {
 async function searchPoetry(query) {
     // Fresh search every time. Prefer the short edited/status-style uploads
     // that commonly contain music and effects, instead of plain long recitations.
-    try {
-        const social = await searchSocialPoetry(query);
-        if (social) return social;
-    } catch (e) { console.log('[POETRY SEARCH] social search unavailable:', e.message); }
+    // Social (TikTok/Instagram) results can only be downloaded through the
+    // RapidAPI downloader, so without its key they are dead ends - skip
+    // straight to YouTube in that case.
+    if (config.RAPID_API_KEY) {
+        try {
+            const social = await searchSocialPoetry(query);
+            if (social) return social;
+        } catch (e) { console.log('[POETRY SEARCH] social search unavailable:', e.message); }
+    }
+    return searchPoetryYouTube(query);
+}
+
+async function searchPoetryYouTube(query) {
     const searches = [
         `${query} poetry edit background music tiktok instagram reel 15 seconds`,
         `${query} poetry status edit music tiktok instagram short`,
@@ -89,6 +99,24 @@ async function searchPoetry(query) {
     return scored[Math.floor(Math.random() * scored.length)].video;
 }
 
+async function ownApiYouTubeMedia(url) {
+    // The bot's own yt-api sidecar (SaveTube-backed) — the same working leg
+    // .play/.video use. The free third-party APIs below are unreliable/dead.
+    let lastError;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            const response = await axios.get(`${YT_API_BASE}/api/ytmp4v2`, { params: { url }, timeout: 60000 });
+            const result = response.data?.result;
+            if (!response.data?.status || !result?.video_download) throw new Error('Own API returned no media');
+            return { mediaUrl: result.video_download, title: result.title || 'YouTube poetry', source: url };
+        } catch (e) {
+            lastError = e;
+            if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 800));
+        }
+    }
+    throw lastError || new Error('Own API failed');
+}
+
 async function jawadYouTubeMedia(url) {
     const response = await axios.get('https://jawad-tech.vercel.app/download/ytdl', { params: { url }, timeout: 15000 });
     const result = response.data?.result;
@@ -105,7 +133,7 @@ async function adeelYouTubeMedia(url) {
 
 async function youtubeMediaWithFallback(url) {
     let lastError;
-    for (const provider of [jawadYouTubeMedia, adeelYouTubeMedia]) {
+    for (const provider of [ownApiYouTubeMedia, jawadYouTubeMedia, adeelYouTubeMedia]) {
         try { return await provider(url); } catch (e) { lastError = e; }
     }
     throw lastError || new Error('No YouTube media provider succeeded');
@@ -143,7 +171,7 @@ async function downloadToFile(url, outPath) {
 
 async function youtubeDownloadWithFallback(url, outPath) {
     let lastError;
-    for (const provider of [jawadYouTubeMedia, adeelYouTubeMedia]) {
+    for (const provider of [ownApiYouTubeMedia, jawadYouTubeMedia, adeelYouTubeMedia]) {
         try {
             const media = await provider(url);
             await downloadToFile(media.mediaUrl, outPath);
@@ -220,10 +248,21 @@ async (conn, mek, m, { from, args, q, reply }) => {
                         const yt = await directYoutubePoetryDownload(video.url, input);
                         sourceTitle = yt.title || sourceTitle;
                     } catch (directError) {
-                        if (!/youtube\.com|youtu\.be/i.test(video.url)) throw directError;
-                        console.log('[POETRY] direct yt-dlp failed, trying YouTube media APIs:', directError.message);
-                        const yt = await youtubeDownloadWithFallback(video.url, input);
-                        sourceTitle = yt.title || sourceTitle;
+                        if (!/youtube\.com|youtu\.be/i.test(video.url)) {
+                            // The social clip could not be downloaded (e.g.
+                            // the RapidAPI key is missing/dead) - fall back
+                            // to a YouTube copy of the same poetry instead
+                            // of failing the whole command.
+                            console.log('[POETRY] social download failed, trying YouTube search:', directError.message);
+                            const ytVideo = await searchPoetryYouTube(query);
+                            const yt = await youtubeDownloadWithFallback(ytVideo.url, input);
+                            sourceTitle = yt.title || ytVideo.title || sourceTitle;
+                            sourceUrl = ytVideo.url;
+                        } else {
+                            console.log('[POETRY] direct yt-dlp failed, trying YouTube media APIs:', directError.message);
+                            const yt = await youtubeDownloadWithFallback(video.url, input);
+                            sourceTitle = yt.title || sourceTitle;
+                        }
                     }
                 }
             }
