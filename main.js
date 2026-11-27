@@ -4399,14 +4399,24 @@ async function dashPic(n, socket) {
     return url;
 }
 
-router.get('/dashboard', adminRateLimit, async (req, res) => {
-    const provided = req.query.apikey || req.headers['x-api-key'];
-    const authed = (config.PAIR_API_KEY && provided === config.PAIR_API_KEY) ||
-                   (provided && provided === config.ADMIN_PANEL_KEY);
+// ── Dashboard snapshot: the full payload is rebuilt in the BACKGROUND
+// every 60s and persisted to jsondb, so /dashboard answers instantly
+// (unlock in ~1-2s) even right after a restart. The page auto-refreshes
+// every 30s anyway, so the data is never more than ~a minute old.
+const DashSnapshotDB = require('./lib/jsondb').model('DashSnapshot');
+let dashSnapshot = null;
+let dashLastPersist = 0;
+(async () => {
+    try {
+        const docs = await DashSnapshotDB.find({});
+        const d = (docs || []).find(x => x && x.key === 'latest');
+        if (d && d.payload) dashSnapshot = d.payload;
+    } catch {}
+})();
+
+async function dashBuildPayload() {
     const connected = getConnectedNumbers();
     const connecting = getConnectingNumbers();
-    if (!authed) return res.json({ status: 'active', connected: connected.length, connecting: connecting.length });
-    try {
         const known = await Promise.resolve().then(() => getAllNumbersFromMongoDB()).catch(() => []);
         const allNumbers = [...new Set([...(known || []), ...activeSockets.keys()])]
             .map(x => String(x).replace(/[^0-9]/g, '')).filter(Boolean);
@@ -4466,7 +4476,7 @@ router.get('/dashboard', adminRateLimit, async (req, res) => {
         }
         const owner = { name: 'Ahmad', number: config.OWNER_NUMBER, pic: ownerPicEnt.url };
         const mem = process.memoryUsage();
-        res.json({
+        return {
             status: 'success',
             generatedAt: new Date().toISOString(),
             bot: { uptime: Math.round(process.uptime()), rssMB: Math.round(mem.rss / 1048576), build: process.env.RAILWAY_GIT_COMMIT_SHA || null },
@@ -4478,8 +4488,40 @@ router.get('/dashboard', adminRateLimit, async (req, res) => {
                 groupMembers: groups.reduce((s, g) => s + (g.size || 0), 0)
             },
             owner, sessions, groups, channels, feed, uptime7d
-        });
-    } catch (e) { res.status(500).json({ status: 'error', message: 'Dashboard unavailable' }); }
+        };
+}
+
+let dashBuilding = false;
+async function dashRefreshSnapshot() {
+    if (dashBuilding) return;
+    dashBuilding = true;
+    try {
+        const p = await dashBuildPayload();
+        if (p && p.status === 'success') {
+            dashSnapshot = p;
+            if (Date.now() - dashLastPersist > 300000) {
+                dashLastPersist = Date.now();
+                DashSnapshotDB.findOneAndUpdate({ key: 'latest' }, { $set: { payload: p, ts: Date.now() } }, { upsert: true }).catch(() => {});
+            }
+        }
+    } catch {} finally { dashBuilding = false; }
+}
+setTimeout(dashRefreshSnapshot, 25000).unref?.();
+setInterval(dashRefreshSnapshot, 60000).unref?.();
+
+router.get('/dashboard', adminRateLimit, async (req, res) => {
+    const provided = req.query.apikey || req.headers['x-api-key'];
+    const authed = (config.PAIR_API_KEY && provided === config.PAIR_API_KEY) ||
+                   (provided && provided === config.ADMIN_PANEL_KEY);
+    const connected = getConnectedNumbers();
+    const connecting = getConnectingNumbers();
+    if (!authed) return res.json({ status: 'active', connected: connected.length, connecting: connecting.length });
+    if (dashSnapshot) return res.json(dashSnapshot);
+    try {
+        const p = await dashBuildPayload();
+        dashSnapshot = p;
+        return res.json(p);
+    } catch (e) { return res.status(500).json({ status: 'error', message: 'Dashboard unavailable' }); }
 });
 
 // QUICK MESSAGE (2026-11-27): the owner dashboard sends ONE WhatsApp
