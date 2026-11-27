@@ -4401,6 +4401,20 @@ router.get('/dashboard', adminRateLimit, async (req, res) => {
         const daily = await DashDailyDB.find({});
         const uptime7d = daily.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(-7)
             .map(d => ({ date: d.date, pct: d.samples ? Math.round((d.online / d.samples) * 100) : null }));
+        // Owner branding for the dashboard header: his WhatsApp profile
+        // pic, fetched through any connected session (1h cache).
+        let ownerPicEnt = dashPicCache.get('__owner');
+        if (!ownerPicEnt || Date.now() - ownerPicEnt.ts > 3600000) {
+            let url = null;
+            for (const n of connected) {
+                const s2 = activeSockets.get(n);
+                if (!s2) continue;
+                try { url = await s2.profilePictureUrl(config.OWNER_NUMBER + '@s.whatsapp.net', 'image'); if (url) break; } catch {}
+            }
+            ownerPicEnt = { url, ts: Date.now() };
+            dashPicCache.set('__owner', ownerPicEnt);
+        }
+        const owner = { name: 'Ahmad', number: config.OWNER_NUMBER, pic: ownerPicEnt.url };
         const mem = process.memoryUsage();
         res.json({
             status: 'success',
@@ -4413,7 +4427,7 @@ router.get('/dashboard', adminRateLimit, async (req, res) => {
                 groups: groups.length,
                 groupMembers: groups.reduce((s, g) => s + (g.size || 0), 0)
             },
-            sessions, groups, feed, uptime7d
+            owner, sessions, groups, feed, uptime7d
         });
     } catch (e) { res.status(500).json({ status: 'error', message: 'Dashboard unavailable' }); }
 });
