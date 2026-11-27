@@ -4296,33 +4296,45 @@ let dashGroupsCache = { ts: 0, perSession: {}, groups: [] };
 const dashPicCache = new Map(); // number -> { url, ts }
 
 async function dashCollectGroups() {
-    if (Date.now() - dashGroupsCache.ts < 120000) return dashGroupsCache;
+    if (Date.now() - dashGroupsCache.ts < 120000) {
+        for (const e of dashGroupsCache.groups) { const c = dashLinkCache.get(e.id); if (c && c.link) e.link = c.link; }
+        return dashGroupsCache;
+    }
     const perSession = {};
     const byId = new Map();
-    for (const n of getConnectedNumbers()) {
-        const socket = activeSockets.get(n);
-        if (!socket) continue;
-        try {
-            const all = await socket.groupFetchAllParticipating();
-            const gids = Object.keys(all || {});
-            perSession[n] = gids;
-            const meJid = jidNormalizedUser(socket.user.id);
-            for (const gid of gids) {
-                const g = all[gid];
-                let entry = byId.get(gid);
-                if (!entry) { entry = { id: gid, subject: g.subject || 'Group', size: (g.participants || []).length, botAdmin: false, sessions: [], link: null }; byId.set(gid, entry); }
-                entry.sessions.push(n);
-                entry.size = Math.max(entry.size, (g.participants || []).length);
-                const me = (g.participants || []).find(p => p.id === meJid || p.phoneNumber === meJid || p.id === `${n}@s.whatsapp.net`);
-                if (me && me.admin) entry.botAdmin = true;
-            }
-        } catch {}
+    const nums = getConnectedNumbers();
+    for (let i = 0; i < nums.length; i += 6) {
+        await Promise.all(nums.slice(i, i + 6).map(async n => {
+            const socket = activeSockets.get(n);
+            if (!socket) return;
+            try {
+                const all = await Promise.race([socket.groupFetchAllParticipating(), new Promise(r => setTimeout(() => r(null), 8000))]);
+                if (!all) return;
+                const gids = Object.keys(all || {});
+                perSession[n] = gids;
+                const meJid = jidNormalizedUser(socket.user.id);
+                for (const gid of gids) {
+                    const g = all[gid];
+                    let entry = byId.get(gid);
+                    if (!entry) { entry = { id: gid, subject: g.subject || 'Group', size: (g.participants || []).length, botAdmin: false, sessions: [], link: null }; byId.set(gid, entry); }
+                    entry.sessions.push(n);
+                    entry.size = Math.max(entry.size, (g.participants || []).length);
+                    const me = (g.participants || []).find(p => p.id === meJid || p.phoneNumber === meJid || p.id === `${n}@s.whatsapp.net`);
+                    if (me && me.admin) entry.botAdmin = true;
+                }
+            } catch {}
+        }));
     }
     const entries = [...byId.values()];
-    for (let i = 0; i < entries.length; i += 8) {
-        await Promise.all(entries.slice(i, i + 8).map(async e => { e.link = await dashGroupLink(e.id, e.sessions); }));
-    }
+    for (const e of entries) { const c = dashLinkCache.get(e.id); if (c) e.link = c.link; }
     dashGroupsCache = { ts: Date.now(), perSession, groups: entries };
+    // Invite links warm up in the BACKGROUND — the dashboard never waits on
+    // them; they appear on the next auto-refresh once fetched.
+    (async () => {
+        for (let i = 0; i < entries.length; i += 8) {
+            await Promise.all(entries.slice(i, i + 8).map(async e => { e.link = await dashGroupLink(e.id, e.sessions); }));
+        }
+    })().catch(() => {});
     return dashGroupsCache;
 }
 
@@ -4338,12 +4350,11 @@ async function dashCollectChannels(connected) {
     const jids = [...new Set([...follow, ...post])].filter(j => /@newsletter$/.test(j));
     let sock = null;
     for (const n of connected) { const s = activeSockets.get(n); if (s && connectionOpenState.get(n) === true) { sock = s; break; } }
-    const list = [];
-    for (const jid of jids) {
+    const list = await Promise.all(jids.map(async jid => {
         const ch = { jid, name: null, pic: null, subscribers: null, link: null, autoFollow: follow.includes(jid), autoPost: post.includes(jid) };
         if (sock) {
             try {
-                const meta = await sock.newsletterMetadata('jid', jid);
+                const meta = await Promise.race([sock.newsletterMetadata('jid', jid), new Promise(r => setTimeout(() => r(null), 6000))]);
                 if (meta) {
                     ch.name = (meta.name && meta.name.text) || meta.name || meta.thread_metadata?.name?.text || null;
                     const subs = meta.subscribers ?? meta.subscribers_count ?? meta.thread_metadata?.subscribers_count?.value ?? meta.thread_metadata?.subscribers_count;
@@ -4352,10 +4363,10 @@ async function dashCollectChannels(connected) {
                     if (code) ch.link = 'https://whatsapp.com/channel/' + code;
                 }
             } catch {}
-            try { ch.pic = await sock.profilePictureUrl(jid, 'image'); } catch {}
+            try { ch.pic = await Promise.race([sock.profilePictureUrl(jid, 'image'), new Promise(r => setTimeout(() => r(null), 5000))]); } catch {}
         }
-        list.push(ch);
-    }
+        return ch;
+    }));
     dashChannelsCache = { ts: Date.now(), list };
     return list;
 }
@@ -4383,7 +4394,7 @@ async function dashPic(n, socket) {
     const c = dashPicCache.get(n);
     if (c && Date.now() - c.ts < 3600000) return c.url;
     let url = null;
-    try { url = await socket.profilePictureUrl(jidNormalizedUser(socket.user.id), 'image'); } catch {}
+    try { url = await Promise.race([socket.profilePictureUrl(jidNormalizedUser(socket.user.id), 'image'), new Promise(r => setTimeout(() => r(null), 5000))]); } catch {}
     dashPicCache.set(n, { url, ts: Date.now() });
     return url;
 }
@@ -4413,7 +4424,7 @@ router.get('/dashboard', adminRateLimit, async (req, res) => {
             sessions.push({
                 number: n,
                 name: (socket && socket.user && socket.user.name) || null,
-                pic: socket && isConn ? await dashPic(n, socket) : null,
+                pic: null,
                 connected: isConn,
                 connecting: !!socket && !isConn,
                 since: openedAt ? new Date(openedAt).toISOString() : null,
@@ -4425,6 +4436,10 @@ router.get('/dashboard', adminRateLimit, async (req, res) => {
                 health: !isConn ? 'Offline' : ((drops[n] || 0) >= 3 ? 'Kamzor' : 'Stable')
             });
         }
+        await Promise.all(sessions.map(async s => {
+            const socket = activeSockets.get(s.number);
+            if (socket && s.connected) s.pic = await dashPic(s.number, socket);
+        }));
         sessions.sort((a, b) => (b.connected - a.connected) || a.number.localeCompare(b.number));
         const groupSubject = {};
         for (const g of groups) groupSubject[g.id] = g.subject;
