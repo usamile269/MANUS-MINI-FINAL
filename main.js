@@ -4432,6 +4432,35 @@ router.get('/dashboard', adminRateLimit, async (req, res) => {
     } catch (e) { res.status(500).json({ status: 'error', message: 'Dashboard unavailable' }); }
 });
 
+// QUICK MESSAGE (2026-11-27): the owner dashboard sends ONE WhatsApp
+// message from a chosen connected session to any number (any country)
+// or group. Key-gated exactly like /connect-all.
+router.post('/dashboard-send', requireAdminOrApiKey, adminRateLimit, express.json(), async (req, res) => {
+    const from = String((req.body && req.body.from) || '').replace(/[^0-9]/g, '');
+    const toRaw = String((req.body && req.body.to) || '').trim();
+    const text = String((req.body && req.body.text) || '').trim().slice(0, 4000);
+    if (!from || !toRaw || !text) return res.status(400).json({ status: 'error', message: 'from, to and text are required' });
+    const socket = activeSockets.get(from);
+    if (!socket || connectionOpenState.get(from) !== true) return res.status(400).json({ status: 'error', message: 'Sender number is not connected' });
+    let jid;
+    if (toRaw.endsWith('@g.us') || toRaw.endsWith('@newsletter')) {
+        jid = toRaw;
+    } else {
+        const num = toRaw.replace(/[^0-9]/g, '');
+        if (num.length < 7) return res.status(400).json({ status: 'error', message: 'Invalid target number' });
+        jid = num + '@s.whatsapp.net';
+        try {
+            const [r] = await socket.onWhatsApp(num);
+            if (!r || !r.exists) return res.status(400).json({ status: 'error', message: 'That number is not on WhatsApp' });
+            jid = r.jid;
+        } catch {}
+    }
+    try {
+        await socket.sendMessage(jid, { text });
+        return res.json({ status: 'success', to: jid });
+    } catch (e) { return res.status(500).json({ status: 'error', message: 'Send failed' }); }
+});
+
 router.get('/stats', async (req, res) => {
     const { number } = req.query;
     if (!number) return res.status(400).json({ error: 'Number required' });
