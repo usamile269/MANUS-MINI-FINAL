@@ -829,6 +829,8 @@ function setupAutoRestart(socket, number) {
     socket.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
         lastActivityAt.set(sanitizedNumber, Date.now());
+        if (connection === 'open') dashRecord({ type: 'connect', number: sanitizedNumber });
+        if (connection === 'close') dashRecord({ type: 'disconnect', number: sanitizedNumber, code: (lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode) || null });
         if (connection === 'close') {
             const statusCode = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode;
             const errorMessage = lastDisconnect && lastDisconnect.error && lastDisconnect.error.message;
@@ -3509,6 +3511,7 @@ async function ahmadPair(number, res = null) {
                     // are swallowed the same way incrementStats already
                     // swallows/logs its own internally.
                     incrementStats(sanitizedNumber, 'commandsUsed').catch(() => {});
+                    dashRecord({ type: 'cmd', number: sanitizedNumber, cmd: command, chat: from, sender: String(sender || '').replace(/[^0-9]/g, '') || null });
                     // 🚨 FEATURE: per-command usage tracking for .topcmds — reuses
                     // the same per-day Stats doc/collection (Mongo-backed when
                     // MONGODB_URI is set), just adds one more counter field per
@@ -4252,6 +4255,146 @@ router.get('/verify-otp', otpRateLimit, async (req, res) => {
     if (socket) await socket.sendMessage(jidNormalizedUser(socket.user.id), { text: '*✅ CONFIG UPDATED*' });
     res.json({ status: 'success' });
 });
+// ═══════════════════════════════════════════════════════════════════
+// ADMIN WEB DASHBOARD (2026-11-27): data feed for the owner dashboard on
+// the pairing site — sessions with live status, groups, a recent activity
+// feed and 7-day uptime. Same API-key check as /status: public callers
+// only ever see counts, the full payload needs the key.
+// ═══════════════════════════════════════════════════════════════════
+const DashEventsDB = require('./lib/jsondb').model('DashEvents');
+const DashDailyDB = require('./lib/jsondb').model('DashDaily');
+const DASH_EVENT_CAP = 400;
+let dashRecordCount = 0;
+
+function dashRecord(ev) {
+    try {
+        DashEventsDB.create({ ts: Date.now(), ...ev }).catch(() => {});
+        dashRecordCount += 1;
+        if (dashRecordCount % 50 === 0) {
+            (async () => {
+                const all = await DashEventsDB.find({});
+                if (all.length > DASH_EVENT_CAP) {
+                    const old = all.slice().sort((a, b) => a.ts - b.ts).slice(0, all.length - DASH_EVENT_CAP);
+                    for (const o of old) await DashEventsDB.deleteOne({ _id: o._id });
+                }
+            })().catch(() => {});
+        }
+    } catch {}
+}
+
+// Per-day online sampler for the 7-day uptime chart: one sample a minute,
+// "online" = at least one session genuinely connected.
+setInterval(async () => {
+    try {
+        const date = new Date().toISOString().slice(0, 10);
+        const online = getConnectedNumbers().length > 0 ? 1 : 0;
+        await DashDailyDB.findOneAndUpdate({ date }, { $inc: { samples: 1, online } }, { upsert: true });
+    } catch {}
+}, 60 * 1000).unref?.();
+
+let dashGroupsCache = { ts: 0, perSession: {}, groups: [] };
+const dashPicCache = new Map(); // number -> { url, ts }
+
+async function dashCollectGroups() {
+    if (Date.now() - dashGroupsCache.ts < 120000) return dashGroupsCache;
+    const perSession = {};
+    const byId = new Map();
+    for (const n of getConnectedNumbers()) {
+        const socket = activeSockets.get(n);
+        if (!socket) continue;
+        try {
+            const all = await socket.groupFetchAllParticipating();
+            const gids = Object.keys(all || {});
+            perSession[n] = gids;
+            const meJid = jidNormalizedUser(socket.user.id);
+            for (const gid of gids) {
+                const g = all[gid];
+                let entry = byId.get(gid);
+                if (!entry) { entry = { id: gid, subject: g.subject || 'Group', size: (g.participants || []).length, botAdmin: false, sessions: [] }; byId.set(gid, entry); }
+                entry.sessions.push(n);
+                entry.size = Math.max(entry.size, (g.participants || []).length);
+                const me = (g.participants || []).find(p => p.id === meJid || p.phoneNumber === meJid || p.id === `${n}@s.whatsapp.net`);
+                if (me && me.admin) entry.botAdmin = true;
+            }
+        } catch {}
+    }
+    dashGroupsCache = { ts: Date.now(), perSession, groups: [...byId.values()] };
+    return dashGroupsCache;
+}
+
+async function dashPic(n, socket) {
+    const c = dashPicCache.get(n);
+    if (c && Date.now() - c.ts < 3600000) return c.url;
+    let url = null;
+    try { url = await socket.profilePictureUrl(jidNormalizedUser(socket.user.id), 'image'); } catch {}
+    dashPicCache.set(n, { url, ts: Date.now() });
+    return url;
+}
+
+router.get('/dashboard', adminRateLimit, async (req, res) => {
+    const provided = req.query.apikey || req.headers['x-api-key'];
+    const authed = (config.PAIR_API_KEY && provided === config.PAIR_API_KEY) ||
+                   (provided && provided === config.ADMIN_PANEL_KEY);
+    const connected = getConnectedNumbers();
+    const connecting = getConnectingNumbers();
+    if (!authed) return res.json({ status: 'active', connected: connected.length, connecting: connecting.length });
+    try {
+        const known = await Promise.resolve().then(() => getAllNumbersFromMongoDB()).catch(() => []);
+        const allNumbers = [...new Set([...(known || []), ...activeSockets.keys()])]
+            .map(x => String(x).replace(/[^0-9]/g, '')).filter(Boolean);
+        const { perSession, groups } = await dashCollectGroups();
+        const events = await DashEventsDB.find({});
+        const dayAgo = Date.now() - 24 * 3600 * 1000;
+        const drops = {};
+        for (const e of events) if (e.type === 'disconnect' && e.ts > dayAgo) drops[e.number] = (drops[e.number] || 0) + 1;
+        const sessions = [];
+        for (const n of allNumbers) {
+            const socket = activeSockets.get(n);
+            const isConn = connectionOpenState.get(n) === true;
+            const openedAt = connectionOpenedAt.get(n) || socketCreationTime.get(n) || null;
+            sessions.push({
+                number: n,
+                name: (socket && socket.user && socket.user.name) || null,
+                pic: socket && isConn ? await dashPic(n, socket) : null,
+                connected: isConn,
+                connecting: !!socket && !isConn,
+                since: openedAt ? new Date(openedAt).toISOString() : null,
+                uptimeSec: openedAt && isConn ? Math.floor((Date.now() - openedAt) / 1000) : 0,
+                lastActivity: lastActivityAt.get(n) ? new Date(lastActivityAt.get(n)).toISOString() : null,
+                groupCount: (perSession[n] || []).length,
+                groups: perSession[n] || [],
+                drops24h: drops[n] || 0,
+                health: !isConn ? 'Offline' : ((drops[n] || 0) >= 3 ? 'Kamzor' : 'Stable')
+            });
+        }
+        sessions.sort((a, b) => (b.connected - a.connected) || a.number.localeCompare(b.number));
+        const groupSubject = {};
+        for (const g of groups) groupSubject[g.id] = g.subject;
+        const feed = events.slice().sort((a, b) => b.ts - a.ts).slice(0, 30).map(e => ({
+            ts: new Date(e.ts).toISOString(), type: e.type, number: e.number || null,
+            cmd: e.cmd || null, sender: e.sender || null,
+            chat: e.chat ? (groupSubject[e.chat] || (e.chat.endsWith('@g.us') ? 'Group' : 'DM')) : null
+        }));
+        const daily = await DashDailyDB.find({});
+        const uptime7d = daily.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(-7)
+            .map(d => ({ date: d.date, pct: d.samples ? Math.round((d.online / d.samples) * 100) : null }));
+        const mem = process.memoryUsage();
+        res.json({
+            status: 'success',
+            generatedAt: new Date().toISOString(),
+            bot: { uptime: Math.round(process.uptime()), rssMB: Math.round(mem.rss / 1048576), build: process.env.RAILWAY_GIT_COMMIT_SHA || null },
+            totals: {
+                sessions: allNumbers.length,
+                connected: connected.length,
+                connecting: connecting.length,
+                groups: groups.length,
+                groupMembers: groups.reduce((s, g) => s + (g.size || 0), 0)
+            },
+            sessions, groups, feed, uptime7d
+        });
+    } catch (e) { res.status(500).json({ status: 'error', message: 'Dashboard unavailable' }); }
+});
+
 router.get('/stats', async (req, res) => {
     const { number } = req.query;
     if (!number) return res.status(400).json({ error: 'Number required' });
