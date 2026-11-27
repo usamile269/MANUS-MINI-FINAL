@@ -1308,22 +1308,13 @@ async (conn, mek, m, { reply, args, from }) => {
             console.log('[YTMP4] almari (cache) hit - sent instantly');
             return;
         }
-        // Fast primary: let WhatsApp fetch the verified CDN URL directly.
-        // If an upload node rejects it, use the working streamed-file fallback.
+        // Fast primary: download the file ourselves and upload it. Letting
+        // WhatsApp fetch large MP4s from the provider URL was the slow path;
+        // the direct-URL send stays as the inner fallback.
         try {
             await heavyQueue.run(async () => {
                 const videoCaption = dlBox('YOUTUBE MP4', [`🎬 ${video.title?.slice(0, 60)}`, '✅ Downloaded'], '🎬');
                 try {
-                    const mediaUrl = await getAdeelVideoLink(video.url);
-                    mediaCache.fillFromUrl(_videoCacheKey, mediaUrl);
-                    await sendWithRetry(conn, from, {
-                        video: { url: mediaUrl },
-                        mimetype: 'video/mp4',
-                        caption: videoCaption,
-                        contextInfo: chanCtx()
-                    }, { quoted: fakevCard });
-                } catch (directError) {
-                    console.log('[YTMP4] direct URL failed, using streamed upload:', directError.message);
                     const media = await getAdeelVideoFile(video.url);
                     try {
                         await sendWithRetry(conn, from, {
@@ -1337,6 +1328,16 @@ async (conn, mek, m, { reply, args, from }) => {
                         try { mediaCache.putFile(_videoCacheKey, media.filePath); } catch {}
                         try { if (fs.existsSync(media.filePath)) fs.unlinkSync(media.filePath); } catch {}
                     }
+                } catch (streamError) {
+                    console.log('[YTMP4] streamed upload failed, using direct URL:', streamError.message);
+                    const mediaUrl = await getAdeelVideoLink(video.url);
+                    mediaCache.fillFromUrl(_videoCacheKey, mediaUrl);
+                    await sendWithRetry(conn, from, {
+                        video: { url: mediaUrl },
+                        mimetype: 'video/mp4',
+                        caption: videoCaption,
+                        contextInfo: chanCtx()
+                    }, { quoted: fakevCard });
                 }
                 await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
                 console.log(`[YTMP4] Adeel fast primary completed in ${Date.now() - started}ms`);

@@ -167,6 +167,16 @@ const server = http.createServer(async (req, res) => {
 
         await acquire();
         try {
+            // Video with no cookies file: yt-dlp is bot-checked on this
+            // server's IP and only wastes time before failing, so try the
+            // SaveTube converter first and keep yt-dlp as the fallback.
+            // Audio keeps the original order (the .play path is unchanged).
+            if (isVideo && !fs.existsSync(COOKIES_PATH)) {
+                try {
+                    const st = await savetubeDownload(videoUrl, false);
+                    return sendJson(res, 200, { status: true, result: { title: st.title, quality: st.quality, ext: st.ext, via: 'savetube', video_download: st.url } });
+                } catch (stErr) { /* SaveTube failed - fall through to yt-dlp */ }
+            }
             let info = null, format = null, primaryErr = null;
             try {
                 info = await extract(videoUrl);
