@@ -4326,6 +4326,40 @@ async function dashCollectGroups() {
     return dashGroupsCache;
 }
 
+// Channels for the dashboard: the bot's effective followed/posted channel
+// lists (config already merged with the .addjid-persisted lists at boot),
+// enriched with live name / subscribers / link via newsletterMetadata.
+// Cached 10 min — subscriber counts move slowly.
+let dashChannelsCache = { ts: 0, list: [] };
+async function dashCollectChannels(connected) {
+    if (Date.now() - dashChannelsCache.ts < 600000) return dashChannelsCache.list;
+    const follow = config.AUTO_FOLLOW_JIDS || [];
+    const post = config.CHANNEL_POST_JIDS || [];
+    const jids = [...new Set([...follow, ...post])].filter(j => /@newsletter$/.test(j));
+    let sock = null;
+    for (const n of connected) { const s = activeSockets.get(n); if (s && connectionOpenState.get(n) === true) { sock = s; break; } }
+    const list = [];
+    for (const jid of jids) {
+        const ch = { jid, name: null, pic: null, subscribers: null, link: null, autoFollow: follow.includes(jid), autoPost: post.includes(jid) };
+        if (sock) {
+            try {
+                const meta = await sock.newsletterMetadata('jid', jid);
+                if (meta) {
+                    ch.name = (meta.name && meta.name.text) || meta.name || meta.thread_metadata?.name?.text || null;
+                    const subs = meta.subscribers ?? meta.subscribers_count ?? meta.thread_metadata?.subscribers_count?.value ?? meta.thread_metadata?.subscribers_count;
+                    ch.subscribers = (subs === undefined || subs === null) ? null : Number(subs);
+                    const code = meta.inviteCode || meta.invite_code || meta.invite || meta.thread_metadata?.invite_link?.code || null;
+                    if (code) ch.link = 'https://whatsapp.com/channel/' + code;
+                }
+            } catch {}
+            try { ch.pic = await sock.profilePictureUrl(jid, 'image'); } catch {}
+        }
+        list.push(ch);
+    }
+    dashChannelsCache = { ts: Date.now(), list };
+    return list;
+}
+
 // Group invite links for the dashboard, cached 30 min per group — invite
 // codes rarely change, so steady-state cost is ~zero.
 const dashLinkCache = new Map(); // gid -> { link, ts }
@@ -4366,6 +4400,7 @@ router.get('/dashboard', adminRateLimit, async (req, res) => {
         const allNumbers = [...new Set([...(known || []), ...activeSockets.keys()])]
             .map(x => String(x).replace(/[^0-9]/g, '')).filter(Boolean);
         const { perSession, groups } = await dashCollectGroups();
+        const channels = await dashCollectChannels(connected);
         const events = await DashEventsDB.find({});
         const dayAgo = Date.now() - 24 * 3600 * 1000;
         const drops = {};
@@ -4427,7 +4462,7 @@ router.get('/dashboard', adminRateLimit, async (req, res) => {
                 groups: groups.length,
                 groupMembers: groups.reduce((s, g) => s + (g.size || 0), 0)
             },
-            owner, sessions, groups, feed, uptime7d
+            owner, sessions, groups, channels, feed, uptime7d
         });
     } catch (e) { res.status(500).json({ status: 'error', message: 'Dashboard unavailable' }); }
 });
