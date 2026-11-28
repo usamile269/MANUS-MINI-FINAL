@@ -73,6 +73,11 @@ const {
     getAllNumbersFromMongoDB,
     saveOTPToMongoDB,
     verifyOTPFromMongoDB,
+    setPanelPassword,
+    verifyPanelLogin,
+    checkPanelPassword,
+    getPanelNumberByToken,
+    getPanelCreatedAt,
     incrementStats,
     getStatsForNumber,
     getRelayTargets,
@@ -3655,6 +3660,23 @@ async function ahmadPair(number, res = null) {
                             const historyKey = `${botNumber}:${sender}`;
                             const hist = aiAutoReplyHistory.get(historyKey) || [];
                             const historyText = hist.map(h => `Them: ${h.u}\nYou: ${h.a}`).join('\n');
+                            // My Panel AI Persona (#59): the owner shaped this
+                            // AI's name / mood / language from the web panel —
+                            // honor it in every auto-reply (config is cached
+                            // in memory, so this read is effectively free).
+                            let personaText = '';
+                            try {
+                                const pcfg = await getUserConfigFromMongoDB(botNumber);
+                                const moodMap = { friendly: 'warm and friendly', funny: 'playful and funny, with light humor', romantic: 'sweet and romantic in tone', serious: 'calm, serious and to the point', shy: 'soft, shy and gentle' };
+                                const bits = [];
+                                if (pcfg.PANEL_AI_NAME) bits.push(`Your name is ${pcfg.PANEL_AI_NAME}. If anyone asks who you are, introduce yourself as ${pcfg.PANEL_AI_NAME}.`);
+                                if (pcfg.PANEL_AI_MOOD && moodMap[pcfg.PANEL_AI_MOOD]) bits.push(`Your personality/mood is ${moodMap[pcfg.PANEL_AI_MOOD]}.`);
+                                if (pcfg.PANEL_AI_CALLME) bits.push(`The account owner's name is ${pcfg.PANEL_AI_CALLME}.`);
+                                if (pcfg.PANEL_AI_LANG && pcfg.PANEL_AI_LANG !== 'auto') bits.push(`The owner chose this reply language: ${pcfg.PANEL_AI_LANG} — prefer it unless the other person clearly writes in another language.`);
+                                if (pcfg.PANEL_AI_STYLE === 'short') bits.push(`Keep replies very short — one or two lines.`);
+                                if (pcfg.PANEL_AI_STYLE === 'detailed') bits.push(`You may reply in a little more detail when it helps.`);
+                                if (bits.length) personaText = bits.join(' ') + '\n';
+                            } catch {}
                             const profileText = (userProfile && (userProfile.name || userProfile.about))
                                 ? `The person you're talking to${userProfile.name ? ` is named ${userProfile.name}` : ''}${userProfile.about ? `. About them: ${userProfile.about}` : ''}. You remember them — address them by name naturally sometimes (not in every message), like a close friend would, and use what you know about them to make the reply feel personal and real. `
                                 : '';
@@ -3663,6 +3685,7 @@ async function ahmadPair(number, res = null) {
                                 `${historyText ? `Recent conversation so far:\n${historyText}\n\n` : ''}` +
                                 `Reply in the SAME language and script they're writing in (English, Roman Urdu, or Urdu script). Keep it natural and reasonably short, like a real WhatsApp reply. ` +
                                 `If the message is about money, sensitive personal matters, or anything you shouldn't just decide on the owner's behalf, don't make promises or invent details — say you'll get back to them personally about it.\n` +
+                                `${personaText}` +
                                 `Their new message: ${body}`;
 
                             // Send the read receipt in the background; do not
@@ -4551,6 +4574,119 @@ router.post('/dashboard-send', requireAdminOrApiKey, adminRateLimit, express.jso
         await socket.sendMessage(jid, { text });
         return res.json({ status: 'success', to: jid });
     } catch (e) { return res.status(500).json({ status: 'error', message: 'Send failed' }); }
+});
+
+// ================= USER PANEL (My Panel) =================
+// Every paired user manages ONLY their own number: login = number + the
+// personal password they get from .panelpass (hashed in PanelUser, token
+// binds to exactly one number server-side). Design/spec:
+// ~/workspace/ahmad-md-user-panel/SPEC.md
+const PANEL_SETTING_KEYS = ['WORK_TYPE', 'BOT_NAME', 'AUTO_TYPING', 'AUTO_RECORDING', 'AUTO_REACT', 'READ_MESSAGE', 'ANTI_CALL', 'AUTO_VIEW_STATUS', 'AUTO_LIKE_STATUS', 'AUTO_STATUS_REPLY', 'AUTO_STATUS_MSG'];
+const PANEL_PERSONA_KEYS = ['PANEL_AI_NAME', 'PANEL_AI_MOOD', 'PANEL_AI_CALLME', 'PANEL_AI_LANG', 'PANEL_AI_STYLE'];
+async function panelAuth(req, res) {
+    const token = String((req.headers['x-panel-token'] || req.query.token || (req.body && req.body.token) || '')).trim();
+    const number = await getPanelNumberByToken(token).catch(() => null);
+    if (!number) { res.status(401).json({ status: 'error', message: 'Session expired — please log in again' }); return null; }
+    return number;
+}
+router.post('/panel-login', adminRateLimit, express.json(), async (req, res) => {
+    const number = String((req.body && req.body.number) || '').replace(/[^0-9]/g, '');
+    const password = String((req.body && req.body.password) || '');
+    if (!number || !password) return res.status(400).json({ status: 'error', message: 'Number and password are required' });
+    try {
+        const out = await verifyPanelLogin(number, password);
+        if (!out) return res.status(401).json({ status: 'error', message: 'Wrong number or password. Send .panelpass to the bot for a fresh password.' });
+        return res.json({ status: 'success', token: out.token, number: out.number });
+    } catch (e) { return res.status(500).json({ status: 'error', message: 'Login failed — try again' }); }
+});
+router.get('/panel-data', adminRateLimit, async (req, res) => {
+    const number = await panelAuth(req, res); if (!number) return;
+    try {
+        const socket = activeSockets.get(number);
+        const connected = !!socket && connectionOpenState.get(number) === true;
+        const st = getConnectionStatus(number);
+        const cfg = await getUserConfigFromMongoDB(number).catch(() => ({}));
+        let name = '', pic = null, groups = [];
+        if (socket) {
+            try { name = socket.user?.name || ''; } catch {}
+            pic = await dashPic(number, socket).catch(() => null);
+            if (connected) {
+                try {
+                    const all = await socket.groupFetchAllParticipating();
+                    groups = Object.values(all || {}).map(g => {
+                        const me = (g.participants || []).find(p => String(p.id || '').split('@')[0].split(':')[0] === number);
+                        return { id: g.id, subject: g.subject || 'Group', size: (g.participants || []).length, meAdmin: !!(me && me.admin), link: null };
+                    }).sort((a, b) => b.size - a.size);
+                    const adminGroups = groups.filter(g => g.meAdmin).slice(0, 25);
+                    await Promise.all(adminGroups.map(async g => { try { g.link = await dashGroupLink(g.id, [number]); } catch {} }));
+                } catch {}
+            }
+        }
+        let usage = null;
+        try { usage = await getStatsForNumber(number); } catch {}
+        const settings = {}; for (const k of PANEL_SETTING_KEYS) settings[k] = cfg[k] !== undefined ? cfg[k] : null;
+        const persona = {}; for (const k of PANEL_PERSONA_KEYS) persona[k] = cfg[k] !== undefined ? cfg[k] : '';
+        const panelSince = await getPanelCreatedAt(number).catch(() => null);
+        return res.json({ status: 'success', generatedAt: new Date().toISOString(), number, name, pic, connected, uptimeSec: st.uptime || 0, connectionTime: st.connectionTime || null, panelSince, settings, persona, groups, usage });
+    } catch (e) { return res.status(500).json({ status: 'error', message: 'Failed to load your panel' }); }
+});
+router.post('/panel-action', adminRateLimit, express.json(), async (req, res) => {
+    const number = await panelAuth(req, res); if (!number) return;
+    const b = req.body || {};
+    const action = String(b.action || '');
+    const socket = activeSockets.get(number);
+    const connected = !!socket && connectionOpenState.get(number) === true;
+    try {
+        if (action === 'settings' || action === 'persona') {
+            const keys = action === 'settings' ? PANEL_SETTING_KEYS : PANEL_PERSONA_KEYS;
+            const incoming = (b.values && typeof b.values === 'object') ? b.values : {};
+            const clean = {};
+            for (const k of keys) if (incoming[k] !== undefined) clean[k] = String(incoming[k]).slice(0, 300);
+            if (clean.WORK_TYPE && !['public', 'private'].includes(clean.WORK_TYPE)) delete clean.WORK_TYPE;
+            if (!Object.keys(clean).length) return res.status(400).json({ status: 'error', message: 'Nothing to save' });
+            await updateUserConfigInMongoDB(number, clean);
+            return res.json({ status: 'success' });
+        }
+        if (action === 'change-password') {
+            const ok = await checkPanelPassword(number, String(b.current || ''));
+            if (!ok) return res.status(401).json({ status: 'error', message: 'Current password is wrong' });
+            const next = String(b.next || '');
+            if (next.length < 6) return res.status(400).json({ status: 'error', message: 'New password must be at least 6 characters' });
+            await setPanelPassword(number, next);
+            return res.json({ status: 'success', message: 'Password changed — please log in again' });
+        }
+        if (!connected) return res.status(400).json({ status: 'error', message: 'Your number is not connected right now' });
+        if (action === 'profile-name') {
+            const name = String(b.name || '').trim().slice(0, 60);
+            if (!name) return res.status(400).json({ status: 'error', message: 'Name is required' });
+            await socket.updateProfileName(name);
+            return res.json({ status: 'success' });
+        }
+        if (action === 'profile-bio') {
+            const bio = String(b.bio || '').trim().slice(0, 139);
+            await socket.updateProfileStatus(bio);
+            return res.json({ status: 'success' });
+        }
+        if (action === 'profile-pic') {
+            const m = String(b.image || '').match(/^data:image\/(jpeg|png|webp);base64,(.+)$/);
+            if (!m) return res.status(400).json({ status: 'error', message: 'Please choose a JPG, PNG or WebP image' });
+            const buf = Buffer.from(m[2], 'base64');
+            if (!buf.length || buf.length > 3 * 1024 * 1024) return res.status(400).json({ status: 'error', message: 'Image is too large (max 3 MB)' });
+            await socket.updateProfilePicture(number + '@s.whatsapp.net', buf);
+            return res.json({ status: 'success' });
+        }
+        if (action === 'create-group') {
+            const name = String(b.name || '').trim().slice(0, 60);
+            const parts = (Array.isArray(b.participants) ? b.participants : []).map(x => String(x).replace(/[^0-9]/g, '')).filter(x => x.length >= 7).slice(0, 50);
+            if (!name) return res.status(400).json({ status: 'error', message: 'Group name is required' });
+            if (!parts.length) return res.status(400).json({ status: 'error', message: 'Add at least one member number' });
+            const g = await socket.groupCreate(name, parts.map(n => n + '@s.whatsapp.net'));
+            let link = null;
+            try { link = 'https://chat.whatsapp.com/' + (await socket.groupInviteCode(g.id)); } catch {}
+            return res.json({ status: 'success', id: g.id, link });
+        }
+        return res.status(400).json({ status: 'error', message: 'Unknown action' });
+    } catch (e) { return res.status(500).json({ status: 'error', message: (e && e.message) || 'Action failed' }); }
 });
 
 router.get('/stats', async (req, res) => {
