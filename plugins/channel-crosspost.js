@@ -82,6 +82,52 @@ async function resolveChannelJid(conn, input) {
     return meta?.id || null;
 }
 
+// ===========================================================================
+// .chreact — react to ONE channel post from its link, WITHOUT following the
+// channel (Ahmad: "only reacts Jain, no follow"). Default is react-only; if
+// WhatsApp refuses a react on a channel the account doesn't follow, the user
+// can explicitly opt in with ".chreact follow <link>".
+// ===========================================================================
+const chreactCooldown = new Map();
+cmd({
+    pattern: "chreact",
+    alias: ["channelreact", "reactch"],
+    desc: "React to a channel post from its link — no follow needed",
+    category: "tools",
+    react: "❤️",
+    use: ".chreact https://whatsapp.com/channel/XXXX/952 ❤️",
+    filename: __filename
+}, async (conn, mek, m, { args, reply, sender }) => {
+    const parts = [...args];
+    let useFollow = false;
+    if ((parts[0] || '').toLowerCase() === 'follow') { useFollow = true; parts.shift(); }
+    const link = parts.find(a => a.includes('whatsapp.com/channel/'));
+    if (!link) return reply(renderError('Give a channel POST link — e.g. .chreact https://whatsapp.com/channel/XXXX/952 ❤️'));
+    const seg = link.split('whatsapp.com/channel/')[1].split('?')[0].split('/').filter(Boolean);
+    const postId = seg[1];
+    if (!postId || !/^\d+$/.test(postId)) return reply(renderError('That link has no post number at the end — open the post inside the channel and copy ITS link.'));
+    const emojiArg = parts.find(a => a !== link && /\p{Extended_Pictographic}/u.test(a));
+    const emoji = emojiArg || '❤️';
+    const now = Date.now();
+    if (now - (chreactCooldown.get(sender) || 0) < 10000) return reply(renderError('Easy — wait a few seconds between reacts.'));
+    chreactCooldown.set(sender, now);
+    try {
+        const jid = await resolveChannelJid(conn, link);
+        if (!jid) return reply(renderError('Could not resolve that channel link.'));
+        if (useFollow) { try { await conn.newsletterFollow(jid); } catch {} }
+        await conn.newsletterReactMessage(jid, postId.toString(), emoji);
+        let chName = jid.split('@')[0];
+        try { const meta = await conn.newsletterMetadata('jid', jid); if (meta && meta.name) chName = meta.name; } catch {}
+        return reply(renderLuxe('Channel React', [
+            `${emoji} Reacted on ${chName}`,
+            useFollow ? '📌 Followed the channel first — you asked for that' : '🚫 Not following — react only, just like you wanted'
+        ]));
+    } catch (e) {
+        if (!useFollow) return reply(renderError(`React failed: ${e.message}\nWhatsApp may want a follow first — try: .chreact follow ${link}`));
+        return reply(renderError('React failed: ' + e.message));
+    }
+});
+
 cmd({
     // 🆕 (Ahmad: ".chnfor yeh users kay lyay karo" — open this up, not
     // owner-only anymore) — any user of the bot can now set up their own
