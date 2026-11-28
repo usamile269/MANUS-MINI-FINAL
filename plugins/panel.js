@@ -77,6 +77,39 @@ cmd({
 });
 
 cmd({
+    pattern: "idcard",
+    alias: ["myidcard", "membercard"],
+    desc: "🪪 Get your Ahmad MD member ID card as an image",
+    category: "settings",
+    react: "🪪",
+    use: ".idcard",
+    filename: __filename
+}, async (conn, mek, m, { isOwner, isMe, botNumber, reply }) => {
+    if (!isMe && !isOwner) {
+        return reply(box('ID CARD', ['⛔ The ID card belongs to the number paired with this bot — only they can make it.']));
+    }
+    try {
+        const { generateIdCard } = require('../lib/idcard');
+        const { getUserConfigFromMongoDB } = require('../lib/database');
+        const { getSiteSettings } = require('../data/SiteSettings');
+        const ownJid = `${botNumber}@s.whatsapp.net`;
+        let picUrl = null;
+        try { picUrl = await conn.profilePictureUrl(ownJid, 'image'); } catch {}
+        let logoUrl = '';
+        try { logoUrl = (await getSiteSettings()).botImageUrl || ''; } catch {}
+        let botName = 'Ahmad MD';
+        try { botName = (await getUserConfigFromMongoDB(botNumber)).BOT_NAME || botName; } catch {}
+        const buf = await generateIdCard({
+            name: conn.user?.name || '', number: botNumber, picUrl, logoUrl,
+            botName, statusText: 'Connected', connected: true
+        });
+        await conn.sendMessage(ownJid, { image: buf, caption: '🪪 *Your Ahmad MD Member Card*\n\nSave it, share it, put it on your status 😎' }, { quoted: mek });
+    } catch (e) {
+        return reply(box('ID CARD', [`❌ Card could not be made right now: ${e.message}`]));
+    }
+});
+
+cmd({
     pattern: "panel",
     alias: ["mypanel", "webpanel"],
     desc: "🌐 Open your My Panel (web) — manage your bot from the website",

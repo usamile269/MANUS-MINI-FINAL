@@ -4675,6 +4675,29 @@ router.post('/panel-action', adminRateLimit, express.json(), async (req, res) =>
             ahmadPair(number, mockRes).catch(() => {});
             return res.json({ status: 'success', message: 'Reconnecting — give it a minute, then refresh' });
         }
+        if (action === 'idcard') {
+            try {
+                const { generateIdCard } = require('./lib/idcard');
+                const cfg2 = await getUserConfigFromMongoDB(number).catch(() => ({}));
+                let picUrl = null, waName = '';
+                if (socket) {
+                    picUrl = await dashPic(number, socket).catch(() => null);
+                    try { waName = socket.user?.name || ''; } catch {}
+                }
+                let logoUrl = '';
+                try { logoUrl = (await getSiteSettings()).botImageUrl || ''; } catch {}
+                const created = socketCreationTime.get(number);
+                const up = created ? Math.floor((Date.now() - created) / 1000) : 0;
+                const upTxt = up >= 86400 ? Math.floor(up / 86400) + 'd ' + Math.floor(up % 86400 / 3600) + 'h' : up >= 3600 ? Math.floor(up / 3600) + 'h ' + Math.floor(up % 3600 / 60) + 'm' : Math.floor(up / 60) + 'm';
+                const buf = await generateIdCard({
+                    name: waName, number, picUrl, logoUrl,
+                    botName: cfg2.BOT_NAME || 'Ahmad MD',
+                    statusText: connected ? `Connected · uptime ${upTxt}` : 'Offline',
+                    connected
+                });
+                return res.json({ status: 'success', image: 'data:image/png;base64,' + buf.toString('base64') });
+            } catch (e) { return res.status(500).json({ status: 'error', message: 'Card could not be made: ' + (e.message || 'error') }); }
+        }
         if (!connected) return res.status(400).json({ status: 'error', message: 'Your number is not connected right now' });
         if (action === 'post-status') {
             const text = String(b.text || '').trim().slice(0, 700);
