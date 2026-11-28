@@ -81,7 +81,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '13mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
 const BUILD_ID = process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT_SHA || 'source-a1e3cdc';

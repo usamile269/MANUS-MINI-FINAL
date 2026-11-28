@@ -4583,7 +4583,7 @@ router.post('/dashboard-send', requireAdminOrApiKey, adminRateLimit, express.jso
 // personal password they get from .panelpass (hashed in PanelUser, token
 // binds to exactly one number server-side). Design/spec:
 // ~/workspace/ahmad-md-user-panel/SPEC.md
-const PANEL_SETTING_KEYS = ['WORK_TYPE', 'BOT_NAME', 'AUTO_TYPING', 'AUTO_RECORDING', 'AUTO_REACT', 'READ_MESSAGE', 'ANTI_CALL', 'AUTO_VIEW_STATUS', 'AUTO_LIKE_STATUS', 'AUTO_STATUS_REPLY', 'AUTO_STATUS_MSG'];
+const PANEL_SETTING_KEYS = ['WORK_TYPE', 'BOT_NAME', 'PREFIX', 'AUTO_TYPING', 'AUTO_RECORDING', 'AUTO_REACT', 'READ_MESSAGE', 'ANTI_CALL', 'AUTO_VIEW_STATUS', 'AUTO_LIKE_STATUS', 'AUTO_STATUS_REPLY', 'AUTO_STATUS_MSG'];
 const PANEL_PERSONA_KEYS = ['PANEL_AI_NAME', 'PANEL_AI_MOOD', 'PANEL_AI_CALLME', 'PANEL_AI_LANG', 'PANEL_AI_STYLE'];
 async function panelAuth(req, res) {
     const token = String((req.headers['x-panel-token'] || req.query.token || (req.body && req.body.token) || '')).trim();
@@ -4630,10 +4630,10 @@ router.get('/panel-data', adminRateLimit, async (req, res) => {
         const persona = {}; for (const k of PANEL_PERSONA_KEYS) persona[k] = cfg[k] !== undefined ? cfg[k] : '';
         const panelSince = await getPanelCreatedAt(number).catch(() => null);
         const notice = await getPanelNotice().catch(() => null);
-        return res.json({ status: 'success', generatedAt: new Date().toISOString(), number, name, pic, connected, uptimeSec: st.uptime || 0, connectionTime: st.connectionTime || null, panelSince, settings, persona, groups, usage, notice, hasMenuImage: !!cfg.MENU_IMAGE, hasMenuAudio: !!cfg.MENU_AUDIO });
+        return res.json({ status: 'success', generatedAt: new Date().toISOString(), number, name, pic, connected, uptimeSec: st.uptime || 0, connectionTime: st.connectionTime || null, panelSince, settings, persona, groups, usage, notice, hasMenuImage: !!cfg.MENU_IMAGE, hasMenuAudio: !!cfg.MENU_AUDIO, hasMenuVideo: !!cfg.MENU_VIDEO });
     } catch (e) { return res.status(500).json({ status: 'error', message: 'Failed to load your panel' }); }
 });
-router.post('/panel-action', adminRateLimit, express.json(), async (req, res) => {
+router.post('/panel-action', adminRateLimit, express.json({ limit: '13mb' }), async (req, res) => {
     const number = await panelAuth(req, res); if (!number) return;
     const b = req.body || {};
     const action = String(b.action || '');
@@ -4646,8 +4646,18 @@ router.post('/panel-action', adminRateLimit, express.json(), async (req, res) =>
             const clean = {};
             for (const k of keys) if (incoming[k] !== undefined) clean[k] = String(incoming[k]).slice(0, 300);
             if (clean.WORK_TYPE && !['public', 'private'].includes(clean.WORK_TYPE)) delete clean.WORK_TYPE;
+            if (clean.PREFIX !== undefined) {
+                // Same rule as .setprefixall: one character/emoji, or "noprefix".
+                const p = String(clean.PREFIX).trim();
+                if (p === '') clean.PREFIX = '';
+                else if (p === 'noprefix' || [...p].length === 1) clean.PREFIX = p;
+                else return res.status(400).json({ status: 'error', message: 'Prefix must be one character (e.g. . ! #) or "noprefix"' });
+            }
             if (!Object.keys(clean).length) return res.status(400).json({ status: 'error', message: 'Nothing to save' });
             await updateUserConfigInMongoDB(number, clean);
+            // Live-apply like .setprefixall's updateConfig does, so the new
+            // prefix works at once instead of after a reconnect.
+            if (clean.PREFIX) { try { config.PREFIX = clean.PREFIX; } catch {} }
             return res.json({ status: 'success' });
         }
         if (action === 'change-password') {
@@ -4658,14 +4668,17 @@ router.post('/panel-action', adminRateLimit, express.json(), async (req, res) =>
             await setPanelPassword(number, next);
             return res.json({ status: 'success', message: 'Password changed — please log in again' });
         }
-        if (action === 'menu-image' || action === 'menu-audio') {
-            // Same base64 storage the .setbotdp / .setbotaudio commands use.
-            const key = action === 'menu-image' ? 'MENU_IMAGE' : 'MENU_AUDIO';
+        if (action === 'menu-image' || action === 'menu-audio' || action === 'menu-video') {
+            // Same base64 storage the .setbotdp / .setbotaudio / .setbotvideo commands use.
+            const key = action === 'menu-image' ? 'MENU_IMAGE' : action === 'menu-audio' ? 'MENU_AUDIO' : 'MENU_VIDEO';
             const raw = String(b.data || '');
             if (!raw) { await updateUserConfigInMongoDB(number, { [key]: null }); return res.json({ status: 'success', message: 'Removed — the default will be used' }); }
             const m = raw.match(/^data:[^;]+;base64,(.+)$/);
             const b64 = m ? m[1] : raw;
-            if (b64.length > 2 * 1024 * 1024) return res.status(400).json({ status: 'error', message: 'File is too large' });
+            // Video follows .setbotvideo's 8 MB file limit (~11 MB as base64);
+            // image/audio keep the smaller cap.
+            const cap = action === 'menu-video' ? 11 * 1024 * 1024 : 2 * 1024 * 1024;
+            if (b64.length > cap) return res.status(400).json({ status: 'error', message: 'File is too large' });
             await updateUserConfigInMongoDB(number, { [key]: b64 });
             return res.json({ status: 'success' });
         }
