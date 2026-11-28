@@ -2735,10 +2735,11 @@ async function ahmadPair(number, res = null) {
                 // group-addressed message wrapped in groupStatusMessage /
                 // groupStatusMessageV2 (an IFutureProofMessage; Baileys keeps
                 // the wrapper on mek.message). It is NOT a chat message, so it
-                // is consumed here. WhatsApp lets NOBODY delete someone else's
-                // status — when the group has .antistatus on and the status
-                // text carries a link, the action lands on the MEMBER
-                // (warn in the group, or kick when the bot is admin).
+                // is consumed here. When the group has .antistatus on and the
+                // status text carries a link, the bot acts: warn in the group,
+                // and in delete/kick modes (bot admin) it also admin-deletes
+                // the status itself — a group status is a group message, so
+                // admins get a delete option for it, unlike personal statuses.
                 const gsWrap = mek.message && (mek.message.groupStatusMessage || mek.message.groupStatusMessageV2);
                 if (gsWrap && mek.key.remoteJid && mek.key.remoteJid.endsWith('@g.us')) {
                     try {
@@ -2766,10 +2767,24 @@ async function ahmadPair(number, res = null) {
                                         const action = gs.antistatusAction || 'warn';
                                         const botIsAdmin = !!(botP && botP.admin);
                                         const target = (author.endsWith('@lid') && authorAlt) ? authorAlt : author;
-                                        const needsAdminNote = (action === 'kick' && !botIsAdmin)
-                                            ? `\n┃❃│ ⚠️ Bot isn't admin — couldn't remove them.\n┃❃│ ⚠️ Make bot admin to enable kick.`
+                                        // Unlike a personal status, a GROUP status is a
+                                        // message in the group — a group admin (the bot
+                                        // included) gets a delete option for it in the
+                                        // app, and the same admin-delete revoke used by
+                                        // antilink applies here. Best effort: WhatsApp's
+                                        // server decides whether the revoke is honoured.
+                                        let deleted = false;
+                                        if (action !== 'warn' && botIsAdmin) {
+                                            try {
+                                                await conn.sendMessage(gid, { delete: { remoteJid: gid, fromMe: false, id: mek.key.id, participant: author } });
+                                                deleted = true;
+                                            } catch {}
+                                        }
+                                        const needsAdminNote = (action !== 'warn' && !botIsAdmin)
+                                            ? `\n┃❃│ ⚠️ Bot isn't admin — couldn't delete/kick.\n┃❃│ ⚠️ Make bot admin to enable this.`
                                             : '';
-                                        const alert = `╭═══ 🔗 ANTI-STATUS ═══⊷\n┃❃╭──────────────\n┃❃│ 🚫 Links aren't allowed in group status\n┃❃│ 👤 @${norm(target)}\n┃❃│ ⚙️ Action: ${action.toUpperCase()}${needsAdminNote}\n┃❃╰───────────────\n╰═════════════════⊷`;
+                                        const deletedLine = deleted ? `\n┃❃│ 🗑️ Status deleted by bot` : '';
+                                        const alert = `╭═══ 🔗 ANTI-STATUS ═══⊷\n┃❃╭──────────────\n┃❃│ 🚫 Links aren't allowed in group status\n┃❃│ 👤 @${norm(target)}\n┃❃│ ⚙️ Action: ${action.toUpperCase()}${deletedLine}${needsAdminNote}\n┃❃╰───────────────\n╰═════════════════⊷`;
                                         await conn.sendMessage(gid, { text: alert, mentions: [target] }).catch(() => {});
                                         if (action === 'kick' && botIsAdmin) {
                                             await conn.groupParticipantsUpdate(gid, [target], 'remove').catch(() => {});

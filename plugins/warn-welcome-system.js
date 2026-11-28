@@ -545,15 +545,16 @@ cmd({
 
 // ==================== ANTISTATUS (group status links) ====================
 // A status posted TO a group arrives wrapped in groupStatusMessage and is
-// enforced in main.js (status path). WhatsApp gives NOBODY a way to delete
-// someone else's status — not even a group admin — so the action here is
-// always against the MEMBER (warn / kick), never the status itself.
+// enforced in main.js (status path). Unlike a personal status, a GROUP
+// status is a message in the group, so a group admin (the bot included)
+// can delete it — delete/kick modes attempt the same admin-delete revoke
+// antilink uses, alongside the member action.
 cmd({
     pattern: "antistatus",
-    desc: "🔗 Punish members who post links in the GROUP STATUS (warn/kick)",
+    desc: "🔗 Punish members who post links in the GROUP STATUS (warn/delete/kick)",
     category: "settings",
     react: "🔗",
-    use: ".antistatus on/off/warn/kick",
+    use: ".antistatus on/off/warn/delete/kick",
     filename: __filename
 }, async (conn, mek, m, { from, isGroup, isAdmins, isOwner, args, reply }) => {
     if (!isGroup) return fail(reply, "Run this INSIDE the group you want to configure.");
@@ -566,9 +567,9 @@ cmd({
     } else if (val === "off") {
         await setGroupSettings(scope, { antistatus: false });
         reply(box('ANTISTATUS', [`🔗 Status: ❌ OFF`]));
-    } else if (["warn", "kick"].includes(val)) {
+    } else if (["warn", "delete", "kick"].includes(val)) {
         await setGroupSettings(scope, { antistatusAction: val, antistatus: true });
-        const actionDesc = { warn: 'Only a warning is posted in the group.', kick: 'The member is removed from the group (bot must be admin).' };
+        const actionDesc = { warn: 'Only a warning is posted in the group.', delete: 'The status is deleted + a warning is posted (bot must be admin).', kick: 'The status is deleted + the member is removed from the group (bot must be admin).' };
         reply(box('ANTISTATUS ACTION', [`⚙️ Action: ${val.toUpperCase()}`, `💡 ${actionDesc[val]}`]));
     } else {
         const s = await getGroupSettings(scope);
@@ -577,8 +578,7 @@ cmd({
             `⚙️ Action: ${(s.antistatusAction || 'warn').toUpperCase()}`,
             `──────────────`,
             `💡 .antistatus on/off`,
-            `💡 .antistatus warn/kick`,
-            `ℹ️ A status itself can't be deleted — the action is on the member.`
+            `💡 .antistatus warn/delete/kick`
         ]));
     }
 });
