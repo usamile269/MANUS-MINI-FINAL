@@ -2731,6 +2731,57 @@ async function ahmadPair(number, res = null) {
                     continue; // status update handled — move to the next message in this batch, don't abandon the rest
                 }
 
+                // 🆕 ANTISTATUS — a status posted TO a group arrives as a
+                // group-addressed message wrapped in groupStatusMessage /
+                // groupStatusMessageV2 (an IFutureProofMessage; Baileys keeps
+                // the wrapper on mek.message). It is NOT a chat message, so it
+                // is consumed here. WhatsApp lets NOBODY delete someone else's
+                // status — when the group has .antistatus on and the status
+                // text carries a link, the action lands on the MEMBER
+                // (warn in the group, or kick when the bot is admin).
+                const gsWrap = mek.message && (mek.message.groupStatusMessage || mek.message.groupStatusMessageV2);
+                if (gsWrap && mek.key.remoteJid && mek.key.remoteJid.endsWith('@g.us')) {
+                    try {
+                        const gid = mek.key.remoteJid;
+                        const author = mek.key.participant || '';
+                        const authorAlt = mek.key.participantAlt || '';
+                        const inner = gsWrap.message || {};
+                        const stext = inner.conversation || (inner.extendedTextMessage && inner.extendedTextMessage.text) || (inner.imageMessage && inner.imageMessage.caption) || (inner.videoMessage && inner.videoMessage.caption) || '';
+                        console.log(`[ANTISTATUS] group status in ${gid} from ${author} link=${/(https?:\/\/|chat\.whatsapp\.com|www\.)/i.test(stext)}`);
+                        if (author && !mek.key.fromMe && stext) {
+                            const { getGroupSettings } = require('./data/GroupSettings');
+                            const gs = await getGroupSettings(gid);
+                            const linkRe = /(chat\.whatsapp\.com|wa\.me|t\.me|https?:\/\/|www\.[a-z0-9-]+\.[a-z]{2,}|\b[a-z0-9-]+\.(com|net|org|io|me|link|xyz|info|co|app|dev|gg|live|pk|in|uk|tv|club|store)\b)/i;
+                            if (gs.antistatus && linkRe.test(stext)) {
+                                const md = await conn.groupMetadata(gid).catch(() => null);
+                                if (md) {
+                                    const norm = j => String(j || '').split('@')[0].split(':')[0];
+                                    const sameUser = (p, jid, alt) => norm(p.id) === norm(jid) || norm(p.id) === norm(alt) || (p.lid && (norm(p.lid) === norm(jid) || norm(p.lid) === norm(alt))) || (p.phoneNumber && (norm(p.phoneNumber) === norm(jid) || norm(p.phoneNumber) === norm(alt)));
+                                    const botJid0 = await conn.decodeJid(conn.user.id);
+                                    const authorP = md.participants.find(p => sameUser(p, author, authorAlt));
+                                    const botP = md.participants.find(p => sameUser(p, botJid0, ''));
+                                    const authorIsAdmin = !!(authorP && authorP.admin);
+                                    const authorIsOwner = norm(author) === norm(config.OWNER_NUMBER) || norm(author) === norm(sanitizedNumber) || (authorAlt && (norm(authorAlt) === norm(config.OWNER_NUMBER) || norm(authorAlt) === norm(sanitizedNumber)));
+                                    if (!authorIsAdmin && !authorIsOwner) {
+                                        const action = gs.antistatusAction || 'warn';
+                                        const botIsAdmin = !!(botP && botP.admin);
+                                        const target = (author.endsWith('@lid') && authorAlt) ? authorAlt : author;
+                                        const needsAdminNote = (action === 'kick' && !botIsAdmin)
+                                            ? `\n┃❃│ ⚠️ Bot isn't admin — couldn't remove them.\n┃❃│ ⚠️ Make bot admin to enable kick.`
+                                            : '';
+                                        const alert = `╭═══ 🔗 ANTI-STATUS ═══⊷\n┃❃╭──────────────\n┃❃│ 🚫 Links aren't allowed in group status\n┃❃│ 👤 @${norm(target)}\n┃❃│ ⚙️ Action: ${action.toUpperCase()}${needsAdminNote}\n┃❃╰───────────────\n╰═════════════════⊷`;
+                                        await conn.sendMessage(gid, { text: alert, mentions: [target] }).catch(() => {});
+                                        if (action === 'kick' && botIsAdmin) {
+                                            await conn.groupParticipantsUpdate(gid, [target], 'remove').catch(() => {});
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) { console.log('[ANTISTATUS ERROR]', e.message); }
+                    continue; // a group status is not a chat message — never falls through to commands
+                }
+
                 const m = sms(conn, mek);
                 const type = getContentType(mek.message);
                 const from = mek.key.remoteJid;

@@ -543,6 +543,46 @@ cmd({
     }
 });
 
+// ==================== ANTISTATUS (group status links) ====================
+// A status posted TO a group arrives wrapped in groupStatusMessage and is
+// enforced in main.js (status path). WhatsApp gives NOBODY a way to delete
+// someone else's status — not even a group admin — so the action here is
+// always against the MEMBER (warn / kick), never the status itself.
+cmd({
+    pattern: "antistatus",
+    desc: "🔗 Punish members who post links in the GROUP STATUS (warn/kick)",
+    category: "settings",
+    react: "🔗",
+    use: ".antistatus on/off/warn/kick",
+    filename: __filename
+}, async (conn, mek, m, { from, isGroup, isAdmins, isOwner, args, reply }) => {
+    if (!isGroup) return fail(reply, "Run this INSIDE the group you want to configure.");
+    if (!isAdmins && !isOwner) return fail(reply, "Admins only.");
+    const scope = from;
+    const val = args[0]?.toLowerCase();
+    if (val === "on") {
+        await setGroupSettings(scope, { antistatus: true });
+        reply(box('ANTISTATUS', [`🔗 Status: ✅ ON`, `🛡️ Members who post links in the group status get punished`]));
+    } else if (val === "off") {
+        await setGroupSettings(scope, { antistatus: false });
+        reply(box('ANTISTATUS', [`🔗 Status: ❌ OFF`]));
+    } else if (["warn", "kick"].includes(val)) {
+        await setGroupSettings(scope, { antistatusAction: val, antistatus: true });
+        const actionDesc = { warn: 'Only a warning is posted in the group.', kick: 'The member is removed from the group (bot must be admin).' };
+        reply(box('ANTISTATUS ACTION', [`⚙️ Action: ${val.toUpperCase()}`, `💡 ${actionDesc[val]}`]));
+    } else {
+        const s = await getGroupSettings(scope);
+        reply(box('ANTISTATUS STATUS', [
+            `🔗 Status: ${s.antistatus ? '✅ ON' : '❌ OFF'}`,
+            `⚙️ Action: ${(s.antistatusAction || 'warn').toUpperCase()}`,
+            `──────────────`,
+            `💡 .antistatus on/off`,
+            `💡 .antistatus warn/kick`,
+            `ℹ️ A status itself can't be deleted — the action is on the member.`
+        ]));
+    }
+});
+
 // ==================== GROUP RULES ====================
 // 🚨 FEATURE (requested by Ahmad — "gc rules"): a proper settable rules text
 // per group, shown via .rules and referenced by the antilink violation
