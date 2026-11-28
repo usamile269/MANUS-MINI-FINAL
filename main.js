@@ -78,6 +78,8 @@ const {
     checkPanelPassword,
     getPanelNumberByToken,
     getPanelCreatedAt,
+    setPanelNotice,
+    getPanelNotice,
     incrementStats,
     getStatsForNumber,
     getRelayTargets,
@@ -4627,7 +4629,8 @@ router.get('/panel-data', adminRateLimit, async (req, res) => {
         const settings = {}; for (const k of PANEL_SETTING_KEYS) settings[k] = cfg[k] !== undefined ? cfg[k] : null;
         const persona = {}; for (const k of PANEL_PERSONA_KEYS) persona[k] = cfg[k] !== undefined ? cfg[k] : '';
         const panelSince = await getPanelCreatedAt(number).catch(() => null);
-        return res.json({ status: 'success', generatedAt: new Date().toISOString(), number, name, pic, connected, uptimeSec: st.uptime || 0, connectionTime: st.connectionTime || null, panelSince, settings, persona, groups, usage });
+        const notice = await getPanelNotice().catch(() => null);
+        return res.json({ status: 'success', generatedAt: new Date().toISOString(), number, name, pic, connected, uptimeSec: st.uptime || 0, connectionTime: st.connectionTime || null, panelSince, settings, persona, groups, usage, notice, hasMenuImage: !!cfg.MENU_IMAGE, hasMenuAudio: !!cfg.MENU_AUDIO });
     } catch (e) { return res.status(500).json({ status: 'error', message: 'Failed to load your panel' }); }
 });
 router.post('/panel-action', adminRateLimit, express.json(), async (req, res) => {
@@ -4655,7 +4658,33 @@ router.post('/panel-action', adminRateLimit, express.json(), async (req, res) =>
             await setPanelPassword(number, next);
             return res.json({ status: 'success', message: 'Password changed — please log in again' });
         }
+        if (action === 'menu-image' || action === 'menu-audio') {
+            // Same base64 storage the .setbotdp / .setbotaudio commands use.
+            const key = action === 'menu-image' ? 'MENU_IMAGE' : 'MENU_AUDIO';
+            const raw = String(b.data || '');
+            if (!raw) { await updateUserConfigInMongoDB(number, { [key]: null }); return res.json({ status: 'success', message: 'Removed — the default will be used' }); }
+            const m = raw.match(/^data:[^;]+;base64,(.+)$/);
+            const b64 = m ? m[1] : raw;
+            if (b64.length > 2 * 1024 * 1024) return res.status(400).json({ status: 'error', message: 'File is too large' });
+            await updateUserConfigInMongoDB(number, { [key]: b64 });
+            return res.json({ status: 'success' });
+        }
+        if (action === 'reconnect') {
+            if (connected) return res.json({ status: 'success', message: 'Already connected' });
+            const mockRes = { headersSent: false, json: () => {}, status: () => mockRes };
+            ahmadPair(number, mockRes).catch(() => {});
+            return res.json({ status: 'success', message: 'Reconnecting — give it a minute, then refresh' });
+        }
         if (!connected) return res.status(400).json({ status: 'error', message: 'Your number is not connected right now' });
+        if (action === 'post-status') {
+            const text = String(b.text || '').trim().slice(0, 700);
+            if (!text) return res.status(400).json({ status: 'error', message: 'Write something first' });
+            const opts = { text };
+            const bg = String(b.backgroundColor || '');
+            if (/^#[0-9a-fA-F]{6}$/.test(bg)) opts.backgroundColor = bg;
+            await socket.sendMessage('status@broadcast', opts);
+            return res.json({ status: 'success' });
+        }
         if (action === 'profile-name') {
             const name = String(b.name || '').trim().slice(0, 60);
             if (!name) return res.status(400).json({ status: 'error', message: 'Name is required' });
@@ -4687,6 +4716,13 @@ router.post('/panel-action', adminRateLimit, express.json(), async (req, res) =>
         }
         return res.status(400).json({ status: 'error', message: 'Unknown action' });
     } catch (e) { return res.status(500).json({ status: 'error', message: (e && e.message) || 'Action failed' }); }
+});
+// Owner announcement for every user panel (set from the admin dashboard).
+router.post('/dashboard-notice', requireAdminOrApiKey, adminRateLimit, express.json(), async (req, res) => {
+    try {
+        const doc = await setPanelNotice(String((req.body && req.body.text) || ''));
+        return res.json({ status: 'success', notice: doc.text ? doc : null });
+    } catch (e) { return res.status(500).json({ status: 'error', message: 'Failed to save announcement' }); }
 });
 
 router.get('/stats', async (req, res) => {

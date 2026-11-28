@@ -1,19 +1,20 @@
 // ============================================================================
 // plugins/panel.js — User Web Panel ("My Panel") access commands.
 //
-// .panelpass — generates a FRESH panel password for the paired number and
-//              sends it ONLY to the owner's own DM (never in a group, where
-//              anyone could read it). Every new .panelpass kills the old
-//              password. Only the person who paired this number (isMe) or
-//              the global owner can run it — the password belongs to the
-//              number it was paired with, nobody else can request it.
+// .panelpass — sends the paired number's CURRENT panel password to the
+//              owner's own DM only (never in a group, where anyone could
+//              read it). If the user changed their password in the panel,
+//              .panelpass returns THAT SAME password (the owner asked for
+//              exactly this). A fresh password is generated only when none
+//              exists yet. Only the person who paired this number (isMe)
+//              or the global owner can run it.
 // .panel     — sends the panel link + a reminder how to get the password.
 //
 // Panel itself: https://ahmadminipair.vercel.app/panel (login = number +
 // this password). Passwords are stored hashed (lib/database.js PanelUser).
 // ============================================================================
 const { cmd } = require('../ahmad-core');
-const { setPanelPassword } = require('../lib/database');
+const { setPanelPassword, getPanelPassword } = require('../lib/database');
 const { randomFooter, toSansBoldItalic } = require('../lib/menu-styles');
 
 const PANEL_URL = 'https://ahmadminipair.vercel.app/panel';
@@ -46,26 +47,32 @@ cmd({
         return reply(box('MY PANEL', ['⛔ Only the number paired with this bot can get its panel password.']));
     }
     try {
-        const password = genPassword();
-        await setPanelPassword(botNumber, password);
+        let password = await getPanelPassword(botNumber).catch(() => null);
+        let isNew = false;
+        if (!password) {
+            password = genPassword();
+            await setPanelPassword(botNumber, password);
+            isNew = true;
+        }
         const ownJid = `${botNumber}@s.whatsapp.net`;
         await conn.sendMessage(ownJid, {
             text: box('MY PANEL PASSWORD', [
-                `🔐 Your new panel password:`,
+                isNew ? `🔐 Your new panel password:` : `🔐 Your panel password (the one you saved):`,
                 ``,
                 `   *${password}*`,
                 ``,
                 `🌐 Panel: ${PANEL_URL}`,
                 `📱 Login with your number + this password.`,
-                `♻️ This password replaced any old one.`,
+                `✏️ Change it any time from inside the panel —`,
+                `   .panelpass will then show the new one.`,
                 `🤫 Keep it private — anyone with it can open your panel.`
             ])
         });
         if (from !== ownJid) {
-            return reply(box('MY PANEL', ['✅ Your new panel password was sent to your DM.', '🤫 Never share it with anyone.']));
+            return reply(box('MY PANEL', ['✅ Your panel password was sent to your DM.', '🤫 Never share it with anyone.']));
         }
     } catch (e) {
-        return reply(box('MY PANEL', [`❌ Could not create a password right now: ${e.message}`]));
+        return reply(box('MY PANEL', [`❌ Could not fetch your password right now: ${e.message}`]));
     }
 });
 
